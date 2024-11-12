@@ -13,3 +13,8 @@ task_one_df <- read.csv("data1.csv")
 task_one_df
 
 ```
+
+#test_from_imar_for_pushpull
+x <- rnorm(5, 1, 2)
+x
+
