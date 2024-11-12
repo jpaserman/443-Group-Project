@@ -9,5 +9,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r}
-data <- jfksfjkds
+task_one_df <- read.csv("data1.csv")
+task_one_df
+
 ```
