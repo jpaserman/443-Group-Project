@@ -6,6 +6,7 @@ date: "2024-11-12"
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+options(warn=-1)
 ```
 
 ```{r parameters}
@@ -16,7 +17,7 @@ packages = list("caret",
 
 ```
 
-```{r setup}
+```{r, include=FALSE}
 set.seed(seed)
 
 for (package in packages){
@@ -28,8 +29,125 @@ for (package in packages){
 }
 ```
 
+
+# Task 1: binary classification
+
 ```{r}
 task_one_df <- read.csv(csv_file_one)
 
 str(task_one_df)
 ```
+
+
+## T1.1: exploratory data analysis and summary statistics (Peter?)
+
+```{r}
+
+```
+
+
+## T1.2: training and evaluating on various classifiers
+
+### Without PCA
+
+#### Linear Discriminant Analysis (LDA) (Imar)
+
+```{r}
+
+```
+
+#### Logistic classifier (Imar)
+
+```{r}
+
+```
+
+#### Quadratic Discriminant Analysis (QDA) (Chi)
+
+```{r}
+
+```
+
+#### Nearest Neighbor Classifier (k-NN) (Chi)
+
+```{r}
+
+```
+
+#### Gradient Boosting Decision Trees (GBDT) (Jonathan)
+
+```{r}
+
+```
+
+#### Random Forest (Jonathan)
+
+```{r}
+
+```
+
+#### Support Vector Machine (SVM) (Peter)
+
+```{r}
+
+```
+
+
+### With PCA
+
+#### Linear Discriminant Analysis (LDA) (Imar)
+
+```{r}
+
+```
+
+#### Logistic classifier (Imar)
+
+```{r}
+
+```
+
+#### Quadratic Discriminant Analysis (QDA) (Chi)
+
+```{r}
+
+```
+
+#### Nearest Neighbor Classifier (k-NN) (Chi)
+
+```{r}
+
+```
+
+#### Gradient Boosting Decision Trees (GBDT) (Jonathan)
+
+```{r}
+
+```
+
+#### Random Forest (Jonathan)
+
+```{r}
+
+```
+
+#### Support Vector Machine (SVM) (Peter)
+
+```{r}
+
+```
+
+
+## T1.3:
+
+## T1.4:
+
+
+# Task 2: feature selection
+
+## T2.1:
+
+## T2.2:
+
+## T2.3:
+
