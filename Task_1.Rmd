@@ -8,16 +8,28 @@ date: "2024-11-12"
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r}
-task_one_df <- read.csv("data1.csv")
-task_one_df
+```{r parameters}
+seed = 445
+csv_file_one = "data1.csv"
+packages = list("caret", 
+                "randomForest")
 
 ```
 
-#test_from_imar_for_pushpull
-x <- rnorm(5, 1, 2)
-x
+```{r setup}
+set.seed(seed)
 
-Test test -- Peter :)
+for (package in packages){
+  if(!require(package, character.only = TRUE)){
+    install.packages(package, character.only = TRUE)
+  } else {
+    library(package, character.only = TRUE)
+  }
+}
+```
 
-Test test test -- Chi
+```{r}
+task_one_df <- read.csv(csv_file_one)
+
+str(task_one_df)
+```
