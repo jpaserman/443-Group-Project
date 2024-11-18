@@ -1,5 +1,5 @@
 ---
-title: "Task 1 Test"
+title: "Task 1 RmD"
 output: html_document
 date: "2024-11-12"
 ---
@@ -10,10 +10,11 @@ options(warn=-1)
 ```
 
 ```{r parameters}
-seed = 445
+set.seed(445)
 csv_file_one = "data1.csv"
 packages = list("caret", 
-                "randomForest")
+                "randomForest", "tree"
+)
 
 ```
 
@@ -36,13 +37,40 @@ for (package in packages){
 task_one_df <- read.csv(csv_file_one)
 
 str(task_one_df)
+task_one_df$label_as_factor <- as.factor(task_one_df$label)
 ```
 
 
 ## T1.1: exploratory data analysis and summary statistics (Peter?)
 
 ```{r}
+table(task_one_df$label)
+library(ggplot2)
+nrow(task_one_df)
+ncol(task_one_df)
 
+## Checking if there are any rows that have missing values... Keep this hashed unless you want to check, because it takes a while to run
+# for (i in 1:nrow(task_one_df)) {
+#   if (any(is.na(task_one_df[i, ]))) {
+#     print(paste("Row", i, "contains NA values."))
+#   }
+# }
+
+# twenty_random_columns <- sample(names(task_one_df)[-1], 20)
+
+## Create boxplots for the random sample of columns
+for (column in twenty_random_columns) {
+    p <- ggplot(task_one_df, aes_string(x = "label", y = column)) +
+        geom_jitter(width = 0.2, height = 0) +  # Use jitter to avoid overplotting
+        ggtitle(paste("Scatter Plot of", column, "by Label")) +
+        theme_minimal()
+    print(p)
+}
+
+# Split Data into Test and Train (We should all use the same data)
+train_indeces <-sample(1:nrow(task_one_df), 3829) # 3829 is 70% of the data
+train_data <- task_one_df[train_indeces,]
+test_data <-task_one_df[-train_indeces,]
 ```
 
 
@@ -77,6 +105,25 @@ str(task_one_df)
 #### Gradient Boosting Decision Trees (GBDT) (Jonathan)
 
 ```{r}
+## Running Tree on all the variables on train data
+tree.rna_features <- tree(label_as_factor ~ ., split="deviance", data = train_data)
+summary(tree.rna_features)
+plot(tree.rna_features)
+text(tree.rna_features, pretty = 0, cex = 1)
+
+## Predict on Test variables
+tree.pred <-predict(tree.rna_features, test_data, type="class")
+
+## Mis-classification Rate and Confusion Matrix
+table(tree.pred,test_data$label_as_factor)
+mean(tree.pred!=test_data$label_as_factor)
+
+
+# ## Pruning, does it improve anything? 
+prune.rna_features <- prune.tree(tree.rna_features, best = 20)
+# plot(tree.rna_features)
+# text(tree.rna_features, pretty = 0)
+
 
 ```
 
