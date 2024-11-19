@@ -10,11 +10,12 @@ options(warn=-1)
 ```
 
 ```{r parameters}
-set.seed(445)
+seed = 443
 csv_file_one = "data1.csv"
 packages = list("caret", 
-                "randomForest", "tree"
-)
+                "randomForest", 
+                "tree"
+                )
 
 ```
 
@@ -122,7 +123,9 @@ mean(tree.pred!=test_data$label_as_factor)
 cv.rna_data <- cv.tree(tree.rna_features)
 plot(cv.rna_data$size, cv.rna_data$dev, type ='b')
 ```
+
 Above we use a gradient-boosting tree search to find When using the GBDT, we get that there are 11 features that are the most important to classifying whether a cell is a T Regulatory Cell or a CD4-positive cell. However, we can see based on the tree that there are certain features that appear more than once. Based on the tree plot, we can determine that the most important regressor that helps determine if a cell is a Regulatory T cell or a CD4-positive cell is the IL7R. From the National Library of medicine ("https://www.ncbi.nlm.nih.gov/gene/3575"), IL7R is a protein encoded by a gene that plays a critical role in the development of lymph nodes. 
+
 ```{r}
 prune.rna_features <- prune.tree(tree.rna_features, best = 6) #best argument sets # terminal nodes desired.
 plot(prune.rna_features)
@@ -188,14 +191,23 @@ yhat.rf <-predict(rf.rna_features, newdata=test_data)
 
 ```
 
-## T1.3:
+## T1.3: Improving F1 Score (???)
 
-## T1.4:
+Train and evaluating three classifiers of our choice with the goal of improving
+the F1 score (can use methods like bagging, boosting, and regularization).
 
-# Task 2: feature selection
+```{r}
 
-## T2.1:
+```
 
-## T2.2:
 
-## T2.3:
+## T1.4: Implement predictor (???)
+
+Choose the best approach from those above tested and implement our predictor
+as a function of our code.
+
+```{r}
+
+```
+
+
