@@ -132,6 +132,9 @@ text(prune.rna_features, pretty = 0)
 #### Random Forest (Jonathan)
 
 ```{r}
+rna_features.test <- test_data$label_as_factor
+rf.rna_features <-randomForest(label_as_factor~., data=train_data, mtry=14, importance=TRUE, n.tree = 5000)
+yhat.rf <-predict(rf.rna_features, newdata=test_data)
 
 ```
 
