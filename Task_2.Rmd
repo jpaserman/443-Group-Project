@@ -1,0 +1,81 @@
+---
+title: "Task 2 RmD"
+output: html_document
+date: "2024-11-19"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(warn=-1)
+```
+
+```{r parameters}
+seed = 443
+csv_file_two = "data2.csv.gz"
+packages = list("caret", 
+                "randomForest", 
+                "tree"
+                )
+
+```
+
+```{r, include=FALSE}
+set.seed(seed)
+
+for (package in packages){
+  if(!require(package, character.only = TRUE)){
+    install.packages(package, character.only = TRUE)
+  } else {
+    library(package, character.only = TRUE)
+  }
+}
+```
+
+
+# Task 2: feature selection
+
+```{r}
+task_two_df <- read.csv(csv_file_two)
+
+str(task_two_df)
+```
+
+```{r}
+table(task_two_df$label)
+```
+
+
+## T2.1: exploratory data analysis and summary statistics
+
+```{r}
+
+```
+
+
+## T2.2: train and evaluate feature selection methods
+
+Train and evaluate feature selection methods with the goal of achieving high 
+balanced accuracy using a minimal number of selected features. Use three 
+different approaches of your choice that were covered in the course.
+
+```{r}
+
+```
+
+
+## T2.3: additional feature selection methods
+
+Train and evaluate up to three additional feature selection methods, 
+other than those in T2.2, which may include methods not covered in the course, 
+with the goal of achieving high balanced accuracy using a minimal number of 
+selected features. Provide an explanation of each new method.
+
+For T2.2 and T2.3, your evaluation results should include the balanced accuracy 
+and the number of selected features achieved by each method for various numbers 
+of selected features. You may also compare the balanced accuracy achieved 
+by different methods for a similar number of selected features.
+
+```{r}
+
+```
+
