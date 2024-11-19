@@ -60,7 +60,7 @@ mean_table <- task_one_df %>%
   
   pivot_wider(names_from = label_as_factor, values_from = mean_value) %>%
   
-  mutate(diff = abs(mean_table$`CD4+T` - mean_table$TREG)) %>% 
+  mutate(diff = abs(`CD4+T` - TREG)) %>% 
   
   arrange(desc(diff))
   
