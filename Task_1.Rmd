@@ -13,14 +13,15 @@ options(warn=-1)
 set.seed(445)
 csv_file_one = "data1.csv"
 packages = list("caret", 
-                "randomForest", "tree"
+                "randomForest",
+                "tree",
+                "dplyr",
+                "tidyr"
 )
 
 ```
 
 ```{r, include=FALSE}
-set.seed(seed)
-
 for (package in packages){
   if(!require(package, character.only = TRUE)){
     install.packages(package, character.only = TRUE)
@@ -49,6 +50,23 @@ library(ggplot2)
 nrow(task_one_df)
 ncol(task_one_df)
 
+mean_table <- task_one_df %>% 
+  
+  select(!label) %>%
+  
+  group_by(label_as_factor) %>%
+  
+  summarise(across(everything(), mean, na.rm = TRUE)) %>% 
+  
+  pivot_longer(cols = -label_as_factor, names_to = 'genes', values_to = 'mean_value') %>%
+  
+  pivot_wider(names_from = label_as_factor, values_from = mean_value) %>%
+  
+  mutate(diff = abs(mean_table$`CD4+T` - mean_table$TREG)) %>% 
+  
+  arrange(desc(diff))
+  
+  
 ## Checking if there are any rows that have missing values... Keep this hashed unless you want to check, because it takes a while to run
 # for (i in 1:nrow(task_one_df)) {
 #   if (any(is.na(task_one_df[i, ]))) {
@@ -56,7 +74,7 @@ ncol(task_one_df)
 #   }
 # }
 
-# twenty_random_columns <- sample(names(task_one_df)[-1], 20)
+twenty_random_columns <- sample(names(task_one_df)[-1], 20)
 
 ## Create boxplots for the random sample of columns
 for (column in twenty_random_columns) {
