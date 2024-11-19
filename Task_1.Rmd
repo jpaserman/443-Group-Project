@@ -10,7 +10,7 @@ options(warn=-1)
 ```
 
 ```{r parameters}
-set.seed(445)
+seed = 443
 csv_file_one = "data1.csv"
 packages = list("caret", 
                 "randomForest",
@@ -31,7 +31,6 @@ for (package in packages){
 }
 ```
 
-
 # Task 1: binary classification
 
 ```{r}
@@ -40,7 +39,6 @@ task_one_df <- read.csv(csv_file_one)
 str(task_one_df)
 task_one_df$label_as_factor <- as.factor(task_one_df$label)
 ```
-
 
 ## T1.1: exploratory data analysis and summary statistics (Peter?)
 
@@ -91,7 +89,6 @@ train_data <- task_one_df[train_indeces,]
 test_data <-task_one_df[-train_indeces,]
 ```
 
-
 ## T1.2: training and evaluating on various classifiers
 
 ### Without PCA
@@ -137,17 +134,27 @@ table(tree.pred,test_data$label_as_factor)
 mean(tree.pred!=test_data$label_as_factor)
 
 
-# ## Pruning, does it improve anything? 
-prune.rna_features <- prune.tree(tree.rna_features, best = 20)
-# plot(tree.rna_features)
-# text(tree.rna_features, pretty = 0)
+```
 
+```{r}
+cv.rna_data <- cv.tree(tree.rna_features)
+plot(cv.rna_data$size, cv.rna_data$dev, type ='b')
+```
 
+Above we use a gradient-boosting tree search to find When using the GBDT, we get that there are 11 features that are the most important to classifying whether a cell is a T Regulatory Cell or a CD4-positive cell. However, we can see based on the tree that there are certain features that appear more than once. Based on the tree plot, we can determine that the most important regressor that helps determine if a cell is a Regulatory T cell or a CD4-positive cell is the IL7R. From the National Library of medicine ("https://www.ncbi.nlm.nih.gov/gene/3575"), IL7R is a protein encoded by a gene that plays a critical role in the development of lymph nodes. 
+
+```{r}
+prune.rna_features <- prune.tree(tree.rna_features, best = 6) #best argument sets # terminal nodes desired.
+plot(prune.rna_features)
+text(prune.rna_features, pretty = 0)
 ```
 
 #### Random Forest (Jonathan)
 
 ```{r}
+rna_features.test <- test_data$label_as_factor
+rf.rna_features <-randomForest(label_as_factor~., data=train_data, mtry=14, importance=TRUE, n.tree = 5000)
+yhat.rf <-predict(rf.rna_features, newdata=test_data)
 
 ```
 
@@ -156,7 +163,6 @@ prune.rna_features <- prune.tree(tree.rna_features, best = 20)
 ```{r}
 
 ```
-
 
 ### With PCA
 
@@ -202,17 +208,23 @@ prune.rna_features <- prune.tree(tree.rna_features, best = 20)
 
 ```
 
+## T1.3: Improving F1 Score (???)
 
-## T1.3:
+Train and evaluating three classifiers of our choice with the goal of improving
+the F1 score (can use methods like bagging, boosting, and regularization).
 
-## T1.4:
+```{r}
+
+```
 
 
-# Task 2: feature selection
+## T1.4: Implement predictor (???)
 
-## T2.1:
+Choose the best approach from those above tested and implement our predictor
+as a function of our code.
 
-## T2.2:
+```{r}
 
-## T2.3:
+```
+
 
