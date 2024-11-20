@@ -16,7 +16,7 @@ packages = list("caret",
                 "randomForest",
                 "tree",
                 "dplyr",
-                "tidyr", "caret"
+                "tidyr", "caret", "gbm"
 )
 
 ```
@@ -118,9 +118,39 @@ test_data <-task_one_df[-train_indeces,]
 ```
 
 #### Gradient Boosting Decision Trees (GBDT) (Jonathan)
-
 ```{r}
+#Number of trees
+num_trees = 100
+# Define grid of lambda (shrinkage) values to evaluate
+lambda_grid <- c(0.001, 0.01,0.03,0.05)
 
+# Initialize a vector to store test errors for each lambda
+test_errors <- numeric(length(lambda_grid))
+train_data$label_as_numeric <- ifelse(train_data$label == "CD4-positive", 1, 0)
+test_data$label_as_numeric <- ifelse(test_data$label == "CD4-positive", 1, 0)
+train_data <- train_data[, !(names(train_data) %in% c("label"))]
+
+
+# Loop over each lambda value
+for (i in seq_along(lambda_grid)) {
+  lambda <- lambda_grid[i]
+  
+  # Train the gbm model with the current lambda (shrinkage) value
+  gbm_model <- gbm(label_as_numeric ~ ., data = train_data, 
+                 distribution = "bernoulli", 
+                 n.trees = num_trees, 
+                 interaction.depth = 4, 
+                 shrinkage = lambda, 
+                 cv.folds = 5, 
+                 verbose = FALSE)
+  
+  predictions <- predict(gbm_model, newdata = test_data, n.trees = num_trees, type = "response")
+  
+  predicted_classes <- ifelse(predictions > 0.5, 1, 0)  # 1 for CD4-positive, 0 for Treg
+  
+  # Calculate the Mean Squared Error on the test set
+  test_errors[i] <- mean((predictions - test_data$label_as_numeric)^2)
+}
 ```
 
 
