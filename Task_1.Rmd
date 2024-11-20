@@ -120,6 +120,12 @@ test_data <-task_one_df[-train_indeces,]
 #### Gradient Boosting Decision Trees (GBDT) (Jonathan)
 
 ```{r}
+
+```
+
+
+#### Random Forest (Jonathan)
+```{r}
 ## Running Tree on all the variables on train data
 tree.rna_features <- tree(label_as_factor ~ ., split="deviance", data = train_data)
 summary(tree.rna_features)
@@ -140,15 +146,7 @@ cv.rna_data <- cv.tree(tree.rna_features)
 plot(cv.rna_data$size, cv.rna_data$dev, type ='b')
 ```
 
-Above we use a  tree search to find....  When using the GBDT, we get that there are 11 features that are the most important to classifying whether a cell is a T Regulatory Cell or a CD4-positive cell. However, we can see based on the tree that there are certain features that appear more than once. Based on the tree plot, we can determine that the most important regressor that helps determine if a cell is a Regulatory T cell or a CD4-positive cell is the IL7R. From the National Library of medicine ("https://www.ncbi.nlm.nih.gov/gene/3575"), IL7R is a protein encoded by a gene that plays a critical role in the development of lymph nodes. 
-
-```{r}
-prune.rna_features <- prune.tree(tree.rna_features, best = 6) #best argument sets # terminal nodes desired.
-plot(prune.rna_features)
-text(prune.rna_features, pretty = 0)
-```
-
-#### Random Forest (Jonathan)
+Above we use a  tree search to find....  When using the GBDT, we get that there are 11 features that are the most important to classifying whether a cell is a T Regulatory Cell or a CD4-positive cell. However, we can see based on the tree that there are certain features that appear more than once. Based on the tree plot, we can determine that the most important regressor that helps determine if a cell is a Regulatory T cell or a CD4-positive cell is the IL7R. From the National Library of medicine ("https://www.ncbi.nlm.nih.gov/gene/3575"), IL7R is a protein encoded by a gene that plays a critical role in the development of lymph nodes. Based on the analysis above, we decided to create a Random Forest regression that will have 14 terminal nodes. 
 
 ```{r}
 rna_features.test <- test_data$label_as_factor
@@ -161,7 +159,7 @@ performance_metrics <- confusionMatrix(yhat.rf, test_data$label_as_factor)
 print(performance_metrics)
 
 ```
-
+Using a random forest tree model, we see that the accuracy of the model was 0.9312 percent. Which is quite accurate! 
 
 #### Support Vector Machine (SVM) (Peter)
 
