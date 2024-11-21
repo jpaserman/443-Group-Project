@@ -34,10 +34,17 @@ for (package in packages){
 # Task 1: binary classification
 
 ```{r}
+set.seed(seed)
+
 task_one_df <- read.csv(csv_file_one)
 
 str(task_one_df)
 task_one_df$label_as_factor <- as.factor(task_one_df$label)
+
+# Split Data into Test and Train (We should all use the same data)
+train_indeces <- sample(1:nrow(task_one_df), 3829) # 3829 is 70% of the data
+train_data <- task_one_df[train_indeces,]
+test_data <- task_one_df[-train_indeces,]
 ```
 
 ## T1.1: exploratory data analysis and summary statistics (Peter?)
@@ -63,6 +70,20 @@ mean_table <- task_one_df %>%
   mutate(diff = abs(`CD4+T` - TREG)) %>% 
   
   arrange(desc(diff))
+
+### Next steps --> 
+  ### (1) instead of absolute value difference, include also
+  ### percentage change. then plot boxplots for the top 5? 10? variables
+  ### that appear to have the clearest distinction between the two labels
+  ### these specific variables provide a good baseline for what we expect
+  ### our subsequent models to choose for the most important fields
+  
+  ### (2) instead of having 3829 hard-coded above as the proportion of data
+  ### in the training set, instead have a parameter at the beginning of the
+  ### script to set the proportion
+
+  ### (3) set a seed at the begining of the script so that the sample command
+  ### for determining training/test set partitions the data consistently
   
   
 ## Checking if there are any rows that have missing values... Keep this hashed unless you want to check, because it takes a while to run
@@ -83,10 +104,6 @@ for (column in twenty_random_columns) {
     print(p)
 }
 
-# Split Data into Test and Train (We should all use the same data)
-train_indeces <-sample(1:nrow(task_one_df), 3829) # 3829 is 70% of the data
-train_data <- task_one_df[train_indeces,]
-test_data <-task_one_df[-train_indeces,]
 ```
 
 ## T1.2: training and evaluating on various classifiers
@@ -120,7 +137,7 @@ test_data <-task_one_df[-train_indeces,]
 #### Gradient Boosting Decision Trees (GBDT) (Jonathan)
 ```{r}
 #Number of trees
-num_trees = 100
+num_trees = 10
 # Define grid of lambda (shrinkage) values to evaluate
 lambda_grid <- c(0.001, 0.01,0.03,0.05)
 
