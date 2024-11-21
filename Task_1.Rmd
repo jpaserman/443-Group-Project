@@ -44,8 +44,8 @@ set.seed(seed)
 task_one_df <- read.csv(csv_file_one)
 
 # str(task_one_df)
-task_one_df$label <- as.factor(task_one_df$label)
-
+task_one_df$label_as_factor <- as.factor(task_one_df$label)
+task_one_df$label_as_numeric <- as.numeric(task_one_df$label_as_factor) -1 
 # Split Data into Test and Train (We should all use the same data)
 
 train_split = as.integer(nrow(task_one_df)*training_size)
