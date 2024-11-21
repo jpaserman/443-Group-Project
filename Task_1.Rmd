@@ -131,8 +131,9 @@ for (column in twenty_random_columns) {
 
 #### Quadratic Discriminant Analysis (QDA) (Chi)
 
-```{r}
-covariates = mean_table$genes[1:500]
+```{r qdaTrain}
+covariates = mean_table$genes[1:300]
+
 formula = as.formula(
   paste(
     "label ~",
@@ -141,6 +142,23 @@ formula = as.formula(
 
 qda_fit <- qda(formula, data = train_data)
 ```
+
+```{r qdaConfusion}
+qda_pred <- predict(qda_fit, test_data)$class
+
+table(predicted = qda_pred, observed = test_data$label)
+```
+
+```{r qdaMisclass}
+mean(qda_pred != test_data$label)
+```
+
+```{r qdaROC}
+roc_curve_qda <- roc(formula = qda_fit$)
+plot(roc_curve_lr, col = "blue", main = "ROC Curve for Logistic Regression")
+auc(roc_curve_qda)
+```
+
 
 #### Nearest Neighbor Classifier (k-NN) (Chi)
 
