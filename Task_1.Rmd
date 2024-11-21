@@ -12,11 +12,15 @@ options(warn=-1)
 ```{r parameters}
 seed = 443
 csv_file_one = "data1.csv"
+training_size = 0.7 # Proportion of dataset that is to be split for training
 packages = list("caret", 
                 "randomForest",
                 "tree",
                 "dplyr",
-                "tidyr", "caret", "gbm"
+                "tidyr", 
+                "caret", 
+                "gbm",
+                "ggplot2"
 )
 
 ```
@@ -42,7 +46,7 @@ str(task_one_df)
 task_one_df$label_as_factor <- as.factor(task_one_df$label)
 
 # Split Data into Test and Train (We should all use the same data)
-train_indeces <- sample(1:nrow(task_one_df), 3829) # 3829 is 70% of the data
+train_indeces <- sample(1:nrow(task_one_df), floor(training_size*nrow(task_one_df)))
 train_data <- task_one_df[train_indeces,]
 test_data <- task_one_df[-train_indeces,]
 ```
@@ -50,10 +54,10 @@ test_data <- task_one_df[-train_indeces,]
 ## T1.1: exploratory data analysis and summary statistics (Peter?)
 
 ```{r}
-table(task_one_df$label)
-library(ggplot2)
-nrow(task_one_df)
-ncol(task_one_df)
+nrow(task_one_df) # The data has 5471 observations
+ncol(task_one_df) # The data contains 4125 variables-- 4124 originally, 1 added (label_as_factor)
+table(task_one_df$label) # 3356 observations are labelled as CD4+T and 2115 are labelled as TREG
+
 
 mean_table <- task_one_df %>% 
   
@@ -69,22 +73,20 @@ mean_table <- task_one_df %>%
   
   mutate(diff = abs(`CD4+T` - TREG)) %>% 
   
+  mutate(pct_diff = 100 * (diff / ((`CD4+T` + TREG)/2) )) %>%
+  
   arrange(desc(diff))
+
+## There are decent differences between the ranking of absolute difference in means of groups
+## and the ranking of percentage difference in means of groups
+## perhaps we create box plots of the top 5 of each metric??
 
 ### Next steps --> 
   ### (1) instead of absolute value difference, include also
-  ### percentage change. then plot boxplots for the top 5? 10? variables
+  ### percentage change. then plot box plots for the top 5? 10? variables
   ### that appear to have the clearest distinction between the two labels
   ### these specific variables provide a good baseline for what we expect
   ### our subsequent models to choose for the most important fields
-  
-  ### (2) instead of having 3829 hard-coded above as the proportion of data
-  ### in the training set, instead have a parameter at the beginning of the
-  ### script to set the proportion
-
-  ### (3) set a seed at the begining of the script so that the sample command
-  ### for determining training/test set partitions the data consistently
-  
   
 ## Checking if there are any rows that have missing values... Keep this hashed unless you want to check, because it takes a while to run
 # for (i in 1:nrow(task_one_df)) {
