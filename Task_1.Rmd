@@ -44,8 +44,8 @@ set.seed(seed)
 task_one_df <- read.csv(csv_file_one)
 
 # str(task_one_df)
-task_one_df$label <- as.factor(task_one_df$label)
-
+task_one_df$label_as_factor <- as.factor(task_one_df$label)
+task_one_df$label_as_numeric <- as.numeric(task_one_df$label_as_factor) -1 
 # Split Data into Test and Train (We should all use the same data)
 
 train_split = as.integer(nrow(task_one_df)*training_size)
@@ -53,6 +53,8 @@ train_split = as.integer(nrow(task_one_df)*training_size)
 train_indices <- sample(1:nrow(task_one_df), train_split)
 train_data <- task_one_df[train_indices,]
 test_data <- task_one_df[-train_indices,]
+
+
 
 ```
 
@@ -169,44 +171,99 @@ auc(roc_curve_qda)
 #### Gradient Boosting Decision Trees (GBDT) (Jonathan)
 ```{r}
 #Number of trees
-num_trees = 10
+num_trees = 1000
 # Define grid of lambda (shrinkage) values to evaluate
 lambda_grid <- c(0.001, 0.01,0.03,0.05)
 
 # Initialize a vector to store test errors for each lambda
 test_errors <- numeric(length(lambda_grid))
-train_data$label_as_numeric <- ifelse(train_data$label == "CD4-positive", 1, 0)
-test_data$label_as_numeric <- ifelse(test_data$label == "CD4-positive", 1, 0)
-train_data <- train_data[, !(names(train_data) %in% c("label"))]
+```
 
 
+```{r}
+
+test_data_cleaned <- test_data[, !colnames(test_data) %in% c("label_as_factor", "label")]
 # Loop over each lambda value
 for (i in seq_along(lambda_grid)) {
   lambda <- lambda_grid[i]
   
   # Train the gbm model with the current lambda (shrinkage) value
-  gbm_model <- gbm(label_as_numeric ~ ., data = train_data, 
+  gbm_model <- gbm(label_as_numeric ~. -label - label_as_factor, data = train_data, 
+                   distribution = "bernoulli", 
+                   n.trees = num_trees, 
+                   interaction.depth = 4, 
+                   shrinkage = lambda, 
+                   cv.folds = 5, 
+                   verbose = FALSE)
+  
+  # Make predictions on the test set using the optimal number of trees
+  predictions <- predict(gbm_model, newdata = test_data_cleaned, n.trees = num_trees)
+  
+  # Calculate the Mean Squared Error on the test set
+  test_errors[i] <- mean((predictions - test_data_cleaned$label_as_numeric)^2)
+}
+```
+
+```{r}
+# Combine lambda values and test errors into a data frame for plotting
+error_df <- data.frame(lambda = lambda_grid, test_error = test_errors)
+
+# Plot the test error over the range of lambda values
+ggplot(error_df, aes(x = lambda, y = test_error)) +
+  geom_line() +
+  geom_point() +
+  labs(title = "Test Error vs Lambda (Shrinkage)", 
+       x = "Lambda (Shrinkage)", 
+       y = "Test Mean Squared Error") +
+  theme_minimal()
+
+```
+The results above show use that the GLM model with the lowest Test Mean Squared Error, will be the one with the lowest lambda value we assigned of 0.001. This does not necessarily mean that the best Gradient Descent Boosting model that will work best will be the best model for our data, as it may not account for over fitting. However, we will continue using the GBDT model with a shrinkage value of 0.001 to analyze the model and to compare it to our other models. 
+
+```{r}
+# Set a single shrinkage value
+lambda <- 0.001
+
+# Train the gbm model
+smallest_lambda_gbm_model <- gbm(label_as_numeric ~. -label - label_as_factor, 
+                 data = train_data, 
                  distribution = "bernoulli", 
                  n.trees = num_trees, 
                  interaction.depth = 4, 
                  shrinkage = lambda, 
                  cv.folds = 5, 
                  verbose = FALSE)
-  
-  predictions <- predict(gbm_model, newdata = test_data, n.trees = num_trees, type = "response")
-  
-  predicted_classes <- ifelse(predictions > 0.5, 1, 0)  # 1 for CD4-positive, 0 for Treg
-  
-  # Calculate the Mean Squared Error on the test set
-  test_errors[i] <- mean((predictions - test_data$label_as_numeric)^2)
-}
+
+# Get the best number of trees based on cross-validation
+best_trees <- gbm.perf(smallest_lambda_gbm_model, method = "cv")
+
+# Make predictions on the test set using the best number of trees
+pred_probs <- predict(smallest_lambda_gbm_model, newdata = test_data_cleaned, n.trees = best_trees, type = "response")
+pred_classes <- ifelse(pred_probs > 0.5, 1, 0)
+
+# Evaluate performance
+test_mse <- mean((pred_probs - test_data_cleaned$label_as_numeric)^2)
+accuracy <- mean(pred_classes == test_data_cleaned$label_as_numeric)
+auc <- auc(test_data_cleaned$label_as_numeric, pred_probs)
+# f1_score <- MLmetrics::F1_Score(predicted = pred_classes, reference = test_data_cleaned$label_as_numeric)
+
+# Print results
+cat("Test MSE:", test_mse, "\n")
+cat("Accuracy:", accuracy, "\n")
+cat("AUC:", auc, "\n")
+# cat("F1 Score:", f1_score, "\n")
+
 ```
+The accuracy for the gradient descent decision tree model (where the shrinkage term was equal to 0.001) was 0.904. The Area under the curve was equal to 0.972 and the Test mean squared erroe was equal to 0.109. 
 
 
 #### Random Forest (Jonathan)
 ```{r}
+## Clean the test data for the Random Forest Classifier task
+test_data_cleaned_for_rf <- test_data[, !colnames(test_data) %in% c("label_as_numeric", "label")]
+
 ## Running Tree on all the variables on train data
-tree.rna_features <- tree(label_as_factor ~ ., split="deviance", data = train_data)
+tree.rna_features <- tree(label_as_factor ~ . -label_as_numeric -label, split="deviance", data = train_data)
 summary(tree.rna_features)
 plot(tree.rna_features)
 text(tree.rna_features, pretty = 0, cex = 1)
@@ -215,8 +272,8 @@ text(tree.rna_features, pretty = 0, cex = 1)
 tree.pred <-predict(tree.rna_features, test_data, type="class")
 
 ## Mis-classification Rate and Confusion Matrix
-table(tree.pred,test_data$label_as_factor)
-mean(tree.pred!=test_data$label_as_factor)
+table(tree.pred,test_data_cleaned_for_rf$label_as_factor)
+mean(tree.pred!=test_data_cleaned_for_rf$label_as_factor)
 
 ```
 
@@ -228,17 +285,25 @@ plot(cv.rna_data$size, cv.rna_data$dev, type ='b')
 Above we use a  tree search to find....  When using the GBDT, we get that there are 11 features that are the most important to classifying whether a cell is a T Regulatory Cell or a CD4-positive cell. However, we can see based on the tree that there are certain features that appear more than once. Based on the tree plot, we can determine that the most important regressor that helps determine if a cell is a Regulatory T cell or a CD4-positive cell is the IL7R. From the National Library of medicine ("https://www.ncbi.nlm.nih.gov/gene/3575"), IL7R is a protein encoded by a gene that plays a critical role in the development of lymph nodes. Based on the analysis above, we decided to create a Random Forest regression that will have 14 terminal nodes. 
 
 ```{r}
-rna_features.test <- test_data$label_as_factor
-rf.rna_features <-randomForest(label_as_factor~., data=train_data, mtry=14, importance=TRUE, n.tree = 5000)
+# Define the columns to exclude
+exclude_columns <- c("label_as_numeric", "label")
+
+# Get the feature columns programmatically
+feature_columns <- setdiff(colnames(train_data), exclude_columns)
+
+rna_features.test <- test_data_cleaned_for_rf$label_as_factor
+rf.rna_features <-randomForest(label_as_factor~. - label_as_numeric -label, data=train_data, mtry=14, importance=TRUE, n.tree = 5000)
 yhat.rf <-predict(rf.rna_features, newdata=test_data)
 
 # Calculate precision, recall, F1-score (using `caret` package)
 library(caret)
-performance_metrics <- confusionMatrix(yhat.rf, test_data$label_as_factor)
+performance_metrics <- confusionMatrix(yhat.rf,test_data_cleaned_for_rf$label_as_factor)
 print(performance_metrics)
 
 ```
-Using a random forest tree model, we see that the accuracy of the model was 0.9312 percent. Which is quite accurate! 
+
+
+Using a random forest tree model, we see that the accuracy of the model was 0.0.891 percent. Which is quite accurate! 
 
 #### Support Vector Machine (SVM) (Peter)
 
