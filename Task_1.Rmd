@@ -48,7 +48,7 @@ task_one_df$label <- as.factor(task_one_df$label)
 
 # Split Data into Test and Train (We should all use the same data)
 
-train_split = as.integer(nrow(task_one_df)*0.7)
+train_split = as.integer(nrow(task_one_df)*training_size)
 
 train_indices <- sample(1:nrow(task_one_df), train_split)
 train_data <- task_one_df[train_indices,]
