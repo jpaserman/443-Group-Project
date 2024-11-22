@@ -138,7 +138,7 @@ covariates = mean_table$genes[1:300]
 
 formula = as.formula(
   paste(
-    "label_as_factor ~. -label -label_as_numeric",
+    "label_as_factor ~",
     paste(covariates, collapse = " + ")
     ))
 
@@ -152,12 +152,23 @@ table(predicted = qda_pred, observed = test_data$label)
 ```
 
 ```{r qdaMisclass}
-mean(qda_pred != test_data$label)
+qda_misclass_rate = mean(qda_pred != test_data$label)
+
+cat("Misclassification rate:", qda_misclass_rate*100, "%")
 ```
 
 ```{r qdaROC}
-roc_curve_qda <- roc(formula = qda_fit$)
-plot(roc_curve_lr, col = "blue", main = "ROC Curve for Logistic Regression")
+qda_pred_numeric <- ifelse(qda_pred == "TREG", 1, 0)
+  
+roc_curve_qda <- roc(
+  response = test_data$label_as_numeric,
+  predictor = qda_pred_numeric, 
+  levels = c(0,1),
+  direction = "<"
+  )
+
+plot(roc_curve_qda, col = "red", main = "ROC Curve for QDA")
+
 auc(roc_curve_qda)
 ```
 
