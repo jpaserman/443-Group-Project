@@ -134,7 +134,8 @@ for (column in twenty_random_columns) {
 #### Quadratic Discriminant Analysis (QDA) (Chi)
 
 ```{r qdaTrain}
-covariates = mean_table$genes[1:300]
+options(expressions = 10000)
+covariates = mean_table$genes[1:1100]
 
 formula = as.formula(
   paste(
