@@ -66,10 +66,9 @@ nrow(task_one_df) # The data has 5471 observations
 ncol(task_one_df) # The data contains 4125 variables-- 4124 originally, 1 added (label_as_factor)
 table(task_one_df$label) # 3356 observations are labelled as CD4+T and 2115 are labelled as TREG
 
-
 mean_table <- task_one_df %>%
 
-  select(!label) %>%
+  dplyr::select(-label, -label_as_numeric) %>%
 
   group_by(label_as_factor) %>%
 
