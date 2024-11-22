@@ -2,3 +2,5 @@
 .Rhistory
 .RData
 .Ruserdata
+knn_predictions.csv
+.DS_Store
