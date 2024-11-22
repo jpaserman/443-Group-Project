@@ -21,7 +21,8 @@ packages = list("caret",
                 "caret", 
                 "gbm", 
                 "MASS",
-                "ggplot2"
+                "ggplot2",
+                "pROC"
 )
 
 ```
@@ -66,22 +67,22 @@ ncol(task_one_df) # The data contains 4125 variables-- 4124 originally, 1 added 
 table(task_one_df$label) # 3356 observations are labelled as CD4+T and 2115 are labelled as TREG
 
 
-mean_table <- task_one_df %>% 
-  
+mean_table <- task_one_df %>%
+
   select(!label) %>%
-  
+
   group_by(label_as_factor) %>%
-  
-  summarise(across(everything(), mean, na.rm = TRUE)) %>% 
-  
+
+  summarise(across(everything(), mean, na.rm = TRUE)) %>%
+
   pivot_longer(cols = -label_as_factor, names_to = 'genes', values_to = 'mean_value') %>%
-  
+
   pivot_wider(names_from = label_as_factor, values_from = mean_value) %>%
-  
-  mutate(diff = abs(`CD4+T` - TREG)) %>% 
-  
+
+  mutate(diff = abs(`CD4+T` - TREG)) %>%
+
   mutate(pct_diff = 100 * (diff / ((`CD4+T` + TREG)/2) )) %>%
-  
+
   arrange(desc(diff))
 
 ## There are decent differences between the ranking of absolute difference in means of groups
@@ -138,7 +139,7 @@ covariates = mean_table$genes[1:300]
 
 formula = as.formula(
   paste(
-    "label ~",
+    "label_as_factor ~. -label -label_as_numeric",
     paste(covariates, collapse = " + ")
     ))
 
@@ -254,7 +255,7 @@ cat("AUC:", auc, "\n")
 # cat("F1 Score:", f1_score, "\n")
 
 ```
-The accuracy for the gradient descent decision tree model (where the shrinkage term was equal to 0.001) was 0.904. The Area under the curve was equal to 0.972 and the Test mean squared erroe was equal to 0.109. 
+The accuracy for the gradient descent decision tree model (where the shrinkage term was equal to 0.001) was 0.904. The Area under the curve was equal to 0.972 and the Test mean squared error was equal to 0.109. 
 
 
 #### Random Forest (Jonathan)
