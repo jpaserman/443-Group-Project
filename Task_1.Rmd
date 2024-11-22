@@ -13,12 +13,11 @@ options(warn=-1)
 seed = 443
 csv_file_one = "data1.csv"
 training_size = 0.7 # Proportion of dataset that is to be split for training
-packages = list("caret", 
+packages = list("class", 
                 "randomForest",
                 "tree",
                 "dplyr",
                 "tidyr",
-                "caret", 
                 "gbm", 
                 "MASS",
                 "ggplot2",
@@ -39,7 +38,7 @@ for (package in packages){
 
 # Task 1: binary classification
 
-```{r train test split}
+```{r train_test_split}
 set.seed(seed)
 
 task_one_df <- read.csv(csv_file_one)
@@ -54,9 +53,6 @@ train_split = as.integer(nrow(task_one_df)*training_size)
 train_indices <- sample(1:nrow(task_one_df), train_split)
 train_data <- task_one_df[train_indices,]
 test_data <- task_one_df[-train_indices,]
-
-
-
 ```
 
 ## T1.1: exploratory data analysis and summary statistics (Peter?)
@@ -133,7 +129,7 @@ for (column in twenty_random_columns) {
 
 #### Quadratic Discriminant Analysis (QDA) (Chi)
 
-```{r qdaTrain}
+```{r qda_Train}
 options(expressions = 10000)
 qda_covariates = mean_table$genes[1:1100]
 
@@ -146,19 +142,19 @@ qda_formula = as.formula(
 qda_fit <- qda(qda_formula, data = train_data)
 ```
 
-```{r qdaConfusion}
+```{r qda_Confusion}
 qda_pred <- predict(qda_fit, test_data)$class
 
 table(predicted = qda_pred, observed = test_data$label)
 ```
 
-```{r qdaMisclass}
+```{r qda_Misclass}
 qda_misclass_rate = mean(qda_pred != test_data$label)
 
 cat("Misclassification rate:", qda_misclass_rate*100, "%")
 ```
 
-```{r qdaROC}
+```{r qda_ROC}
 qda_pred_numeric <- ifelse(qda_pred == "TREG", 1, 0)
   
 qda_roc_curve <- roc(
@@ -170,9 +166,9 @@ qda_roc_curve <- roc(
 
 plot(qda_roc_curve, col = "red", main = "ROC Curve for QDA")
 
-auc(qda_roc_curve)
+qda_auc <- auc(qda_roc_curve)
+qda_auc
 ```
-
 
 #### Nearest Neighbor Classifier (k-NN) (Chi)
 
