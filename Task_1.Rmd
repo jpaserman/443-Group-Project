@@ -21,7 +21,8 @@ packages = list("caret",
                 "caret", 
                 "gbm", 
                 "MASS",
-                "ggplot2"
+                "ggplot2",
+                "pROC"
 )
 
 ```
@@ -236,7 +237,7 @@ cat("AUC:", auc, "\n")
 # cat("F1 Score:", f1_score, "\n")
 
 ```
-The accuracy for the gradient descent decision tree model (where the shrinkage term was equal to 0.001) was 0.904. The Area under the curve was equal to 0.972 and the Test mean squared erroe was equal to 0.109. 
+The accuracy for the gradient descent decision tree model (where the shrinkage term was equal to 0.001) was 0.904. The Area under the curve was equal to 0.972 and the Test mean squared error was equal to 0.109. 
 
 
 #### Random Forest (Jonathan)
