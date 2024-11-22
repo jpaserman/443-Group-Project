@@ -172,8 +172,46 @@ qda_auc
 
 #### Nearest Neighbor Classifier (k-NN) (Chi)
 
-```{r}
+```{r kNN_train}
+kk_vector = c(3:7) 
 
+knn_train_X <- train_data %>% 
+  dplyr::select(-label, -label_as_factor, label_as_numeric)
+
+knn_train_Y <- train_data$label_as_factor
+
+knn_test_X <- test_data %>% 
+  dplyr::select(-label, -label_as_factor, label_as_numeric)
+
+knn_test_Y <- test_data$label_as_factor
+
+knn_start_time <- Sys.time()
+knn_pred <- sapply(kk_vector,
+                   function(k)
+                     {knn(train = knn_train_X, test = knn_test_X, cl = knn_train_Y, k = k)}
+                   )
+knn_end_time <- Sys.time()
+
+knn_train_runtime <- knn_end_time - knn_start_time
+print(knn_train_runtime)
+
+write.csv(knn_pred, file = "knn_predictions.csv", row.names = TRUE)
+```
+
+```{r kNN_Confusion}
+for (i in kk_vector){
+  print(paste("k =", i))
+  print(table(predicted = knn_pred[,i], observed = knn_test_Y))
+}
+```
+
+```{r kNN_Misclass}
+knn_misclass = c(rep(0,length(kk_vector)))
+for (i in kk_vector){
+  knn_misclass[i] = mean(knn_pred[,i] != knn_test_Y)
+}
+plot(knn_misclass, type = "l")
+```
 ```
 
 #### Gradient Boosting Decision Trees (GBDT) (Jonathan)
