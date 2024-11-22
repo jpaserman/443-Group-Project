@@ -135,15 +135,15 @@ for (column in twenty_random_columns) {
 
 ```{r qdaTrain}
 options(expressions = 10000)
-covariates = mean_table$genes[1:1100]
+qda_covariates = mean_table$genes[1:1100]
 
-formula = as.formula(
+qda_formula = as.formula(
   paste(
     "label_as_factor ~",
-    paste(covariates, collapse = " + ")
+    paste(qda_covariates, collapse = " + ")
     ))
 
-qda_fit <- qda(formula, data = train_data)
+qda_fit <- qda(qda_formula, data = train_data)
 ```
 
 ```{r qdaConfusion}
@@ -161,16 +161,16 @@ cat("Misclassification rate:", qda_misclass_rate*100, "%")
 ```{r qdaROC}
 qda_pred_numeric <- ifelse(qda_pred == "TREG", 1, 0)
   
-roc_curve_qda <- roc(
+qda_roc_curve <- roc(
   response = test_data$label_as_numeric,
   predictor = qda_pred_numeric, 
   levels = c(0,1),
   direction = "<"
   )
 
-plot(roc_curve_qda, col = "red", main = "ROC Curve for QDA")
+plot(qda_roc_curve, col = "red", main = "ROC Curve for QDA")
 
-auc(roc_curve_qda)
+auc(qda_roc_curve)
 ```
 
 
