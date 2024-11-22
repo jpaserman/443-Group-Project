@@ -215,7 +215,7 @@ plot(knn_misclass, type = "l")
 ```
 
 #### Gradient Boosting Decision Trees (GBDT) (Jonathan)
-```{r}
+```{r gbmparams}
 #Number of trees
 num_trees = 1000
 # Define grid of lambda (shrinkage) values to evaluate
@@ -226,7 +226,7 @@ test_errors <- numeric(length(lambda_grid))
 ```
 
 
-```{r}
+```{r gbmloop}
 
 test_data_cleaned <- test_data[, !colnames(test_data) %in% c("label_as_factor", "label")]
 # Loop over each lambda value
@@ -250,7 +250,7 @@ for (i in seq_along(lambda_grid)) {
 }
 ```
 
-```{r}
+```{r gbmtse}
 # Combine lambda values and test errors into a data frame for plotting
 error_df <- data.frame(lambda = lambda_grid, test_error = test_errors)
 
@@ -266,7 +266,7 @@ ggplot(error_df, aes(x = lambda, y = test_error)) +
 ```
 The results above show use that the GLM model with the lowest Test Mean Squared Error, will be the one with the lowest lambda value we assigned of 0.001. This does not necessarily mean that the best Gradient Descent Boosting model that will work best will be the best model for our data, as it may not account for over fitting. However, we will continue using the GBDT model with a shrinkage value of 0.001 to analyze the model and to compare it to our other models. 
 
-```{r}
+```{r gbmlambda}
 # Set a single shrinkage value
 lambda <- 0.001
 
@@ -304,7 +304,7 @@ The accuracy for the gradient descent decision tree model (where the shrinkage t
 
 
 #### Random Forest (Jonathan)
-```{r}
+```{r treeinit}
 ## Clean the test data for the Random Forest Classifier task
 test_data_cleaned_for_rf <- test_data[, !colnames(test_data) %in% c("label_as_numeric", "label")]
 
@@ -323,14 +323,14 @@ mean(tree.pred!=test_data_cleaned_for_rf$label_as_factor)
 
 ```
 
-```{r}
+```{r treecv}
 cv.rna_data <- cv.tree(tree.rna_features)
 plot(cv.rna_data$size, cv.rna_data$dev, type ='b')
 ```
 
 Above we use a  tree search to find....  When using the GBDT, we get that there are 11 features that are the most important to classifying whether a cell is a T Regulatory Cell or a CD4-positive cell. However, we can see based on the tree that there are certain features that appear more than once. Based on the tree plot, we can determine that the most important regressor that helps determine if a cell is a Regulatory T cell or a CD4-positive cell is the IL7R. From the National Library of medicine ("https://www.ncbi.nlm.nih.gov/gene/3575"), IL7R is a protein encoded by a gene that plays a critical role in the development of lymph nodes. Based on the analysis above, we decided to create a Random Forest regression that will have 14 terminal nodes. 
 
-```{r}
+```{r rfmodel}
 # Define the columns to exclude
 exclude_columns <- c("label_as_numeric", "label")
 
