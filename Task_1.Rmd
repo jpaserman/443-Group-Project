@@ -212,7 +212,7 @@ for (i in kk_vector){
 }
 plot(knn_misclass, type = "l")
 ```
-```
+
 
 #### Gradient Boosting Decision Trees (GBDT) (Jonathan)
 ```{r gbmparams}
