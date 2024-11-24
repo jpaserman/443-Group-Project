@@ -21,7 +21,9 @@ packages = list("class",
                 "gbm", 
                 "MASS",
                 "ggplot2",
-                "pROC"
+                "pROC",
+                "MLmetrics",
+                "caret"
 )
 
 ```
@@ -269,10 +271,12 @@ ggplot(error_df, aes(x = lambda, y = test_error)) +
 ```
 The results above show use that the GLM model with the lowest Test Mean Squared Error, will be the one with the lowest lambda value we assigned of 0.001. This does not necessarily mean that the best Gradient Descent Boosting model that will work best will be the best model for our data, as it may not account for over fitting. However, we will continue using the GBDT model with a shrinkage value of 0.001 to analyze the model and to compare it to our other models. 
 
-```{r gbmlambda}
+```{r gbm_model}
 # Set a single shrinkage value
 lambda <- 0.001
 
+# Measure the time it takes to run 
+gbm_start_time <- Sys.time()
 # Train the gbm model
 smallest_lambda_gbm_model <- gbm(label_as_numeric ~. -label - label_as_factor, 
                  data = train_data, 
@@ -286,27 +290,55 @@ smallest_lambda_gbm_model <- gbm(label_as_numeric ~. -label - label_as_factor,
 # Get the best number of trees based on cross-validation
 best_trees <- gbm.perf(smallest_lambda_gbm_model, method = "cv")
 
+# Measure time after model training
+gbm_end_time <- Sys.time()
+gbm_model_training_time <- gbm_end_time - gbm_start_time
+cat("GBM Model training time:", gbm_model_training_time, "\n")
+
+# Measure time for predictions
+gbm_start_time_pred <- Sys.time()
 # Make predictions on the test set using the best number of trees
-pred_probs <- predict(smallest_lambda_gbm_model, newdata = test_data_cleaned, n.trees = best_trees, type = "response")
-pred_classes <- ifelse(pred_probs > 0.5, 1, 0)
+gbm_pred_probs <- predict(smallest_lambda_gbm_model, newdata = test_data_cleaned, n.trees = best_trees, type = "response")
+gbm_pred_classes <- ifelse(gbm_pred_probs > 0.5, 1, 0)
 
-# Evaluate performance
-test_mse <- mean((pred_probs - test_data_cleaned$label_as_numeric)^2)
-accuracy <- mean(pred_classes == test_data_cleaned$label_as_numeric)
-auc <- auc(test_data_cleaned$label_as_numeric, pred_probs)
-# f1_score <- MLmetrics::F1_Score(predicted = pred_classes, reference = test_data_cleaned$label_as_numeric)
-
-cat("Test MSE:", test_mse, "\n")
-cat("Accuracy:", accuracy, "\n")
-cat("AUC:", auc, "\n")
-# cat("F1 Score:", f1_score, "\n")
-
+# Measure time after predictions
+gbm_end_time_pred <- Sys.time()
+gbm_prediction_time <- gbm_end_time_pred - gbm_start_time_pred
+cat("Prediction time:", gbm_prediction_time, "\n")
 ```
-The accuracy for the gradient descent decision tree model (where the shrinkage term was equal to 0.001) was 0.904. The Area under the curve was equal to 0.972 and the Test mean squared error was equal to 0.109. 
+
+
+```{r gbm_Confusion}
+gbm_confusion_matrix <- table(Predicted = gbm_pred_classes, Actual = test_data_cleaned$label_as_numeric)
+print(gbm_confusion_matrix)
+```
+
+```{r gbm_Misclass}
+gbm_misclassification_rate <- mean(gbm_pred_classes != test_data_cleaned$label_as_numeric)
+cat("Misclassification Rate:", gbm_misclassification_rate, "\n")
+```
+
+```{r gbm_Accuracy}
+gbm_accuracy <- mean(gbm_pred_classes == test_data_cleaned$label_as_numeric)
+cat("Accuracy:", gbm_accuracy, "\n")
+```
+
+```{r gbm_ROC_AUC}
+gbm_roc_curve <- roc(test_data_cleaned$label_as_numeric, gbm_pred_probs)
+cat("AUC:", auc(gbm_roc_curve), "\n")
+plot(gbm_roc_curve, main = "ROC Curve")
+```
+
+```{r gbm_f1_score}
+gbm_f1_score <- F1_Score(y_pred = gbm_pred_classes, y_true = test_data_cleaned$label_as_numeric)
+cat("F1 Score:", gbm_f1_score, "\n")
+```
+
+The accuracy for the gradient descent decision tree model (where the shrinkage term was equal to 0.001) was 0.904. The Area under the curve was equal to 0.972 and the Test mean squared error was equal to 0.109. Misclassification rate was equal to 0.096. And F1 score was equal to 0.93
 
 
 #### Random Forest (Jonathan)
-```{r treeinit}
+```{r tree_init}
 ## Clean the test data for the Random Forest Classifier task
 test_data_cleaned_for_rf <- test_data[, !colnames(test_data) %in% c("label_as_numeric", "label")]
 
@@ -333,25 +365,56 @@ plot(cv.rna_data$size, cv.rna_data$dev, type ='b')
 Above we use a  tree search to find....  When using the GBDT, we get that there are 11 features that are the most important to classifying whether a cell is a T Regulatory Cell or a CD4-positive cell. However, we can see based on the tree that there are certain features that appear more than once. Based on the tree plot, we can determine that the most important regressor that helps determine if a cell is a Regulatory T cell or a CD4-positive cell is the IL7R. From the National Library of medicine ("https://www.ncbi.nlm.nih.gov/gene/3575"), IL7R is a protein encoded by a gene that plays a critical role in the development of lymph nodes. Based on the analysis above, we decided to create a Random Forest regression that will have 14 terminal nodes. 
 
 ```{r rfmodel}
-# Define the columns to exclude
-exclude_columns <- c("label_as_numeric", "label")
 
-# Get the feature columns programmatically
-feature_columns <- setdiff(colnames(train_data), exclude_columns)
+# RF model
+start_time_rf <- Sys.time()
 
-rna_features.test <- test_data_cleaned_for_rf$label_as_factor
-rf.rna_features <-randomForest(label_as_factor~. - label_as_numeric -label, data=train_data, mtry=14, importance=TRUE, n.tree = 5000)
+rf.rna_features <-randomForest(label_as_factor~. - label_as_numeric -label, data=train_data, mtry=14, importance=TRUE, n.tree = 5000) # RF Model
+
+end_time_rf <- Sys.time()
+rf_training_time <- end_time_rf - start_time_rf
+cat("Random Forest model training time:", rf_training_time, "\n")
+
+# Predictions
+start_time_rf_pred <- Sys.time()
 yhat.rf <-predict(rf.rna_features, newdata=test_data)
 
-# Calculate precision, recall, F1-score (using `caret` package)
-library(caret)
-performance_metrics <- confusionMatrix(yhat.rf,test_data_cleaned_for_rf$label_as_factor)
-print(performance_metrics)
+end_time_rf_pred <- Sys.time()
+rf_prediction_time <- end_time_rf_pred - start_time_rf_pred
+cat("Random Forest prediction time:", rf_prediction_time, "\n")
+
+
 
 ```
 
+```{r rf_Confusion}
+performance_metrics <- confusionMatrix(yhat.rf, test_data_cleaned_for_rf$label_as_factor)
+print(performance_metrics)
+```
 
-Using a random forest tree model, we see that the accuracy of the model was 0.0.891 percent. Which is quite accurate! 
+```{r rf_Misclass}
+rf_misclassification_rate <- mean(yhat.rf != test_data_cleaned_for_rf$label_as_factor)
+cat("Random Forest Misclassification Rate:", rf_misclassification_rate, "\n")
+```
+
+```{r rf_Accuracy}
+accuracy_rf <- mean(yhat.rf == test_data_cleaned_for_rf$label_as_factor)
+cat("Random Forest Accuracy:", accuracy_rf, "\n")
+```
+
+```{r rf_ROC_AUC}
+roc_rf <- roc(test_data_cleaned_for_rf$label_as_factor, as.numeric(yhat.rf))
+cat("Random Forest AUC:", auc(roc_rf), "\n")
+plot(roc_rf, main = "Random Forest ROC Curve")
+```
+
+```{r rf_f1_score}
+rf_f1_score <- F1_Score(y_pred = yhat.rf, y_true = test_data_cleaned_for_rf$label_as_factor)
+cat("F1 Score:", rf_f1_score, "\n")
+```
+
+
+Using a random forest tree model, we see that the accuracy of the model was 0.0.891 percent. Which is quite accurate! Misclassification Rate was equal to 0.898. The F1 score was equal to 0.924.
 
 #### Support Vector Machine (SVM) (Peter)
 
