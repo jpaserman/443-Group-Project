@@ -226,7 +226,7 @@ test_errors <- numeric(length(lambda_grid))
 ```
 
 
-```{r gbmloop}
+```{r gbmloop, eval=FALSE}
 
 test_data_cleaned <- test_data[, !colnames(test_data) %in% c("label_as_factor", "label")]
 # Loop over each lambda value
@@ -250,7 +250,7 @@ for (i in seq_along(lambda_grid)) {
 }
 ```
 
-```{r gbmtse}
+```{r gbmtse, eval=FALSE}
 # Combine lambda values and test errors into a data frame for plotting
 error_df <- data.frame(lambda = lambda_grid, test_error = test_errors)
 
@@ -293,7 +293,6 @@ accuracy <- mean(pred_classes == test_data_cleaned$label_as_numeric)
 auc <- auc(test_data_cleaned$label_as_numeric, pred_probs)
 # f1_score <- MLmetrics::F1_Score(predicted = pred_classes, reference = test_data_cleaned$label_as_numeric)
 
-# Print results
 cat("Test MSE:", test_mse, "\n")
 cat("Accuracy:", accuracy, "\n")
 cat("AUC:", auc, "\n")
