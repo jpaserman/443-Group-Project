@@ -367,7 +367,7 @@ test_data_cleaned_gbm <- test_data[, !colnames(test_data) %in% c("label_as_facto
 ```
 
 ```{r gbmloop, eval=FALSE}
-
+gbm_optimal_lambda_start <- Sys.time()
 # Loop over each lambda value
 for (i in seq_along(lambda_grid)) {
   lambda <- lambda_grid[i]
@@ -385,8 +385,11 @@ for (i in seq_along(lambda_grid)) {
   predictions <- predict(gbm_model, newdata = test_data_cleaned_gbm, n.trees = num_trees)
   
   # Calculate the Mean Squared Error on the test set
-  test_errors[i] <- mean((predictions - test_data_cleaned$label_as_numeric)^2)
+  test_errors[i] <- mean((predictions - test_data_cleaned_gbm$label_as_numeric)^2)
 }
+gbm_optimal_lambda_end <- Sys.time()
+gbm_optimal_lambda_total_time <- gbm_optimal_lambda_end - gbm_optimal_lambda_start
+print(gbm_optimal_lambda_total_time)
 ```
 
 ```{r gbmtse, eval=FALSE}
@@ -433,7 +436,7 @@ cat("GBM Model training time:", gbm_model_training_time, "\n")
 # Measure time for predictions
 gbm_start_time_pred <- Sys.time()
 # Make predictions on the test set using the best number of trees
-gbm_pred_probs <- predict(smallest_lambda_gbm_model, newdata = test_data_cleaned, n.trees = best_trees, type = "response")
+gbm_pred_probs <- predict(smallest_lambda_gbm_model, newdata = test_data_cleaned_gbm, n.trees = best_trees, type = "response")
 gbm_pred_classes <- ifelse(gbm_pred_probs > 0.5, 1, 0)
 
 # Measure time after predictions
@@ -468,7 +471,7 @@ gbm_f1_score <- F1_Score(y_pred = gbm_pred_classes, y_true = test_data_cleaned_g
 cat("F1 Score:", gbm_f1_score, "\n")
 ```
 
-The accuracy for the gradient descent decision tree model (where the shrinkage term was equal to 0.001) was 0.904. The Area under the curve was equal to 0.972 and the Test mean squared error was equal to 0.109. Misclassification rate was equal to 0.096. And F1 score was equal to 0.93
+The accuracy for the gradient descent decision tree model (where the shrinkage term was equal to 0.001) was 0.904. The Area under the curve was equal to 0.972 and the Test mean squared error was equal to 0.109. Misclassification rate was equal to 0.096. And F1 score was equal to 0.928
 
 #### Random Forest (Jonathan)
 
@@ -547,7 +550,7 @@ rf_f1_score <- F1_Score(y_pred = yhat.rf, y_true = test_data_cleaned_for_rf$labe
 cat("F1 Score:", rf_f1_score, "\n")
 ```
 
-Using a random forest tree model, we see that the accuracy of the model was 0.0.891 percent. Which is quite accurate! Misclassification Rate was equal to 0.898. The F1 score was equal to 0.924.
+Using a random forest tree model, we see that the accuracy of the model was 0.936 Which is quite accurate! Misclassification Rate was equal to 0.064. The F1 score was equal to 0.9504
 
 #### Support Vector Machine (SVM) (Peter)
 
