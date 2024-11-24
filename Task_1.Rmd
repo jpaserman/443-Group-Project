@@ -202,8 +202,10 @@ log_regression <- glm(label_as_numeric ~ . -label -label_as_factor, data = train
 #### Quadratic Discriminant Analysis (QDA) (Chi)
 
 ```{r qda_Train}
+## CAUTION: currently hard-coded numbers here. To be changed (Chi)
 options(expressions = 10000)
 qda_covariates = mean_table$genes[1:1100]
+## CAUTION: currently hard-coded numbers here. To be changed (Chi)
 
 qda_formula = as.formula(
   paste(
@@ -272,7 +274,9 @@ write.csv(knn_pred, file = "knn_predictions.csv", row.names = TRUE)
 knn_pred <- read.csv("knn_predictions.csv") %>% 
   dplyr::select(-X)
 
+## CAUTION: currently hard-coded numbers here. To be changed (Chi)
 colnames(knn_pred) <- paste0("k=", 1:10)
+## CAUTION: currently hard-coded numbers here. To be changed (Chi)
 ```
 
 ```{r kNN_Confusion}
