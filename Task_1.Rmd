@@ -47,7 +47,7 @@ task_one_df <- read.csv(csv_file_one)
 
 # str(task_one_df)
 task_one_df$label_as_factor <- as.factor(task_one_df$label)
-task_one_df$label_as_numeric <- as.numeric(task_one_df$label_as_factor) -1 
+task_one_df$label_as_numeric <- as.numeric(task_one_df$label_as_factor) -1 #Labels cells that are T-Reg cells as 1 and CD4 cells as 0
 # Split Data into Test and Train (We should all use the same data)
 
 train_split = as.integer(nrow(task_one_df)*training_size)
@@ -119,28 +119,59 @@ for (column in twenty_random_columns) {
 
 #### Linear Discriminant Analysis (LDA) (Imar)
 
-```{r}
+```{r LDA}
 
+lda_fit <- lda(label_as_numeric ~ . -label -label_as_factor, data=train_data)
+
+lda_pred_posterior <- predict(lda_fit, test_data)
+lda_pred <- predict(lda_fit, test_data)$class
+head(predict(lda_fit, test_data)$posterior)
+```
+
+```{r Confusion matrix}
+table(lda_pred, truth = test_data$label)
+```
+
+```{r Misclassification error rate}
+mean(lda_pred != test_data$label_as_numeric)
+```
+
+```{r ROC curve}
+roc_curve_lda <- roc(
+  test_data$label_as_factor, predict(lda_fit, test_data)$posterior[,2], 
+  levels= c("TREG", "CD4+T"), direction =">")
+plot(roc_curve_lda, col="blue", main = "ROC Curve for LDA")
+
+lda_auc <- auc(roc_curve_lda)
+lda_auc
 ```
 
 #### Logistic classifier (Imar)
 
 ```{r log regression with 300 predictors}
 # 1.) setting up subset dataframe
-train_data_subset1 <- train_data[, c("label", names(train_data)[2:301])]
-train_data_subset1$label_as_factor <- as.factor(train_data_subset1$label)
-train_data_subset1$label_as_numeric <- as.numeric(train_data_subset1$label_as_factor)-1
-train_data_subset1$label <- train_data_subset1$label_as_numeric
-train_data_subset1 <- train_data_subset1 %>%
-  dplyr::select(-label_as_factor, -label_as_numeric)
+# train_data_subset1 <- train_data[, c("label", names(train_data)[2:301])]
+# train_data_subset1$label_as_factor <- as.factor(train_data_subset1$label)
+# train_data_subset1$label_as_numeric <- as.numeric(train_data_subset1$label_as_factor)-1
+# train_data_subset1$label <- train_data_subset1$label_as_numeric
+# train_data_subset1 <- train_data_subset1 %>%
+#   dplyr::select(-label_as_factor, -label_as_numeric)
 
 # 2.) Log Regression on data subset
-log_formula <- as.formula(
-  paste("label_as_numeric ~", paste(names(train_data_subset1)[-1], collapse = " + ")))
-glm_fit_log <- glm(log_formula, data=train_data, family = binomial)
+# log_formula <- as.formula(
+#   paste("label_as_numeric ~", paste(names(train_data_subset1)[-1], collapse = " + "))
+glm_train_data <- train_data[,!colnames(train_data) %in% c("label_as_factor", "label")]
+glm_start_time <- Sys.time()
+glm_fit_log <- glm(label_as_numeric ~., data=glm_train_data, family = binomial)
+
+glm_end_time <- Sys.time()
+glm_time_to_run <- glm_end_time - glm_start_time
+cat("Logistic Model training time:", glm_time_to_run, "\n")
 summary(glm_fit_log)
 
-glm_probs <- predict(glm_fit_log, newdata = test_data, type = "response")
+
+test_data_cleaned_log <- test_data[, !colnames(test_data) %in% c("label_as_factor", "label")]
+glm_probs <- predict(glm_fit_log, newdata = test_data_cleaned_log, type = "response")
 glm_pred <- ifelse(glm_probs > 0.5, "TREG", "CD4+T")
 ```
 
@@ -155,6 +186,9 @@ mean(glm_pred != test_data$label_as_factor)
 ```{r log regression ROC}
 roc_curve_log <- roc(test_data$label_as_factor, glm_probs, levels=c("TREG", "CD4+T"), direction = ">")
 plot(roc_curve_log, col="blue", main="ROC Curve for Logistic Regression")
+
+log_auc <- auc(roc_curve_log)
+log_auc
 ```
 
 ```{r log regression with ALL predictors}
@@ -323,7 +357,7 @@ test_errors <- numeric(length(lambda_grid))
 ```
 
 ```{r dataprepgbm}
-test_data_cleaned <- test_data[, !colnames(test_data) %in% c("label_as_factor", "label")]
+test_data_cleaned_gbm <- test_data[, !colnames(test_data) %in% c("label_as_factor", "label")]
 ```
 
 ```{r gbmloop, eval=FALSE}
@@ -342,7 +376,7 @@ for (i in seq_along(lambda_grid)) {
                    verbose = FALSE)
   
   # Make predictions on the test set using the optimal number of trees
-  predictions <- predict(gbm_model, newdata = test_data_cleaned, n.trees = num_trees)
+  predictions <- predict(gbm_model, newdata = test_data_cleaned_gbm, n.trees = num_trees)
   
   # Calculate the Mean Squared Error on the test set
   test_errors[i] <- mean((predictions - test_data_cleaned$label_as_numeric)^2)
@@ -403,28 +437,28 @@ cat("Prediction time:", gbm_prediction_time, "\n")
 ```
 
 ```{r gbm_Confusion}
-gbm_confusion_matrix <- table(Predicted = gbm_pred_classes, Actual = test_data_cleaned$label_as_numeric)
+gbm_confusion_matrix <- table(Predicted = gbm_pred_classes, Actual = test_data_cleaned_gbm$label_as_numeric)
 print(gbm_confusion_matrix)
 ```
 
 ```{r gbm_Misclass}
-gbm_misclassification_rate <- mean(gbm_pred_classes != test_data_cleaned$label_as_numeric)
+gbm_misclassification_rate <- mean(gbm_pred_classes != test_data_cleaned_gbm$label_as_numeric)
 cat("Misclassification Rate:", gbm_misclassification_rate, "\n")
 ```
 
 ```{r gbm_Accuracy}
-gbm_accuracy <- mean(gbm_pred_classes == test_data_cleaned$label_as_numeric)
+gbm_accuracy <- mean(gbm_pred_classes == test_data_cleaned_gbm$label_as_numeric)
 cat("Accuracy:", gbm_accuracy, "\n")
 ```
 
 ```{r gbm_ROC_AUC}
-gbm_roc_curve <- roc(test_data_cleaned$label_as_numeric, gbm_pred_probs)
+gbm_roc_curve <- roc(test_data_cleaned_gbm$label_as_numeric, gbm_pred_probs)
 cat("AUC:", auc(gbm_roc_curve), "\n")
 plot(gbm_roc_curve, main = "ROC Curve")
 ```
 
 ```{r gbm_f1_score}
-gbm_f1_score <- F1_Score(y_pred = gbm_pred_classes, y_true = test_data_cleaned$label_as_numeric)
+gbm_f1_score <- F1_Score(y_pred = gbm_pred_classes, y_true = test_data_cleaned_gbm$label_as_numeric)
 cat("F1 Score:", gbm_f1_score, "\n")
 ```
 
