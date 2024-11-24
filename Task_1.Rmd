@@ -119,8 +119,31 @@ for (column in twenty_random_columns) {
 
 #### Linear Discriminant Analysis (LDA) (Imar)
 
-```{r}
+```{r LDA}
 
+lda_fit <- lda(label_as_numeric ~ . -label -label_as_factor, data=train_data)
+
+lda_pred_posterior <- predict(lda_fit, test_data)
+lda_pred <- predict(lda_fit, test_data)$class
+head(predict(lda_fit, test_data)$posterior)
+```
+
+```{r Confusion matrix}
+table(lda_pred, truth = test_data$label)
+```
+
+```{r Misclassification error rate}
+mean(lda_pred != test_data$label_as_numeric)
+```
+
+```{r ROC curve}
+roc_curve_lda <- roc(
+  test_data$label_as_factor, predict(lda_fit, test_data)$posterior[,2], 
+  levels= c("TREG", "CD4+T"), direction =">")
+plot(roc_curve_lda, col="blue", main = "ROC Curve for LDA")
+
+lda_auc <- auc(roc_curve_lda)
+lda_auc
 ```
 
 #### Logistic classifier (Imar)
@@ -155,6 +178,9 @@ mean(glm_pred != test_data$label_as_factor)
 ```{r log regression ROC}
 roc_curve_log <- roc(test_data$label_as_factor, glm_probs, levels=c("TREG", "CD4+T"), direction = ">")
 plot(roc_curve_log, col="blue", main="ROC Curve for Logistic Regression")
+
+log_auc <- auc(roc_curve_log)
+log_auc
 ```
 
 ```{r log regression with ALL predictors}
