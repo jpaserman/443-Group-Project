@@ -125,8 +125,37 @@ for (column in twenty_random_columns) {
 
 #### Logistic classifier (Imar)
 
-```{r}
+```{r log regression with 300 predictors}
+# 1.) setting up subset dataframe
+train_data_subset1 <- train_data[, c("label", names(train_data)[2:301])]
+train_data_subset1$label_as_factor <- as.factor(train_data_subset1$label)
+train_data_subset1$label_as_numeric <- as.numeric(train_data_subset1$label_as_factor)-1
+train_data_subset1$label <- train_data_subset1$label_as_numeric
+train_data_subset1 <- train_data_subset1 %>%
+  dplyr::select(-label_as_factor, -label_as_numeric)
 
+# 2.) Log Regression on data subset
+log_formula <- as.formula(
+  paste("label_as_numeric ~", paste(names(train_data_subset1)[-1], collapse = " + ")))
+glm_fit_log <- glm(log_formula, data=train_data, family = binomial)
+summary(glm_fit_log)
+```
+
+```{r log regression confusion}
+
+```
+
+```{r log regression Missclassification error rate}
+
+```
+
+```{r log regression ROC}
+
+```
+
+```{r log regression with ALL predictors}
+
+log_regression <- glm(label_as_numeric ~ . -label -label_as_factor, data = train_data, family = binomial)
 ```
 
 #### Quadratic Discriminant Analysis (QDA) (Chi)
@@ -215,8 +244,8 @@ for (i in kk_vector){
 plot(knn_misclass, type = "l")
 ```
 
-
 #### Gradient Boosting Decision Trees (GBDT) (Jonathan)
+
 ```{r gbmparams}
 #Number of trees
 num_trees = 1000
@@ -230,7 +259,6 @@ test_errors <- numeric(length(lambda_grid))
 ```{r dataprepgbm}
 test_data_cleaned <- test_data[, !colnames(test_data) %in% c("label_as_factor", "label")]
 ```
-
 
 ```{r gbmloop, eval=FALSE}
 
@@ -269,7 +297,8 @@ ggplot(error_df, aes(x = lambda, y = test_error)) +
   theme_minimal()
 
 ```
-The results above show use that the GLM model with the lowest Test Mean Squared Error, will be the one with the lowest lambda value we assigned of 0.001. This does not necessarily mean that the best Gradient Descent Boosting model that will work best will be the best model for our data, as it may not account for over fitting. However, we will continue using the GBDT model with a shrinkage value of 0.001 to analyze the model and to compare it to our other models. 
+
+The results above show use that the GLM model with the lowest Test Mean Squared Error, will be the one with the lowest lambda value we assigned of 0.001. This does not necessarily mean that the best Gradient Descent Boosting model that will work best will be the best model for our data, as it may not account for over fitting. However, we will continue using the GBDT model with a shrinkage value of 0.001 to analyze the model and to compare it to our other models.
 
 ```{r gbm_model}
 # Set a single shrinkage value
@@ -307,7 +336,6 @@ gbm_prediction_time <- gbm_end_time_pred - gbm_start_time_pred
 cat("Prediction time:", gbm_prediction_time, "\n")
 ```
 
-
 ```{r gbm_Confusion}
 gbm_confusion_matrix <- table(Predicted = gbm_pred_classes, Actual = test_data_cleaned$label_as_numeric)
 print(gbm_confusion_matrix)
@@ -336,8 +364,8 @@ cat("F1 Score:", gbm_f1_score, "\n")
 
 The accuracy for the gradient descent decision tree model (where the shrinkage term was equal to 0.001) was 0.904. The Area under the curve was equal to 0.972 and the Test mean squared error was equal to 0.109. Misclassification rate was equal to 0.096. And F1 score was equal to 0.93
 
-
 #### Random Forest (Jonathan)
+
 ```{r tree_init}
 ## Clean the test data for the Random Forest Classifier task
 test_data_cleaned_for_rf <- test_data[, !colnames(test_data) %in% c("label_as_numeric", "label")]
@@ -362,7 +390,7 @@ cv.rna_data <- cv.tree(tree.rna_features)
 plot(cv.rna_data$size, cv.rna_data$dev, type ='b')
 ```
 
-Above we use a  tree search to find....  When using the GBDT, we get that there are 11 features that are the most important to classifying whether a cell is a T Regulatory Cell or a CD4-positive cell. However, we can see based on the tree that there are certain features that appear more than once. Based on the tree plot, we can determine that the most important regressor that helps determine if a cell is a Regulatory T cell or a CD4-positive cell is the IL7R. From the National Library of medicine ("https://www.ncbi.nlm.nih.gov/gene/3575"), IL7R is a protein encoded by a gene that plays a critical role in the development of lymph nodes. Based on the analysis above, we decided to create a Random Forest regression that will have 12 terminal nodes. 
+Above we use a tree search to find.... When using the GBDT, we get that there are 11 features that are the most important to classifying whether a cell is a T Regulatory Cell or a CD4-positive cell. However, we can see based on the tree that there are certain features that appear more than once. Based on the tree plot, we can determine that the most important regressor that helps determine if a cell is a Regulatory T cell or a CD4-positive cell is the IL7R. From the National Library of medicine ("<https://www.ncbi.nlm.nih.gov/gene/3575>"), IL7R is a protein encoded by a gene that plays a critical role in the development of lymph nodes. Based on the analysis above, we decided to create a Random Forest regression that will have 12 terminal nodes.
 
 ```{r rfmodel}
 
@@ -412,7 +440,6 @@ plot(roc_rf, main = "Random Forest ROC Curve")
 rf_f1_score <- F1_Score(y_pred = yhat.rf, y_true = test_data_cleaned_for_rf$label_as_factor)
 cat("F1 Score:", rf_f1_score, "\n")
 ```
-
 
 Using a random forest tree model, we see that the accuracy of the model was 0.0.891 percent. Which is quite accurate! Misclassification Rate was equal to 0.898. The F1 score was equal to 0.924.
 
@@ -468,21 +495,16 @@ Using a random forest tree model, we see that the accuracy of the model was 0.0.
 
 ## T1.3: Improving F1 Score (???)
 
-Train and evaluating three classifiers of our choice with the goal of improving
-the F1 score (can use methods like bagging, boosting, and regularization).
+Train and evaluating three classifiers of our choice with the goal of improving the F1 score (can use methods like bagging, boosting, and regularization).
 
 ```{r}
 
 ```
-
 
 ## T1.4: Implement predictor (???)
 
-Choose the best approach from those above tested and implement our predictor
-as a function of our code.
+Choose the best approach from those above tested and implement our predictor as a function of our code.
 
 ```{r}
 
 ```
-
-
