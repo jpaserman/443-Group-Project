@@ -225,10 +225,13 @@ lambda_grid <- c(0.001, 0.01,0.03,0.05)
 test_errors <- numeric(length(lambda_grid))
 ```
 
+```{r dataprepgbm}
+test_data_cleaned <- test_data[, !colnames(test_data) %in% c("label_as_factor", "label")]
+```
+
 
 ```{r gbmloop, eval=FALSE}
 
-test_data_cleaned <- test_data[, !colnames(test_data) %in% c("label_as_factor", "label")]
 # Loop over each lambda value
 for (i in seq_along(lambda_grid)) {
   lambda <- lambda_grid[i]
