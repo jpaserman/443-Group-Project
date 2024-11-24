@@ -497,7 +497,7 @@ Above we use a tree search to find.... When using the GBDT, we get that there ar
 # RF model
 start_time_rf <- Sys.time()
 
-rf.rna_features <-randomForest(label_as_factor~. - label_as_numeric -label, data=train_data, mtry=12, importance=TRUE, n.tree = 5000) # RF Model
+rf.rna_features <-randomForest(label_as_factor~. - label_as_numeric -label, data=train_data, mtry=64, importance=TRUE, n.tree = 5000) # RF Model
 
 end_time_rf <- Sys.time()
 rf_training_time <- end_time_rf - start_time_rf
@@ -577,8 +577,21 @@ Using a random forest tree model, we see that the accuracy of the model was 0.0.
 
 #### Gradient Boosting Decision Trees (GBDT) (Jonathan)
 
-```{r}
+```{r Gbm_pca_standartization}
+# Standardize the data (important for PCA)
+gbm_train_data_scaled <- scale(train_data[, -which(names(train_data) %in% c("label", "label_as_factor"))])
+gbm_test_data_scaled <- scale(test_data_cleaned_gbm[, -which(names(test_data_cleaned_gbm) %in% c("label", "label_as_factor"))])
 
+# Perform PCA
+gbm_pca_model <- prcomp(gbm_train_data_scaled, center = TRUE, scale. = TRUE)
+
+# Get the first 10 principal components
+gbm_train_data_pca <- as.data.frame(gbm_pca_model$x[, 1:10])
+gbm_train_data_pca$label_as_numeric <- train_data$label_as_numeric  # Add the target variable
+
+# Transform the test data using the PCA model
+gbm_test_data_pca <- as.data.frame(predict(gbm_pca_model, newdata = gbm_test_data_scaled)[, 1:10])
+gbm_test_data_pca$label_as_numeric <- test_data_cleaned_gbm$label_as_numeric  # Add the target variable
 ```
 
 #### Random Forest (Jonathan)
