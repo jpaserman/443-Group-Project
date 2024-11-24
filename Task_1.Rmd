@@ -26,6 +26,8 @@ packages = list("class",
                 "caret"
 )
 
+# For knn-training
+kk_vector = c(2:7) 
 ```
 
 ```{r, include=FALSE}
@@ -242,18 +244,14 @@ qda_auc
 
 #### Nearest Neighbor Classifier (k-NN) (Chi)
 
-```{r kNN_train}
-kk_vector = c(3:7) 
-
+```{r kNN_train, eval = FALSE}
 knn_train_X <- train_data %>% 
-  dplyr::select(-label, -label_as_factor, label_as_numeric)
+  dplyr::select(-label, -label_as_factor, -label_as_numeric)
 
 knn_train_Y <- train_data$label_as_factor
 
 knn_test_X <- test_data %>% 
-  dplyr::select(-label, -label_as_factor, label_as_numeric)
-
-knn_test_Y <- test_data$label_as_factor
+  dplyr::select(-label, -label_as_factor, -label_as_numeric)
 
 knn_start_time <- Sys.time()
 knn_pred <- sapply(kk_vector,
@@ -264,6 +262,8 @@ knn_end_time <- Sys.time()
 
 knn_train_runtime <- knn_end_time - knn_start_time
 print(knn_train_runtime) #50 mins for k=1 to k=10 
+
+rm(knn_train_X, knn_train_Y, knn_test_X)
 ```
 
 ```{r kNN_save_load, include = FALSE}
@@ -275,18 +275,20 @@ knn_pred <- read.csv("knn_predictions.csv") %>%
 colnames(knn_pred) <- paste0("k=", 1:10)
 ```
 
-
 ```{r kNN_Confusion}
 for (i in kk_vector){
   print(paste("k =", i))
-  print(table(predicted = knn_pred[,i], observed = knn_test_Y))
+  print(table(predicted = knn_pred[,i], observed = test_data$label_as_factor))
 }
+
+knn_test_Y <- 
 ```
 
 ```{r kNN_Misclass}
 knn_misclass = c(rep(0,length(kk_vector)))
+
 for (i in kk_vector){
-  knn_misclass[i] = mean(knn_pred[,i] != knn_test_Y)
+  knn_misclass[i] = mean(knn_pred[,i] != test_data$label_as_factor)
 }
 plot(knn_misclass, type = "l")
 ```
