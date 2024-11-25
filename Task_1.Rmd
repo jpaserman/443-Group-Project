@@ -448,6 +448,10 @@ cat("Prediction time:", gbm_prediction_time, "\n")
 ```{r gbm_Confusion}
 gbm_confusion_matrix <- table(Predicted = gbm_pred_classes, Actual = test_data_cleaned_gbm$label_as_numeric)
 print(gbm_confusion_matrix)
+
+gbm_balanced_accuracy <- ((1/2) *(gbm_confusion_matrix[2,2]/(gbm_confusion_matrix[2,2]+gbm_confusion_matrix[1,2]))+ (1/2 *(gbm_confusion_matrix[1,1]/(gbm_confusion_matrix[1,1] + gbm_confusion_matrix[2,1]))))
+
+cat("The balanced accuracy is", gbm_balanced_accuracy, "\n")
 ```
 
 ```{r gbm_Misclass}
@@ -471,7 +475,7 @@ gbm_f1_score <- F1_Score(y_pred = gbm_pred_classes, y_true = test_data_cleaned_g
 cat("F1 Score:", gbm_f1_score, "\n")
 ```
 
-The accuracy for the gradient descent decision tree model (where the shrinkage term was equal to 0.001) was 0.904. The Area under the curve was equal to 0.972 and the Test mean squared error was equal to 0.109. Misclassification rate was equal to 0.096. And F1 score was equal to 0.928
+The accuracy for the gradient descent decision tree model (where the shrinkage term was equal to 0.001) was 0.904. The AUC was equal to 0.972 and the Test mean squared error was equal to 0.109. Misclassification rate was equal to 0.096. And F1 score was equal to 0.928
 
 #### Random Forest (Jonathan)
 
@@ -499,10 +503,9 @@ cv.rna_data <- cv.tree(tree.rna_features)
 plot(cv.rna_data$size, cv.rna_data$dev, type ='b')
 ```
 
-Above we use a tree search to find.... When using the GBDT, we get that there are 11 features that are the most important to classifying whether a cell is a T Regulatory Cell or a CD4-positive cell. However, we can see based on the tree that there are certain features that appear more than once. Based on the tree plot, we can determine that the most important regressor that helps determine if a cell is a Regulatory T cell or a CD4-positive cell is the IL7R. From the National Library of medicine ("<https://www.ncbi.nlm.nih.gov/gene/3575>"), IL7R is a protein encoded by a gene that plays a critical role in the development of lymph nodes. Based on the analysis above, we decided to create a Random Forest regression that will have 12 terminal nodes.
+Above we use a tree search to find.... When using the tree search, we get that there are 11 features that are the most important to classifying whether a cell is a T Regulatory Cell or a CD4-positive cell. However, we can see based on the tree that there are certain features that appear more than once. Based on the tree plot, we can determine that the most important regressor that helps determine if a cell is a Regulatory T cell or a CD4-positive cell is the IL7R. From the National Library of medicine ("<https://www.ncbi.nlm.nih.gov/gene/3575>"), IL7R is a protein encoded by a gene that plays a critical role in the development of lymph nodes. Based on the analysis above, we decided to create a Random Forest regression that will have 12 terminal nodes.
 
 ```{r rfmodel}
-
 # RF model
 start_time_rf <- Sys.time()
 
@@ -520,13 +523,14 @@ end_time_rf_pred <- Sys.time()
 rf_prediction_time <- end_time_rf_pred - start_time_rf_pred
 cat("Random Forest prediction time:", rf_prediction_time, "\n")
 
-
-
 ```
 
 ```{r rf_Confusion}
-performance_metrics <- confusionMatrix(yhat.rf, test_data_cleaned_for_rf$label_as_factor)
-print(performance_metrics)
+rf_confusion_matrix <- confusion_matrix <- table(Predicted = yhat.rf, Actual = test_data_cleaned_for_rf$label_as_factor)
+print(rf_confusion_matrix)
+rf_balanced_accuracy <- ((1/2) *(rf_confusion_matrix[2,2]/(rf_confusion_matrix[2,2]+rf_confusion_matrix[1,2]))+ (1/2 *(rf_confusion_matrix[1,1]/(rf_confusion_matrix[1,1] + rf_confusion_matrix[2,1]))))
+
+cat("The balanced accuracy is", rf_balanced_accuracy, "\n")
 ```
 
 ```{r rf_Misclass}
@@ -589,10 +593,13 @@ Using a random forest tree model, we see that the accuracy of the model was 0.93
 ```{r Gbm_pca_standartization}
 # Standardize the data (important for PCA)
 gbm_train_data_scaled <- scale(train_data[, -which(names(train_data) %in% c("label", "label_as_factor"))])
-gbm_test_data_scaled <- scale(test_data_cleaned_gbm[, -which(names(test_data_cleaned_gbm) %in% c("label", "label_as_factor"))])
+gbm_test_data_scaled <- scale(test_data_cleaned_gbm[,])
 
+gbm_pca_start <- Sys.time()
 # Perform PCA
 gbm_pca_model <- prcomp(gbm_train_data_scaled, center = TRUE, scale. = TRUE)
+gbm_pca_end <- Sys.time()
+gbm_pcaa_total_time <- gbm_pca_end - gbm_pca_start
 
 # Get the first 10 principal components
 gbm_train_data_pca <- as.data.frame(gbm_pca_model$x[, 1:10])
@@ -602,6 +609,8 @@ gbm_train_data_pca$label_as_numeric <- train_data$label_as_numeric  # Add the ta
 gbm_test_data_pca <- as.data.frame(predict(gbm_pca_model, newdata = gbm_test_data_scaled)[, 1:10])
 gbm_test_data_pca$label_as_numeric <- test_data_cleaned_gbm$label_as_numeric  # Add the target variable
 ```
+
+
 
 #### Random Forest (Jonathan)
 
