@@ -104,7 +104,7 @@ pca_data$label <- task_two_df$label  # Add the target variable
 ```
 
 ```{r subset_data}
-subset_index = as.integer(ncol(task_two_df)*0.3)
+subset_index = as.integer(ncol(task_two_df)*0.15)
 
 subset_split_indices <- sample(1:ncol(task_two_df), subset_index)
 subset_task_two_df <- task_two_df[, subset_split_indices]
