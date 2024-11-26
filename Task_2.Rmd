@@ -73,11 +73,8 @@ train_data <- task_two_df[train_indices,]
 test_data <- task_two_df[-train_indices,]
 ```
 
-<<<<<<< HEAD
 ## T2.1: exploratory data analysis and summary statistics (??? -- need to expand)
-=======
-## T2.1: exploratory data analysis and summary statistics
->>>>>>> 6d4b847 (lasso attempt changes)
+
 
 ```{r}
 nrow(task_two_df) # The data has 800 observations
