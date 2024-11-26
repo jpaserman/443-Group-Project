@@ -16,7 +16,8 @@ training_size = 0.8 # Proportion of dataset that is to be split for training
 packages = list("caret", 
                 "randomForest", 
                 "tree",
-                "glmnet"
+                "glmnet",
+                "leaps"
                 )
 
 ```
@@ -37,7 +38,30 @@ for (package in packages){
 ```{r train_test_split}
 set.seed(seed)
 
+# load_data_start_time <- Sys.time()
+
 task_two_df <- read.csv(csv_file_two)
+
+# load_data_end_time <- Sys.time()
+# 
+# load_data_runtime <- load_data_end_time - load_data_start_time
+# print(load_data_runtime) # 1.3 mins
+
+
+# check_na_start_time <- Sys.time()
+# 
+# # Checking if there are any rows that have missing values... Keep this hashed unless you want to check, because it takes a while to run
+# for (i in 1:nrow(task_two_df)) {
+#   if (any(is.na(task_two_df[i, ]))) {
+#     print(paste("Row", i, "contains NA values."))
+#   }
+# }
+# 
+# check_na_end_time <- Sys.time() # 16.8 mins
+
+# check_na_runtime <- check_na_end_time - check_na_start_time
+# print(check_na_runtime) 
+
 
 # task_two_df$label_as_factor <- as.factor(task_two_df$label)
 
@@ -89,7 +113,7 @@ plot(cv.lasso)
 ### Forward stepwise selection (FSS) (???)
 
 ```{r}
-
+start
 ```
 
 
