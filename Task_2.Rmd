@@ -75,6 +75,8 @@ zero_var_cols <- apply(task_two_df, 2, var) == 0
 table(zero_var_cols)
 
 task_two_df <- task_two_df[, !zero_var_cols ]
+
+task_two_df_first_523 <- task_two_df[, 1:523]
 ```
 
 
@@ -170,26 +172,52 @@ cv.lasso <-cv.glmnet(x_data_sparse, subset_task_two_df$label)
 
 ### Forward stepwise selection (FSS) (???)
 
-```{r}
+```{r, results='hold'}
 fss_start_time <- Sys.time()
 
 regfit_fwd <-  regsubsets(label ~ .,
-                        data = train_data,
-                        nvmax = 5,
+                        data = task_two_df_first_523,
+                        nvmax = 170,
                         method = "forward")
-summary(regfit_fwd)
-
-par(mfrow = c(2, 2))
-plot(regfit_fwd, scale = "r2")
-plot(regfit_fwd, scale = "adjr2")
-plot(regfit_fwd, scale = "Cp")
-plot(regfit_fwd, scale = "bic")
+reg_summary <- summary(regfit_fwd)
 
 fss_end_time <- Sys.time()
 fss_runtime <- fss_end_time - fss_start_time
 print(fss_runtime)
 
+par(mfrow=c(2,2))
+plot(reg_summary$rss, xlab="Number of Variables", ylab="RSS")
+
+# Plot adjusted R2 vs Number of Variables
+plot(reg_summary$adjr2, xlab="Number of Variables", ylab="Adjusted RSq", type="l")
+# which_max() function is used to identify the location of the maximum point of a vector
+best_model = which.max(reg_summary$adjr2)
+# Plot a red dot to indicate the model with the largest adjusted R2
+points(best_model, reg_summary$adjr2[best_model], col="red", cex=2, pch=20)
+
+## In a similar fashion, we can plot Cp and BIC
+plot(reg_summary$cp, xlab="Number of Variables", ylab="Cp", type="l")
+best_model = which.min(reg_summary$cp)
+points(best_model, reg_summary$cp[best_model], col="red", cex=2, pch=20)
+
+plot(reg_summary$bic, xlab="Number of Variables", ylab="BIC", type="l")
+best_model = which.min(reg_summary$bic)
+points(best_model, reg_summary$bic[best_model], col="red", cex=2, pch=20)
+
 ```
+
+
+
+
+
+```{r, fig.height = 20, fig.width = 50, fig.align = "center"}
+par(mfrow = c(2, 2))
+plot(regfit_fwd, scale = "r2")
+plot(regfit_fwd, scale = "adjr2")
+plot(regfit_fwd, scale = "Cp")
+plot(regfit_fwd, scale = "bic")
+```
+
 
 
 ### Backward stepwise selection (BSS) (???)
