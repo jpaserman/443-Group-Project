@@ -15,7 +15,8 @@ csv_file_two = "data2.csv.gz"
 training_size = 0.8 # Proportion of dataset that is to be split for training
 packages = list("caret", 
                 "randomForest", 
-                "tree"
+                "tree",
+                "glmnet"
                 )
 
 ```
@@ -69,7 +70,18 @@ different approaches of your choice that were covered in the course.
 
 ### Lasso (???)
 
-```{r}
+```{r Lasso model}
+start_task_two_lasso <- Sys.time()
+fit.lasso <-glmnet(tra,y)
+
+end_task_two_lasso <- Sys.time()
+total_lasso_time <- end_task_two_lasso - start_task_two_lasso
+print(total_lasso_time)
+
+plot(fit.lasso, xvar="lambda", label= TRUE)
+plot(fit.lasso, xvar="dev", label= TRUE)
+cv.lasso <-cv.glmnet(x, y)
+plot(cv.lasso)
 
 ```
 
