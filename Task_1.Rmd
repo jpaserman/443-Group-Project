@@ -717,11 +717,30 @@ gbm_test_data_pca$label_as_numeric <- test_data_cleaned_gbm$label_as_numeric  # 
 
 ## T1.3: Improving F1 Score (???)
 
-Train and evaluating three classifiers of our choice with the goal of improving the F1 score (can use methods like bagging, boosting, and regularization).
+Train and evaluating three classifiers of our choice with the goal of improving the F1 score (can use methods like bagging, boosting, and regularization (cross-fold validation, ridge/lasso)).
 
+#### Naive Bayes or QDA? - confirm theory to identify techniques of improvement (Chi)
 ```{r}
 
 ```
+
+#### Logistic Regression (w talk about why not adaBoost - confirm with GPT, improve model with ridge/lasso (regularisation), check on ) (Imar)
+```{r}
+
+```
+
+#### Random Forest (It's already bagged, use cross-validation) (Imar) 
+
+Hyperparameter tuning (cross-validation):
+Number of trees (n_estimators): Increasing the number of trees generally improves accuracy, but can slow down the model. 
+Maximum tree depth (max_depth): Controls how deep each tree can grow, preventing overfitting with a smaller depth. 
+Minimum samples per leaf (min_samples_leaf): Sets the minimum number of samples required to split a node, preventing overfitting. 
+Number of features considered at each split (max_features): Controls the randomness in the feature selection process. 
+```{r}
+
+```
+
+
 
 ## T1.4: Implement predictor (???)
 
