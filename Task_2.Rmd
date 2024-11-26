@@ -17,7 +17,9 @@ packages = list("caret",
                 "randomForest", 
                 "tree",
                 "glmnet",
-                "leaps"
+                "leaps",
+                "bigmemory",
+                "biglasso"
                 )
 
 ```
@@ -129,23 +131,24 @@ different approaches of your choice that were covered in the course.
 ### Lasso (???)
 
 ```{r Lasso model}
-train_data_cleaned_lasso <- train_data[, !colnames(test_data) %in% c("label")]
-test_data_cleaned_lasso <- test_data[, !colnames(test_data) %in% c("label")]
+# train_data_cleaned_lasso <- train_data[, !colnames(test_data) %in% c("label")]
+# test_data_cleaned_lasso <- test_data[, !colnames(test_data) %in% c("label")]
 
+x_data_sparse <- Matrix(model.matrix(label ~ ., train_data)[, -1], sparse = TRUE)
 grid <- 10^seq(10, -2, length = 20)
 start_task_two_lasso <- Sys.time()
-fit.lasso <-glmnet(train_data_cleaned_lasso,train_data$label, alpha = 1, lambda = grid)
-
+fit.lasso <-glmnet(x_data_model_for_lasso,train_data$label, alpha = 1, lambda = grid)
+#
 end_task_two_lasso <- Sys.time()
 total_lasso_time <- end_task_two_lasso - start_task_two_lasso
-
+#
 plot(fit.lasso)
 print(total_lasso_time)
-
+#
 plot(fit.lasso, xvar="lambda", label= TRUE)
 plot(fit.lasso, xvar="dev", label= TRUE)
-cv.lasso <-cv.glmnet(train_data[,-1], train_data$label)
-plot(cv.lasso)
+cv.lasso <-cv.glmnet(x_data_model_for_lasso, train_data$label)
+
 ```
 
 
