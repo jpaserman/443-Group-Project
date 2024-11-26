@@ -70,9 +70,12 @@ task_two_df <- read.csv(csv_file_two)
 ```
 
 ```{r}
-which_are_constant(task_two_df)
-```
+zero_var_cols <- apply(task_two_df, 2, var) == 0
+which(zero_var_cols)
+table(zero_var_cols)
 
+task_two_df_has_var <- task_two_df[, !colnames(task_two_df) %in% zero_var_cols)]
+```
 
 
 ```{r apply_pca}
