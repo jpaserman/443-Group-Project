@@ -69,12 +69,12 @@ task_two_df <- read.csv(csv_file_two)
 
 ```
 
-```{r}
+```{r drop_columns with 0 variance}
 zero_var_cols <- apply(task_two_df, 2, var) == 0
-which(zero_var_cols)
+# which(zero_var_cols)
 table(zero_var_cols)
 
-task_two_df_has_var <- task_two_df[, !colnames(task_two_df) %in% zero_var_cols)]
+task_two_df <- task_two_df[, !zero_var_cols ]
 ```
 
 
@@ -89,16 +89,28 @@ task_two_data_scaled <- scale(task_two_df[, -which(names(task_two_df) %in% c("la
 pca_model <- prcomp(task_two_data_scaled, center = TRUE, scale. = TRUE)
 
 pca_end_time <- Sys.time()
-pca_runtime <- pca_end_time - pca_end_time
-
+pca_runtime <- pca_end_time - pca_start_time
+print(pca_runtime)
 ```
 
 
 ```{r apply_pca}
-pca_model <- preProcess(task_two_df[, -1], method = "pca", pcaComp = 1000)
-pca_data <- predict(pca_model, task_two_df[, -1])
-pca_data <- cbind(pca_data, label = task_two_df$label)
+pca_data <- as.data.frame(pca_model$x[, 1:800])
+pca_data$label <- task_two_df$label  # Add the target variable
+
+# Transform the test data using the PCA model
+# gbm_test_data_pca <- as.data.frame(predict(gbm_pca_model, newdata = gbm_test_data_scaled)[, 1:10])
+# gbm_test_data_pca$label_as_numeric <- test_data_cleaned_gbm$label_as_numeric  # Add the target variable
 ```
+
+```{r subset_data}
+subset_index = as.integer(ncol(task_two_df)*0.3)
+
+subset_split_indices <- sample(1:ncol(task_two_df), subset_index)
+subset_task_two_df <- task_two_df[, subset_split_indices]
+subset_task_two_df$label <- task_two_df$label
+```
+
 
 
 ```{r train_test_split}
@@ -137,10 +149,11 @@ different approaches of your choice that were covered in the course.
 # train_data_cleaned_lasso <- train_data[, !colnames(test_data) %in% c("label")]
 # test_data_cleaned_lasso <- test_data[, !colnames(test_data) %in% c("label")]
 
-x_data_sparse <- Matrix(model.matrix(label ~ ., train_data)[, -1], sparse = TRUE)
-grid <- 10^seq(10, -2, length = 20)
+
+x_data_sparse <- model.matrix(label ~ ., subset_task_two_df)[, -1]
+grid <- 10^seq(10, -2, length = 100)
 start_task_two_lasso <- Sys.time()
-fit.lasso <-glmnet(x_data_model_for_lasso,train_data$label, alpha = 1, lambda = grid)
+fit.lasso <-glmnet(x_data_sparse,subset_task_two_df$label, alpha = 1, lambda = grid)
 #
 end_task_two_lasso <- Sys.time()
 total_lasso_time <- end_task_two_lasso - start_task_two_lasso
@@ -150,7 +163,7 @@ print(total_lasso_time)
 #
 plot(fit.lasso, xvar="lambda", label= TRUE)
 plot(fit.lasso, xvar="dev", label= TRUE)
-cv.lasso <-cv.glmnet(x_data_model_for_lasso, train_data$label)
+cv.lasso <-cv.glmnet(x_data_sparse, subset_task_two_df$label)
 
 ```
 
