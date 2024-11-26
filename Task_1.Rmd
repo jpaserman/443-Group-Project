@@ -44,7 +44,7 @@ for (package in packages){
 
 # Task 1: binary classification
 
-```{r train_test_split}
+```{r load_data}
 set.seed(seed)
 
 task_one_df <- read.csv(csv_file_one)
@@ -53,7 +53,17 @@ task_one_df <- read.csv(csv_file_one)
 task_one_df$label_as_factor <- as.factor(task_one_df$label)
 task_one_df$label_as_numeric <- as.numeric(task_one_df$label_as_factor) -1 #Labels cells that are T-Reg cells as 1 and CD4 cells as 0
 # Split Data into Test and Train (We should all use the same data)
+```
 
+
+```{r}
+# Ensure that there are no variables with constant variance
+zero_var_cols <- apply(task_one_df, 2, var) == 0
+table(zero_var_cols)
+```
+
+
+```{r train_test_split}
 train_split = as.integer(nrow(task_one_df)*training_size)
 
 train_indices <- sample(1:nrow(task_one_df), train_split)
