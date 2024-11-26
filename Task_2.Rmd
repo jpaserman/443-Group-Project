@@ -35,7 +35,7 @@ for (package in packages){
 
 # Task 2: feature selection
 
-```{r train_test_split}
+```{r load_data}
 set.seed(seed)
 
 # load_data_start_time <- Sys.time()
@@ -65,6 +65,38 @@ task_two_df <- read.csv(csv_file_two)
 
 # task_two_df$label_as_factor <- as.factor(task_two_df$label)
 
+```
+
+```{r}
+which_are_constant(task_two_df)
+```
+
+
+
+```{r apply_pca}
+
+pca_start_time <- Sys.time()
+
+# Standardize the data (important for PCA)
+task_two_data_scaled <- scale(task_two_df[, -which(names(task_two_df) %in% c("label"))])
+
+# Perform PCA
+pca_model <- prcomp(task_two_data_scaled, center = TRUE, scale. = TRUE)
+
+pca_end_time <- Sys.time()
+pca_runtime <- pca_end_time - pca_end_time
+
+```
+
+
+```{r apply_pca}
+pca_model <- preProcess(task_two_df[, -1], method = "pca", pcaComp = 1000)
+pca_data <- predict(pca_model, task_two_df[, -1])
+pca_data <- cbind(pca_data, label = task_two_df$label)
+```
+
+
+```{r train_test_split}
 # Split Data into Test and Train (We should all use the same data)
 train_split = as.integer(nrow(task_two_df)*training_size)
 
@@ -72,6 +104,7 @@ train_indices <- sample(1:nrow(task_two_df), train_split)
 train_data <- task_two_df[train_indices,]
 test_data <- task_two_df[-train_indices,]
 ```
+
 
 ## T2.1: exploratory data analysis and summary statistics (??? -- need to expand)
 
@@ -119,7 +152,24 @@ plot(cv.lasso)
 ### Forward stepwise selection (FSS) (???)
 
 ```{r}
-start
+fss_start_time <- Sys.time()
+
+regfit_fwd <-  regsubsets(label ~ .,
+                        data = train_data,
+                        nvmax = 5,
+                        method = "forward")
+summary(regfit_fwd)
+
+par(mfrow = c(2, 2))
+plot(regfit_fwd, scale = "r2")
+plot(regfit_fwd, scale = "adjr2")
+plot(regfit_fwd, scale = "Cp")
+plot(regfit_fwd, scale = "bic")
+
+fss_end_time <- Sys.time()
+fss_runtime <- fss_end_time - fss_start_time
+print(fss_runtime)
+
 ```
 
 
