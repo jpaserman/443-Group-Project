@@ -12,6 +12,7 @@ options(warn=-1)
 ```{r parameters}
 seed = 443
 csv_file_two = "data2.csv.gz"
+training_size = 0.8 # Proportion of dataset that is to be split for training
 packages = list("caret", 
                 "randomForest", 
                 "tree"
@@ -20,8 +21,6 @@ packages = list("caret",
 ```
 
 ```{r, include=FALSE}
-set.seed(seed)
-
 for (package in packages){
   if(!require(package, character.only = TRUE)){
     install.packages(package, character.only = TRUE)
@@ -34,20 +33,30 @@ for (package in packages){
 
 # Task 2: feature selection
 
-```{r}
+```{r train_test_split}
+set.seed(seed)
+
 task_two_df <- read.csv(csv_file_two)
 
-str(task_two_df)
+# task_two_df$label_as_factor <- as.factor(task_two_df$label)
+
+# Split Data into Test and Train (We should all use the same data)
+train_split = as.integer(nrow(task_two_df)*training_size)
+
+train_indices <- sample(1:nrow(task_two_df), train_split)
+train_data <- task_two_df[train_indices,]
+test_data <- task_two_df[-train_indices,]
 ```
-
-```{r}
-table(task_two_df$label)
-```
-
-
+s
 ## T2.1: exploratory data analysis and summary statistics
 
 ```{r}
+nrow(task_two_df) # The data has 800 observations
+ncol(task_two_df) # The data contains 100,001 variables (50,000-real variables, 50,000-random probes, 1-label)
+
+# Labels represent whether given compound binds to target site on thrombin 
+# Possible values are -1 (compound did not bind) and 1 (compound did bind)
+table(task_two_df$label) # 772 compounds did not bind and 78 compounds did bind
 
 ```
 
@@ -58,9 +67,26 @@ Train and evaluate feature selection methods with the goal of achieving high
 balanced accuracy using a minimal number of selected features. Use three 
 different approaches of your choice that were covered in the course.
 
+### Lasso (???)
+
 ```{r}
 
 ```
+
+
+### Forward stepwise selection (FSS) (???)
+
+```{r}
+
+```
+
+
+### Backward stepwise selection (BSS) (???)
+
+```{r}
+
+```
+
 
 
 ## T2.3: additional feature selection methods
@@ -75,7 +101,28 @@ and the number of selected features achieved by each method for various numbers
 of selected features. You may also compare the balanced accuracy achieved 
 by different methods for a similar number of selected features.
 
+### Elastic net (not covered in class) (???)
+
 ```{r}
 
 ```
+
+
+### [[Tree-Based models]] (i.e., either Random Forest or LightGBM) (???)
+
+```{r}
+
+```
+
+
+### (Sparse?) SVM (???)
+
+Is the non-sparse SVM a feature-selection method?
+
+```{r}
+
+```
+
+
+
 
