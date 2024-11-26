@@ -70,13 +70,13 @@ task_two_df <- read.csv(csv_file_two)
 ```
 
 ```{r drop_columns with 0 variance}
-zero_var_cols <- apply(task_two_df, 2, var) == 0
+zero_var_cols <- apply(task_two_df, 2, var) <= 0.01
 # which(zero_var_cols)
 table(zero_var_cols)
 
 task_two_df <- task_two_df[, !zero_var_cols ]
 
-task_two_df_first_523 <- task_two_df[, 1:523]
+# task_two_df_first_523 <- task_two_df[, 1:523]
 ```
 
 
@@ -145,28 +145,40 @@ Train and evaluate feature selection methods with the goal of achieving high
 balanced accuracy using a minimal number of selected features. Use three 
 different approaches of your choice that were covered in the course.
 
-### Lasso (???)
+### Lasso (Jonathan)
 
 ```{r Lasso model}
 # train_data_cleaned_lasso <- train_data[, !colnames(test_data) %in% c("label")]
-# test_data_cleaned_lasso <- test_data[, !colnames(test_data) %in% c("label")]
+test_data_cleaned_lasso <- test_data[, !colnames(test_data) %in% c("label")]
 
 
-x_data_sparse <- model.matrix(label ~ ., subset_task_two_df)[, -1]
+x_data_sparse <- Matrix(model.matrix(label ~ ., train_data)[, -1], sparse = TRUE)
 grid <- 10^seq(10, -2, length = 100)
 start_task_two_lasso <- Sys.time()
-fit.lasso <-glmnet(x_data_sparse,subset_task_two_df$label, alpha = 1, lambda = grid)
-#
+fit.lasso <-glmnet(x_data_sparse,train_data$label, alpha = 1, lambda = grid)
+
 end_task_two_lasso <- Sys.time()
 total_lasso_time <- end_task_two_lasso - start_task_two_lasso
-#
+
 plot(fit.lasso)
 print(total_lasso_time)
-#
+
+
 plot(fit.lasso, xvar="lambda", label= TRUE)
 plot(fit.lasso, xvar="dev", label= TRUE)
 cv.lasso <-cv.glmnet(x_data_sparse, subset_task_two_df$label)
 
+pred.test_lasso <-predict(fit.lasso, test_data_cleaned_lasso)
+
+```
+
+```{r Confusion Lasso}
+lasso_confusion_matrix <- table(Predicted = pred.test_lasso, Actual = test_data$label)
+print(lasso_confusion_matrix)
+
+lasso_balanced_accuracy <- ((1/2) *(lasso_confusion_matrix[2,2]/(lasso_confusion_matrix[2,2]+lasso_confusion_matrix[1,2]))+ (1/2 *(lasso_confusion_matrix[1,1]/(lasso_confusion_matrix[1,1] + lasso_confusion_matrix[2,1]))))
+
+cat("The balanced accuracy is", lasso_balanced_accuracy, "\n")
 ```
 
 
