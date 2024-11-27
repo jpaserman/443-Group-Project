@@ -69,14 +69,53 @@ task_two_df <- read.csv(csv_file_two)
 
 ```
 
-```{r drop_columns with 0 variance}
-zero_var_cols <- apply(task_two_df, 2, var) == 0.00
-# which(zero_var_cols)
-table(zero_var_cols)
 
-task_two_df <- task_two_df[, !zero_var_cols ]
+```{r EDA}
 
-# task_two_df_first_523 <- task_two_df[, 1:523]
+nrow(task_two_df) # Our data originally has 800 observations (compounds)
+ncol(task_two_df) # Our data originally has 100,001 features (1 label as well as 50000 real variables and 50000 random probes, randomly permuted)
+
+# Construct dataset of solely the binary features
+task_two_df_no_label <- task_two_df[, -1]
+
+# For each feature, determine the number of observations with "1s" and the variance of the feature
+totals_vector <- sapply(task_two_df_no_label, sum)
+variance_vector <- sapply(task_two_df_no_label, var)
+
+quantile(totals_vector)
+quantile(variance_vector)
+
+# Histogram of the totals and the variance
+hist(totals_vector, breaks = seq(min(totals_vector), max(totals_vector), by = 1),
+     main = "Histogram of number of compounds per feature")
+hist(variance_vector, breaks = seq(min(variance_vector), max(variance_vector), length.out = 1000),
+     main = "Histogram of variance of compounds per feature")
+
+### We notice that there are numerous features that are present in almost no observations
+### As such, we investigate the possiblity of implementing a variance threshold to 
+### restrict the number of features we retain
+sum(totals_vector == 0)
+
+# If we implement a variance threshold of 0.01 (corresponding to a feature only being present
+# in a maximum of 8 out of 800 observations), we would remove 69,879 features
+above_var_threshold <- totals_vector[variance_vector > .01]
+min(above_var_threshold)
+sum(variance_vector <= .01)
+
+```
+
+
+```{r drop_columns less than 0.01 variance}
+# Remove features that have less than or equal to 0.01 variance
+cols_below_var_threshold <- apply(task_two_df, 2, var) <= 0.01
+table(cols_below_var_threshold)
+task_two_df <- task_two_df[, !cols_below_var_threshold]
+
+# After removing features with low variance, our data prior to feature selection 
+# has 800 observations and now only 30,122 features
+nrow(task_two_df)
+ncol(task_two_df)
+
 ```
 
 
