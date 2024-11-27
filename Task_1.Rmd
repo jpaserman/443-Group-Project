@@ -614,25 +614,53 @@ Using a random forest tree model, we see that the accuracy of the model was 0.93
 #### Linear Discriminant Analysis (LDA) (Imar)
 
 ```{r}
-lda_pca_start <- Sys.time()
-lda_pca_model <- prcomp(train_data_log, scale = TRUE)
-lda_pca_end <- Sys.time()
-lda_pca_total_time <- lda_pca_end - lda_pca_start
-lda_pca_total_time
+# CAUTION TO DO: Still need to refer to use train data and not again CreateDataPartition off 80% of already 80% train data
 
-names(lda_pca_model)
-lda_pca_model$center
-# lda_pca_model$scale
-# lda_pca_model$rotation
-# dim(lda_pca_model$x)
+# Step 1: Scale the data (excluding the target variable)
+lda2_train_data <- train_data
+lda2_train_data <- lda2_train_data[, !(names(lda2_train_data) %in% c("label_as_factor", "label_as_numeric"))]
+lda2_train_data$label <- ifelse(lda2_train_data$label == "TREG", 1, 0)
 
-log_pca_var <- log_pca_model$sdev^2
-log_pca_pve <- log_pca_var/sum(log_pca_var)
-log_pca_pve
-cumulative_pve <- cumsum(log_pca_pve)
-num_components_90 <- which(cumulative_pve >= 0.90)[1]
-num_components_90
-selected_components <- 1:num_components_90
+scaled_data <- lda2_train_data[, -which(names(lda2_train_data) == "label")]  # Exclude the 'label' column
+scaled_data <- scale(scaled_data)  # scale the features to have mean=0 and sd=1
+
+# Step 2: Apply PCA and reduce to 10 components
+pca_model <- prcomp(scaled_data, center = TRUE, scale. = TRUE)
+
+# Check the variance explained by the principal components
+summary(pca_model)
+
+# Extract the first 10 principal components
+pca_data <- data.frame(pca_model$x[, 1:10])  # Keep only the first 10 principal components
+
+# Step 3: Add the target variable to the PCA-transformed data
+pca_data$label <- lda2_train_data$label  # Add the target labels
+
+# Step 4: Split the data into training and testing sets using createDataPartition
+set.seed(123)  # Set a seed for reproducibility
+lda_pca_train_indices <- createDataPartition(pca_data$label, p = 0.8, list = FALSE)
+lda_pca_train_data <- pca_data[lda_pca_train_indices, ]
+lda_pca_test_data <- pca_data[-lda_pca_train_indices, ]
+
+# Step 5: Train the LDA model using the PCA-transformed training data
+lda_model <- lda(label ~ ., data = lda_pca_train_data)
+
+# Step 6: Make predictions on the test set
+lda_predictions <- predict(lda_model, lda_pca_test_data)
+
+# Step 7: Evaluate the model performance using confusion matrix
+lda_pca_test_data$label <- as.factor(lda_pca_test_data$label)
+confusion_mat <- confusionMatrix(lda_predictions$class, lda_pca_test_data$label)
+levels(lda_predictions); levels(lda_pca_test_data)
+# Print the confusion matrix and accuracy
+print(confusion_mat)
+
+# Optional: Visualize the results of PCA (for two principal components)
+# Create a 2D plot (for visualizing the first two PCs)
+ggplot(data = pca_data, aes(x = PC1, y = PC2, color = factor(label_as_numeric))) +
+  geom_point() +
+  labs(title = "PCA - First 2 Principal Components", x = "PC1", y = "PC2") +
+  theme_minimal()
 
 ```
 
