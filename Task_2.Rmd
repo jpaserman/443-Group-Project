@@ -70,7 +70,7 @@ task_two_df <- read.csv(csv_file_two)
 ```
 
 ```{r drop_columns with 0 variance}
-zero_var_cols <- apply(task_two_df, 2, var) <= 0.01
+zero_var_cols <- apply(task_two_df, 2, var) == 0.00
 # which(zero_var_cols)
 table(zero_var_cols)
 
@@ -106,7 +106,7 @@ pca_data$label <- task_two_df$label  # Add the target variable
 ```
 
 ```{r subset_data}
-subset_index = as.integer(ncol(task_two_df)*0.15)
+subset_index = as.integer(ncol(task_two_df)*0.20)
 
 subset_split_indices <- sample(1:ncol(task_two_df), subset_index)
 subset_task_two_df <- task_two_df[, subset_split_indices]
@@ -152,10 +152,10 @@ different approaches of your choice that were covered in the course.
 test_data_cleaned_lasso <- test_data[, !colnames(test_data) %in% c("label")]
 
 
-x_data_sparse <- Matrix(model.matrix(label ~ ., train_data)[, -1], sparse = TRUE)
+x_data_sparse <-model.matrix(label ~ ., subset_task_two_df)[, -1]
 grid <- 10^seq(10, -2, length = 100)
 start_task_two_lasso <- Sys.time()
-fit.lasso <-glmnet(x_data_sparse,train_data$label, alpha = 1, lambda = grid)
+fit.lasso <-glmnet(x_data_sparse,subset_task_two_df$label, alpha = 1, lambda = grid)
 
 end_task_two_lasso <- Sys.time()
 total_lasso_time <- end_task_two_lasso - start_task_two_lasso
