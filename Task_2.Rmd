@@ -121,41 +121,6 @@ table(task_two_df$label) # 772 compounds did not bind and 78 compounds did bind
 ```
 
 
-```{r apply_pca}
-
-pca_start_time <- Sys.time()
-
-# Standardize the data (important for PCA)
-task_two_data_scaled <- scale(task_two_df[, -which(names(task_two_df) %in% c("label"))])
-
-# Perform PCA
-pca_model <- prcomp(task_two_data_scaled, center = TRUE, scale. = TRUE)
-
-pca_end_time <- Sys.time()
-pca_runtime <- pca_end_time - pca_start_time
-print(pca_runtime)
-```
-
-
-```{r apply_pca}
-pca_data <- as.data.frame(pca_model$x[, 1:800])
-pca_data$label <- task_two_df$label  # Add the target variable
-
-# Transform the test data using the PCA model
-# gbm_test_data_pca <- as.data.frame(predict(gbm_pca_model, newdata = gbm_test_data_scaled)[, 1:10])
-# gbm_test_data_pca$label_as_numeric <- test_data_cleaned_gbm$label_as_numeric  # Add the target variable
-```
-
-```{r subset_data}
-subset_index = as.integer(ncol(task_two_df)*0.20)
-
-subset_split_indices <- sample(1:ncol(task_two_df), subset_index)
-subset_task_two_df <- task_two_df[, subset_split_indices]
-subset_task_two_df$label <- task_two_df$label
-```
-
-
-
 ```{r train_test_split}
 # Split Data into Test and Train (We should all use the same data)
 train_split = as.integer(nrow(task_two_df)*training_size)
@@ -181,33 +146,6 @@ balanced accuracy using a minimal number of selected features. Use three
 different approaches of your choice that were covered in the course.
 
 ### Lasso (Jonathan)
-
-```{r Lasso model}
-
-test_data_clean_matrix <- as.matrix(test_data[, -1])
-
-train_data_clean_matrix <-as.matrix(train_data[,-1])
-grid <- 10^seq(10, -2, length = 100)
-fit.lasso <-glmnet(train_data_clean_matrix,train_data$label, alpha = 1, lambda = grid)
-
-
-
-
-
-cv.lasso <-cv.glmnet(train_data_clean_matrix, train_data$label)
-
-pred.test_lasso <-predict(fit.lasso, test_data_clean_matrix)
-
-```
-
-```{r Confusion Lasso}
-lasso_confusion_matrix <- table(Predicted = pred.test_lasso, Actual = test_data$label)
-print(lasso_confusion_matrix)
-
-lasso_balanced_accuracy <- ((1/2) *(lasso_confusion_matrix[2,2]/(lasso_confusion_matrix[2,2]+lasso_confusion_matrix[1,2]))+ (1/2 *(lasso_confusion_matrix[1,1]/(lasso_confusion_matrix[1,1] + lasso_confusion_matrix[2,1]))))
-
-cat("The balanced accuracy is", lasso_balanced_accuracy, "\n")
-```
 
 ```{r lasso with balanced accuracy}
 # Prepare the data
@@ -306,10 +244,6 @@ points(best_model, reg_summary$bic[best_model], col="red", cex=2, pch=20)
 
 ```
 
-
-
-
-
 ```{r, fig.height = 20, fig.width = 50, fig.align = "center"}
 par(mfrow = c(2, 2))
 plot(regfit_fwd, scale = "r2")
@@ -319,13 +253,11 @@ plot(regfit_fwd, scale = "bic")
 ```
 
 
-
-### Backward stepwise selection (BSS) (???)
+### Random forest (???)
 
 ```{r}
 
 ```
-
 
 
 ## T2.3: additional feature selection methods
@@ -347,7 +279,7 @@ by different methods for a similar number of selected features.
 ```
 
 
-### [[Tree-Based models]] (i.e., either Random Forest or LightGBM) (???)
+### [[Tree-Based models]] (i.e., either XGBoost or LightGBM) (???)
 
 ```{r}
 
