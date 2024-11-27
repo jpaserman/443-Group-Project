@@ -44,7 +44,7 @@ for (package in packages){
 
 # Task 1: binary classification
 
-```{r load_data}
+```{r train_test_split}
 set.seed(seed)
 
 task_one_df <- read.csv(csv_file_one)
@@ -53,17 +53,7 @@ task_one_df <- read.csv(csv_file_one)
 task_one_df$label_as_factor <- as.factor(task_one_df$label)
 task_one_df$label_as_numeric <- as.numeric(task_one_df$label_as_factor) -1 #Labels cells that are T-Reg cells as 1 and CD4 cells as 0
 # Split Data into Test and Train (We should all use the same data)
-```
 
-
-```{r}
-# Ensure that there are no variables with constant variance
-zero_var_cols <- apply(task_one_df, 2, var) == 0
-table(zero_var_cols)
-```
-
-
-```{r train_test_split}
 train_split = as.integer(nrow(task_one_df)*training_size)
 
 train_indices <- sample(1:nrow(task_one_df), train_split)
@@ -182,16 +172,43 @@ cat("Misclassification error rate of LDA:", misclas_lda, "\n")
 #### Logistic classifier (Imar)
 
 ```{r logreg_Model}
-train_data_log <- train_data[, !(names(test_data) %in% c("label_as_factor", "label"))]
+set.seed(440)
+
+# Calculate the number of rows to sample (75% of the dataset)
+sample_size <- floor(0.75 * nrow(task_one_df))
+
+# Randomly sample the indices for the 75% of the data
+sample_indices <- sample(1:nrow(task_one_df), sample_size)
+
+# Create the resampled dataset using the sampled indices
+resampled_data <- task_one_df[sample_indices, ]
+
+# View the resampled data
+head(resampled_data)
+
+log_train_split = as.integer(nrow(task_one_df)*0.50)
+log_train_indices <- sample(1:nrow(task_one_df), log_train_split)
+log_train_data <- task_one_df[log_train_indices,]
+log_test_data <- task_one_df[-log_train_indices,]
+
+head(log_train_indices)
+
+dim(log_train_data)
+log_train_data <- resampled_data[, !(names(resampled_data) %in% c("label_as_factor", "label"))]
+dim(log_train_data)
+
+head(log_train_data)
+dim(train_data)
+head(train_data)
 
 glm_start_time <- Sys.time()
-glm_fit_log <- glm(label_as_numeric ~ ., data= train_data_log, family = binomial)
+glm_fit_log <- glm(label_as_numeric ~ ., data= log_train_data, family = binomial)
 glm_end_time <- Sys.time()
 glm_time_to_run <- glm_end_time - glm_start_time
 cat("Logistic Model training time:", glm_time_to_run, "\n")
 summary(glm_fit_log)
 #for 80% training data - Warning: glm.fit: algorithm did not converge
-glm_probs <- predict(glm_fit_log, newdata = test_data, type = "response")
+glm_probs <- predict(glm_fit_log, newdata = log_test_data, type = "response")
 #Warning: prediction from rank-deficient fit; attr(*, "non-estim") has doubtful cases
 glm_pred <- ifelse(glm_probs > 0.5, "TREG", "CD4+T")
 ```
@@ -597,13 +614,44 @@ Using a random forest tree model, we see that the accuracy of the model was 0.93
 #### Linear Discriminant Analysis (LDA) (Imar)
 
 ```{r}
+lda_pca_start <- Sys.time()
+lda_pca_model <- prcomp(train_data_log, scale = TRUE)
+lda_pca_end <- Sys.time()
+lda_pca_total_time <- lda_pca_end - lda_pca_start
+lda_pca_total_time
+
+names(lda_pca_model)
+lda_pca_model$center
+# lda_pca_model$scale
+# lda_pca_model$rotation
+# dim(lda_pca_model$x)
+
+log_pca_var <- log_pca_model$sdev^2
+log_pca_pve <- log_pca_var/sum(log_pca_var)
+log_pca_pve
+cumulative_pve <- cumsum(log_pca_pve)
+num_components_90 <- which(cumulative_pve >= 0.90)[1]
+num_components_90
+selected_components <- 1:num_components_90
 
 ```
 
 #### Logistic classifier (Imar)
 
 ```{r}
+log_pca_start <- Sys.time()
+log_pca_model <- prcomp(train_data_log, scale = TRUE)
+log_pca_end <- Sys.time()
+log_pca_total_time <- log_pca_end - log_pca_start
+log_pca_total_time
 
+summary(log_pca_model)
+
+names(log_pca_model)
+log_pca_model$center
+log_pca_model$scale
+log_pca_model$rotation
+dim(log_pca_model)
 ```
 
 #### Quadratic Discriminant Analysis (QDA) (Chi)
