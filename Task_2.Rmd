@@ -17,9 +17,7 @@ packages = list("caret",
                 "randomForest", 
                 "tree",
                 "glmnet",
-                "leaps",
-                "bigmemory",
-                "biglasso"
+                "leaps"
                 )
 
 ```
@@ -185,27 +183,20 @@ different approaches of your choice that were covered in the course.
 ### Lasso (Jonathan)
 
 ```{r Lasso model}
-# train_data_cleaned_lasso <- train_data[, !colnames(test_data) %in% c("label")]
-test_data_cleaned_lasso <- test_data[, !colnames(test_data) %in% c("label")]
 
+test_data_clean_matrix <- as.matrix(test_data[, -1])
 
-x_data_sparse <-model.matrix(label ~ ., subset_task_two_df)[, -1]
+train_data_clean_matrix <-as.matrix(train_data[,-1])
 grid <- 10^seq(10, -2, length = 100)
-start_task_two_lasso <- Sys.time()
-fit.lasso <-glmnet(x_data_sparse,subset_task_two_df$label, alpha = 1, lambda = grid)
-
-end_task_two_lasso <- Sys.time()
-total_lasso_time <- end_task_two_lasso - start_task_two_lasso
-
-plot(fit.lasso)
-print(total_lasso_time)
+fit.lasso <-glmnet(train_data_clean_matrix,train_data$label, alpha = 1, lambda = grid)
 
 
-plot(fit.lasso, xvar="lambda", label= TRUE)
-plot(fit.lasso, xvar="dev", label= TRUE)
-cv.lasso <-cv.glmnet(x_data_sparse, subset_task_two_df$label)
 
-pred.test_lasso <-predict(fit.lasso, test_data_cleaned_lasso)
+
+
+cv.lasso <-cv.glmnet(train_data_clean_matrix, train_data$label)
+
+pred.test_lasso <-predict(fit.lasso, test_data_clean_matrix)
 
 ```
 
@@ -217,6 +208,66 @@ lasso_balanced_accuracy <- ((1/2) *(lasso_confusion_matrix[2,2]/(lasso_confusion
 
 cat("The balanced accuracy is", lasso_balanced_accuracy, "\n")
 ```
+
+```{r lasso with balanced accuracy}
+# Prepare the data
+test_data_clean_matrix <- as.matrix(test_data[, -1])
+train_data_matrix <- as.matrix(train_data[, -1])
+train_labels <- train_data$label
+test_labels <- test_data$label
+
+# Define the lambda grid
+grid <- 10^seq(-4, 4, length = 100)
+
+# Function to calculate balanced accuracy
+calculate_balanced_accuracy <- function(confusion) {
+  if (all(dim(confusion) == c(2, 2))) {
+    balanced_acc <- (1/2) * (confusion[2,2] / (confusion[2,2] + confusion[1,2])) + 
+                    (1/2) * (confusion[1,1] / (confusion[1,1] + confusion[2,1]))
+  } else {
+    balanced_acc <- NA
+  }
+  return(balanced_acc)
+}
+
+# Creating a loop that will test the balanced accuracies for each of the different values of lambda taken from the grid above. 
+start_task_two_lasso <- Sys.time()
+results <- sapply(grid, function(lambda) {
+  fit.lasso <- glmnet(train_data_matrix, train_labels, alpha = 1, lambda = lambda, family = "binomial")
+  pred.test <- predict(fit.lasso, newx = test_data_clean_matrix, type ="class")
+  # pred.test_binary <- ifelse(pred.test > 0, 1, -1)
+  confusion <- table(Predicted = pred.test, Actual = test_labels)
+  balanced_acc <- calculate_balanced_accuracy(confusion)
+  num_predictors <- sum(coef(fit.lasso) != 0) - 1
+  return(c(balanced_acc, num_predictors))
+})
+end_task_two_lasso <- Sys.time()
+total_lasso_time <- end_task_two_lasso - start_task_two_lasso
+print(total_lasso_time)
+
+balanced_accuracies <- results[1, ]
+num_predictors <- results[2, ]
+
+# Plot balanced accuracies against lambda values
+plot(grid, balanced_accuracies, type = "b", log = "x", xlab = "Lambda", ylab = "Balanced Accuracy", main = "Balanced Accuracy for Different Lambda Values")
+grid()
+
+# Plot number of predictors against lambda values
+plot(grid, num_predictors, type = "b", log = "x", xlab = "Lambda", ylab = "Number of Predictors", main = "Number of Predictors for Different Lambda Values")
+grid()
+
+# Find the lambda with the highest balanced accuracy
+best_lambda_index <- which(balanced_accuracies == max(balanced_accuracies, na.rm = TRUE))
+best_lambda <- grid[best_lambda_index]
+best_balanced_accuracy <- balanced_accuracies[best_lambda_index]
+best_num_predictors <- num_predictors[best_lambda_index]
+
+cat("Best Lambda:", best_lambda, "\n")
+cat("Highest Balanced Accuracy:", best_balanced_accuracy, "\n")
+cat("Number of Predictors for Best Lambda:", best_num_predictors, "\n")
+
+```
+
 
 
 ### Forward stepwise selection (FSS) (???)
