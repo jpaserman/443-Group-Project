@@ -116,6 +116,10 @@ task_two_df <- task_two_df[, !cols_below_var_threshold]
 nrow(task_two_df)
 ncol(task_two_df)
 
+# Labels represent whether given compound binds to target site on thrombin 
+# Possible values are -1 (compound did not bind) and 1 (compound did bind)
+table(task_two_df$label) # 772 compounds did not bind and 78 compounds did bind
+
 ```
 
 
@@ -167,15 +171,9 @@ test_data <- task_two_df[-train_indices,]
 ## T2.1: exploratory data analysis and summary statistics (??? -- need to expand)
 
 
-```{r}
-nrow(task_two_df) # The data has 800 observations
-ncol(task_two_df) # The data contains 100,001 variables (50,000-real variables, 50,000-random probes, 1-label)
-
-# Labels represent whether given compound binds to target site on thrombin 
-# Possible values are -1 (compound did not bind) and 1 (compound did bind)
-table(task_two_df$label) # 772 compounds did not bind and 78 compounds did bind
-
-```
+Our partial EDA is in above chunk of code where we plot histograms of the totals
+and the variance amongst each of the 100,000 original features. Should this
+still be expanded?
 
 
 ## T2.2: train and evaluate feature selection methods
