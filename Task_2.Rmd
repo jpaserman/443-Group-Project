@@ -144,7 +144,7 @@ train_labels <- train_data$label
 test_labels <- test_data$label
 
 # Define the lambda grid
-grid <- 10^seq(-4, 4, length = 100)
+grid <- 10^seq(-5, -1, length = 50)
 
 # Function to calculate balanced accuracy
 calculate_balanced_accuracy <- function(confusion) {
@@ -160,10 +160,10 @@ calculate_balanced_accuracy <- function(confusion) {
 # Creating a loop that will test the balanced accuracies for each of the different values of lambda taken from the grid above. 
 start_task_two_lasso <- Sys.time()
 results <- sapply(grid, function(lambda) {
-  fit.lasso <- glmnet(train_data_matrix, train_labels, alpha = 1, lambda = lambda, family = "binomial")
-  pred.test <- predict(fit.lasso, newx = test_data_clean_matrix, type ="class")
-  # pred.test_binary <- ifelse(pred.test > 0, 1, -1)
-  confusion <- table(Predicted = pred.test, Actual = test_labels)
+  fit.lasso <- glmnet(train_data_matrix, train_labels, alpha = 1, lambda = lambda, nfolds = 5)
+  pred.test <- predict(fit.lasso, newx = test_data_clean_matrix)
+  pred.test_binary <- ifelse(pred.test > 0, 1, -1)
+  confusion <- table(Predicted = pred.test_binary, Actual = test_labels)
   balanced_acc <- calculate_balanced_accuracy(confusion)
   num_predictors <- sum(coef(fit.lasso) != 0) - 1
   return(c(balanced_acc, num_predictors))
