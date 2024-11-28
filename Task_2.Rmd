@@ -32,7 +32,6 @@ for (package in packages){
 }
 ```
 
-
 # Task 2: feature selection
 
 ```{r load_data}
@@ -66,7 +65,6 @@ task_two_df <- read.csv(csv_file_two)
 # task_two_df$label_as_factor <- as.factor(task_two_df$label)
 
 ```
-
 
 ```{r EDA}
 
@@ -102,7 +100,6 @@ sum(variance_vector <= .01)
 
 ```
 
-
 ```{r drop_columns less than 0.01 variance}
 # Remove features that have less than or equal to 0.01 variance
 cols_below_var_threshold <- apply(task_two_df, 2, var) <= 0.01
@@ -120,7 +117,6 @@ table(task_two_df$label) # 772 compounds did not bind and 78 compounds did bind
 
 ```
 
-
 ```{r train_test_split}
 # Split Data into Test and Train (We should all use the same data)
 train_split = as.integer(nrow(task_two_df)*training_size)
@@ -130,20 +126,13 @@ train_data <- task_two_df[train_indices,]
 test_data <- task_two_df[-train_indices,]
 ```
 
-
 ## T2.1: exploratory data analysis and summary statistics (??? -- need to expand)
 
-
-Our partial EDA is in above chunk of code where we plot histograms of the totals
-and the variance amongst each of the 100,000 original features. Should this
-still be expanded?
-
+Our partial EDA is in above chunk of code where we plot histograms of the totals and the variance amongst each of the 100,000 original features. Should this still be expanded?
 
 ## T2.2: train and evaluate feature selection methods
 
-Train and evaluate feature selection methods with the goal of achieving high 
-balanced accuracy using a minimal number of selected features. Use three 
-different approaches of your choice that were covered in the course.
+Train and evaluate feature selection methods with the goal of achieving high balanced accuracy using a minimal number of selected features. Use three different approaches of your choice that were covered in the course.
 
 ### Lasso (Jonathan)
 
@@ -206,8 +195,6 @@ cat("Number of Predictors for Best Lambda:", best_num_predictors, "\n")
 
 ```
 
-
-
 ### Forward stepwise selection (FSS) (???)
 
 ```{r, results='hold'}
@@ -252,25 +239,17 @@ plot(regfit_fwd, scale = "Cp")
 plot(regfit_fwd, scale = "bic")
 ```
 
-
 ### Random forest (???)
 
 ```{r}
 
 ```
 
-
 ## T2.3: additional feature selection methods
 
-Train and evaluate up to three additional feature selection methods, 
-other than those in T2.2, which may include methods not covered in the course, 
-with the goal of achieving high balanced accuracy using a minimal number of 
-selected features. Provide an explanation of each new method.
+Train and evaluate up to three additional feature selection methods, other than those in T2.2, which may include methods not covered in the course, with the goal of achieving high balanced accuracy using a minimal number of selected features. Provide an explanation of each new method.
 
-For T2.2 and T2.3, your evaluation results should include the balanced accuracy 
-and the number of selected features achieved by each method for various numbers 
-of selected features. You may also compare the balanced accuracy achieved 
-by different methods for a similar number of selected features.
+For T2.2 and T2.3, your evaluation results should include the balanced accuracy and the number of selected features achieved by each method for various numbers of selected features. You may also compare the balanced accuracy achieved by different methods for a similar number of selected features.
 
 ### Elastic net (not covered in class) (???)
 
@@ -278,13 +257,11 @@ by different methods for a similar number of selected features.
 
 ```
 
-
 ### [[Tree-Based models]] (i.e., either XGBoost or LightGBM) (???)
 
 ```{r}
 
 ```
-
 
 ### (Sparse?) SVM (???)
 
@@ -293,7 +270,3 @@ Is the non-sparse SVM a feature-selection method?
 ```{r}
 
 ```
-
-
-
-
