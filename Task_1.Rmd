@@ -175,35 +175,25 @@ cat("Misclassification error rate of LDA:", misclas_lda, "\n")
 # Create training (80%) and testing (20%) sets
 set.seed(123)
 sample_index <- createDataPartition(task_one_df$label, p = 0.8, list = FALSE)
-train_data1 <- task_one_df[sample_index, ]
-test_data1 <- task_one_df[-sample_index, ]
-
-train_data_log <- train_data1
-test_data_log <- test_data1
+train_data_log <- task_one_df[sample_index, ]
+test_data_log <- task_one_df[-sample_index, ]
 
 train_data_log$label <- ifelse(train_data_log$label == "TREG", 1, 0)
 test_data_log$label <- ifelse(test_data_log$label == "TREG", 1, 0)
-head(train_data_log)
 
-# Train a logistic regression model
 glm_start_time <- Sys.time()
 logistic_model <- glm(label ~ ., data = train_data_log, family = binomial)
-
 glm_end_time <- Sys.time()
 summary(logistic_model)
 
 glm_probs <- predict(logistic_model, newdata = test_data_log, type = "response")
 glm_pred <- ifelse(glm_probs > 0.5, 1, 0)
-log_accuracy <- mean(glm_pred == test_data_log$label)
-log_confusion <- table(prediction = glm_pred, truth = as.factor(test_data_log$label))
-log_confusion
-log_accuracy
 ```
 
 Logistic Regression Evaluation
 
 ```{r logreg_confusion}
-log_confusion <- table(prediction = glm_pred, truth = test_data$label_as_factor)
+log_confusion <- table(prediction = glm_pred, truth = test_data_log$label)
 log_confusion
 ```
 
@@ -218,12 +208,12 @@ cat("Balanced Accuracy of Logistic Regression:", log_balanced_accuracy, "\n")
 ```
 
 ```{r logreg_f1_score}
-log_f1_score <- F1_Score(y_true= test_data$label, y_pred = glm_pred)
+log_f1_score <- F1_Score(y_true= test_data_log$label, y_pred = glm_pred)
 cat("F1 Score for Logistic Regression:", log_f1_score, "\n")
 ```
 
 ```{r logreg_ROC_AUC}
-roc_curve_log <- roc(test_data$label_as_factor, glm_probs, levels=c("TREG", "CD4+T"), direction = ">")
+roc_curve_log <- roc(test_data_log$label, glm_probs, levels=c(1, 0), direction = ">")
 plot(roc_curve_log, col="blue", main="ROC Curve for Logistic Regression")
 
 log_auc <- auc(roc_curve_log)
