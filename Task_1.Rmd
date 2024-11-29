@@ -124,9 +124,12 @@ for (column in twenty_random_columns) {
 #### Linear Discriminant Analysis (LDA) (Imar)
 
 ```{r lda_model}
+set.seed(123)
+sample_index <- createDataPartition(task_one_df$label, p = 0.8, list = FALSE)
+train_data_lda <- task_one_df[sample_index, ]
+test_data_lda <- task_one_df[-sample_index, ]
 
-lda_fit <- lda(label_as_factor ~ . -label -label_as_numeric, data=train_data)
-
+lda_fit <- lda(label_as_factor ~ . -label -label_as_numeric, data=train_data_lda)
 lda_pred_posterior <- predict(lda_fit, test_data)
 lda_pred <- predict(lda_fit, test_data)$class
 head(predict(lda_fit, test_data)$posterior)
@@ -140,7 +143,7 @@ lda_confusion
 ```
 
 ```{r lda_accuracy}
-lda_accuracy <- mean(lda_pred == test_data$label)
+lda_accuracy <- mean(lda_pred == test_data$label_as_factor)
 cat("Accuracy of LDA:", lda_accuracy, "\n")
 ```
 
@@ -150,7 +153,7 @@ cat("Balanced Accuracy of LDA:", lda_balanced_accuracy, "\n")
 ```
 
 ```{r lda_f1_score}
-lda_f1_score <- F1_Score(y_true= test_data$label, y_pred = lda_pred)
+lda_f1_score <- F1_Score(y_true= test_data$label_as_factor, y_pred = lda_pred)
 cat("F1 Score of LDA:", lda_f1_score, "\n")
 ```
 
@@ -221,7 +224,7 @@ cat("The AUC of the ROC of Logistic Regression:", log_auc, "\n")
 ```
 
 ```{r logreg_Misclass}
-misclass_log <- mean(glm_pred != test_data$label_as_factor)
+misclass_log <- mean(glm_pred != test_data_log$label)
 cat("The Misclassification rate of Logistic Regression:", misclass_log, "\n")
 ```
 
@@ -592,7 +595,9 @@ Using a random forest tree model, we see that the accuracy of the model was 0.93
 
 #### Linear Discriminant Analysis (LDA) (Imar)
 
-```{r LDA_with_PCA}
+```{r PCA Data}
+# Step 1: Prepare the training and test data
+set.seed(123)
 lda2_train_data <- train_data
 lda2_train_data <- lda2_train_data[, !(names(lda2_train_data) %in% c("label_as_factor", "label_as_numeric"))]
 lda2_train_data$label <- ifelse(lda2_train_data$label == "TREG", 1, 0)
@@ -601,43 +606,79 @@ lda2_test_data <- test_data
 lda2_test_data <- lda2_test_data[, !(names(lda2_test_data) %in% c("label_as_factor", "label_as_numeric"))]
 lda2_test_data$label <- ifelse(lda2_test_data$label == "TREG", 1, 0)
 
-# Step 1: Scale the data (excluding the target variable)
-scaled_data <- lda2_train_data[, -which(names(lda2_train_data) == "label")]  # Exclude the 'label' column
-scaled_data <- scale(scaled_data)  # scale the features to have mean=0 and sd=1
+# Step 2: Scale the data (excluding the target variable)
+scaled_train_data <- lda2_train_data[, -which(names(lda2_train_data) == "label")]
+scaled_train_data <- scale(scaled_train_data)
 
-# Step 2: Apply PCA and reduce to 10 components
-pca_model <- prcomp(scaled_data, center = TRUE, scale. = TRUE)
-pca_data <- data.frame(pca_model$x[, 1:10])  # Keep only the first 10 principal components
+# Step 3: Apply PCA and reduce to 10 components (train data)
+pca_model <- prcomp(scaled_train_data, center = TRUE, scale. = TRUE)
+pca_train_data <- data.frame(pca_model$x[, 1:10]) 
+pca_train_data$label <- lda2_train_data$label
 
-# Step 3: Add the target variable to the PCA-transformed data
-pca_data$label <- lda2_train_data$label  # Add the target labels
+# Step 4: Apply the same PCA transformation to the test data
+scaled_test_data <- lda2_test_data[, -which(names(lda2_test_data) == "label")]  
+scaled_test_data <- scale(scaled_test_data, center = pca_model$center, scale = pca_model$scale) 
+pca_test_data <- data.frame(predict(pca_model, newdata = scaled_test_data)[, 1:10])
+pca_test_data$label <- lda2_test_data$label
 
-# Step 4: Train the LDA model using the PCA-transformed training data + test the model
-lda_model <- lda(label ~ ., data = pca_data)
-lda_predictions <- predict(lda_model, lda2_test_data)
+lda_pca_accuracy <- mean(lda_pca_predictions_class == lda_test_data_labels)
+print(paste("LDA PCA Accuracy:", lda_pca_accuracy))
+```
 
-# Step 5: Evaluate the model performance using confusion matrix
-lda2_test_data$label <- as.factor(lda2_test_data$label)
-lda_pca_confusion_mat <- confusionMatrix(lda_predictions$class, lda2_test_data$label)
-print(confusion_mat_lda_pca)
+```{r LDA_with_PCA}
+# Step 5: Train the LDA model using the PCA-transformed training data
+lda_pca_model <- lda(label ~ ., data = pca_train_data)
+
+# Step 6: Make predictions on the test data
+lda_pca_pred <- predict(lda_pca_model, pca_test_data)
+
+# Step 7: Evaluate the model performance using confusion matrix
+lda_test_data_labels <- as.factor(pca_test_data$label)
+```
+
+```{r LDA_PCA_Evaluation}
+# Evalution Metrics
+lda_pca_confusion <- table(prediction = lda_pca_pred$class, truth = as.factor(pca_test_data$label))
+lda_pca_accuracy <- mean(lda_pca_pred$class == pca_test_data$label)
+lda_pca_balanced_accuracy <- ((1/2) * (lda_pca_confusion[2,2] / (lda_pca_confusion[2,2] + lda_pca_confusion[1,2]))) + (1/2 * (lda_pca_confusion[1,1] / (lda_pca_confusion[1,1] + lda_pca_confusion[2,1])))
+lda_pca_f1_score <- F1_Score(y_true = pca_test_data$label, y_pred = lda_pca_pred$class)
+roc_curve_lda_pca <- roc(pca_test_data$label, lda_pca_pred$posterior[,2], levels = c(1, 0), direction = ">")
+lda_pca_auc <- auc(roc_curve_lda_pca)
+lda_pca_misclass <- mean(lda_pca_pred$class != pca_test_data$label)
+
+# Create a table of the evaluation metrics
+lda_pca_metrics_table <- data.frame(
+  Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
+  Value = c(lda_pca_accuracy, lda_pca_balanced_accuracy, lda_pca_f1_score, lda_pca_auc, lda_pca_misclass)
+)
+print(lda_pca_metrics_table)
 ```
 
 #### Logistic classifier (Imar)
 
-```{r}
-log_pca_start <- Sys.time()
-log_pca_model <- prcomp(train_data_log, scale = TRUE)
-log_pca_end <- Sys.time()
-log_pca_total_time <- log_pca_end - log_pca_start
-log_pca_total_time
+```{r Log_PCA}
+#Consecutive Step: use PCA preparation from above
+log_pca_model <- glm(label ~ ., data=pca_train_data, family=binomial)
+log_pca_probs <- predict(log_pca_model, newdata = pca_test_data, type="response")
+log_pca_pred <- ifelse(log_pca_probs > 0.5, 1, 0)
+```
 
-summary(log_pca_model)
+```{r Log_PCA_evaluation}
+# Evalution Metrics
+log_pca_confusion <- table(prediction = log_pca_pred, truth = pca_test_data$label)
+log_pca_accuracy <- mean(log_pca_pred == pca_test_data$label)
+log_pca_balanced_accuracy <- ((1/2) * (log_pca_confusion[2,2] / (log_pca_confusion[2,2] + log_pca_confusion[1,2]))) + (1/2 * (log_pca_confusion[1,1] / (log_pca_confusion[1,1] + log_pca_confusion[2,1])))
+log_pca_f1_score <- F1_Score(y_true = pca_test_data$label, y_pred = log_pca_pred)
+roc_curve_log_pca <- roc(pca_test_data$label, log_pca_pred, levels = c(1, 0), direction = ">")
+log_pca_auc <- auc(roc_curve_log)
+log_pca_misclass <- mean(log_pca_pred != pca_test_data$label)
 
-names(log_pca_model)
-log_pca_model$center
-log_pca_model$scale
-log_pca_model$rotation
-dim(log_pca_model)
+# Create a table of the evaluation metrics
+log_pca_metrics_table <- data.frame(
+  Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
+  Value = c(log_pca_accuracy, log_pca_balanced_accuracy, log_pca_f1_score, log_pca_auc, log_pca_misclass)
+)
+print(log_pca_metrics_table)
 ```
 
 #### Quadratic Discriminant Analysis (QDA) (Chi)
