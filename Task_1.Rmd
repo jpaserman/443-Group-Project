@@ -594,6 +594,35 @@ Using a random forest tree model, we see that the accuracy of the model was 0.93
 
 ### With PCA
 
+```{r}
+# Standardize the data (important for PCA)
+task_one_df_scaled <- task_one_df %>%
+  
+  select(-label, - label_as_numeric) %>% 
+  
+  scale()
+  
+# Perform PCA
+pca_start <- Sys.time()
+task_one_df_pca <- task_one_df_scaled %>% 
+  
+  prcomp(center = FALSE, scale. = FALSE)
+
+pca_end <- Sys.time()
+
+pca_runtime <- pca_end_time - pca_start_time
+
+# Get the first 10 principal components
+train_data_pca <- as.data.frame(task_one_df_pca$x[train_indices, 1:10])
+
+test_data_pca <- as.data.frame(task_one_df_pca$x[-train_indices, 1:10])
+
+train_data_pca$label <- train_data$label # Add the target variable
+
+train_data_pca$label_as_numeric <- train_data$label_as_numeric # Add the target variable
+```
+
+
 #### Linear Discriminant Analysis (LDA) (Imar)
 
 ```{r PCA Data}
