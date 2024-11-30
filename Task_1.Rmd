@@ -140,21 +140,18 @@ for (column in twenty_random_columns) {
 #### Linear Discriminant Analysis (LDA) (Imar)
 
 ```{r lda_model}
-set.seed(123)
-sample_index <- createDataPartition(task_one_df$label, p = 0.8, list = FALSE)
-train_data_lda <- task_one_df[sample_index, ]
-test_data_lda <- task_one_df[-sample_index, ]
+lda_start_time  <- Sys.time()
+lda_fit <- lda(label ~ . -label_as_numeric, data=train_data)
+lda_end_time  <- Sys.time()
+lda_runtime <- lda_end_time - lda_start_time # Time difference of 4.937018 mins
 
-lda_fit <- lda(label ~ . -label_as_numeric, data=train_data_lda)
-lda_pred_posterior <- predict(lda_fit, test_data)
 lda_pred <- predict(lda_fit, test_data)$class
-head(predict(lda_fit, test_data)$posterior)
 ```
 
 LDA Evaluation
 
 ```{r lda_confusion}
-lda_confusion <- table(lda_pred, truth = test_data$label)
+lda_confusion <- table(predicted_label = lda_pred, true_label = test_data$label)
 lda_confusion
 ```
 
@@ -164,7 +161,10 @@ cat("Accuracy of LDA:", lda_accuracy, "\n")
 ```
 
 ```{r lda_balanced_accuracy}
-lda_balanced_accuracy <- ((1/2) *(lda_confusion[2,2]/(lda_confusion[2,2]+lda_confusion[1,2]))+ (1/2 *(lda_confusion[1,1]/(lda_confusion[1,1] + lda_confusion[2,1]))))
+lda_balanced_accuracy <- fun_calc_balanced_accuracy(lda_confusion, 
+                                                    pos_label = 'TREG', 
+                                                    neg_label = 'CD4+T')
+
 cat("Balanced Accuracy of LDA:", lda_balanced_accuracy, "\n")
 ```
 
@@ -173,17 +173,23 @@ lda_f1_score <- F1_Score(y_true= test_data$label, y_pred = lda_pred)
 cat("F1 Score of LDA:", lda_f1_score, "\n")
 ```
 
-```{r lda_ROC_AUC}
-roc_curve_lda <- roc(
-  test_data$label, predict(lda_fit, test_data)$posterior[,2], 
-  levels= c("TREG", "CD4+T"), direction =">")
-plot(roc_curve_lda, col="blue", main = "ROC Curve for LDA")
+```{r lda_roc}
+lda_pred_numeric <- ifelse(lda_pred == "TREG", 1, 0)
+  
+lda_roc_curve <- roc(
+  response = test_data$label_as_numeric,
+  predictor = lda_pred_numeric, 
+  levels = c(0,1),
+  direction = "<"
+  )
 
-lda_auc <- auc(roc_curve_lda)
-cat("The AUC of the ROC of LDA:", lda_auc, "\n")
+plot(lda_roc_curve, col = "red", main = "ROC Curve for LDA")
+
+lda_auc <- auc(lda_roc_curve)
+lda_auc
 ```
 
-```{r lda_Misclass}
+```{r lda_misclass}
 misclas_lda <- mean(lda_pred != test_data$label)
 cat("Misclassification error rate of LDA:", misclas_lda, "\n")
 ```
