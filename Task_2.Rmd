@@ -138,14 +138,20 @@ Train and evaluate feature selection methods with the goal of achieving high bal
 ### Lasso (Jonathan)
 
 ```{r lasso with balanced accuracy}
+
+lasso_test_data <-test_data
+lasso_train_data <-train_data
+
+lasso_test_data$label[lasso_test_data$label == -1] <- 0
+lasso_train_data$label[lasso_train_data$label == -1] <- 0
 # Prepare the data
-test_data_clean_matrix <- as.matrix(test_data[, -1])
-train_data_matrix <- as.matrix(train_data[, -1])
-train_labels <- train_data$label
-test_labels <- test_data$label
+test_data_clean_matrix <- as.matrix(lasso_test_data[, -1])
+train_data_matrix <- as.matrix(lasso_train_data[, -1])
+train_labels <- lasso_train_data$label
+test_labels <- lasso_test_data$label
 
 # Define the lambda grid
-grid <- 10^seq(-5, -1, length = 50)
+grid <- 10^seq(1, -4, length = 100)
 
 # Function to calculate balanced accuracy
 calculate_balanced_accuracy <- function(confusion) {
@@ -158,42 +164,48 @@ calculate_balanced_accuracy <- function(confusion) {
   return(balanced_acc)
 }
 
-# Creating a loop that will test the balanced accuracies for each of the different values of lambda taken from the grid above. 
+# Adding weights because of the unbalanced data
+class_weights <- ifelse(train_labels == 1, 1, sum(train_labels == 1) / sum(train_labels == 0))
+
+
+# Perform cross-validation with a sequence of lambda values
 start_task_two_lasso <- Sys.time()
-results <- sapply(grid, function(lambda) {
-  fit.lasso <- glmnet(train_data_matrix, train_labels, alpha = 1, lambda = lambda, nfolds = 5)
-  pred.test <- predict(fit.lasso, newx = test_data_clean_matrix)
-  pred.test_binary <- ifelse(pred.test > 0, 1, -1)
-  confusion <- table(Predicted = pred.test_binary, Actual = test_labels)
-  balanced_acc <- calculate_balanced_accuracy(confusion)
-  num_predictors <- sum(coef(fit.lasso) != 0) - 1
-  return(c(balanced_acc, num_predictors))
-})
+cv_fit <- cv.glmnet(train_data_matrix, train_labels, alpha = 1, lambda = grid, nfolds = 5, family = "binomial", weights = class_weights)
 end_task_two_lasso <- Sys.time()
 total_lasso_time <- end_task_two_lasso - start_task_two_lasso
 print(total_lasso_time)
 
-balanced_accuracies <- results[1, ]
-num_predictors <- results[2, ]
+# Extract the lambda values and their corresponding balanced accuracies
+lambdas <- cv_fit$lambda
+cv_results <- sapply(lambdas, function(lambda) {
+  pred.cv <- predict(cv_fit, newx = train_data_matrix, s = lambda, family = "binomial", type ="response")
+  pred.cv_binary <- ifelse(pred.cv > 0.5, 1, 0)
+  confusion <- table(Predicted = pred.cv_binary, Actual = train_labels)
+  balanced_acc <- calculate_balanced_accuracy(confusion)
+  num_predictors <- sum(coef(cv_fit, s = lambda) != 0) - 1
+  return(c(balanced_acc, num_predictors))
+})
 
-# Plot balanced accuracies against lambda values
-plot(grid, balanced_accuracies, type = "b", log = "x", xlab = "Lambda", ylab = "Balanced Accuracy", main = "Balanced Accuracy for Different Lambda Values")
-grid()
-
-# Plot number of predictors against lambda values
-plot(grid, num_predictors, type = "b", log = "x", xlab = "Lambda", ylab = "Number of Predictors", main = "Number of Predictors for Different Lambda Values")
-grid()
+balanced_accuracies <- cv_results[1, ]
+num_predictors <- cv_results[2, ]
 
 # Find the lambda with the highest balanced accuracy
-best_lambda_index <- which(balanced_accuracies == max(balanced_accuracies, na.rm = TRUE))
-best_lambda <- grid[best_lambda_index]
+best_lambda_index <- which.max(balanced_accuracies)
+best_lambda <- lambdas[best_lambda_index]
 best_balanced_accuracy <- balanced_accuracies[best_lambda_index]
 best_num_predictors <- num_predictors[best_lambda_index]
 
-cat("Best Lambda:", best_lambda, "\n")
-cat("Highest Balanced Accuracy:", best_balanced_accuracy, "\n")
-cat("Number of Predictors for Best Lambda:", best_num_predictors, "\n")
+# Fit the final model using the best lambda
+final_model <- glmnet(train_data_matrix, train_labels, alpha = 1, lambda = lambdas[best_lambda_index], family = "binomial", weights = class_weights)
+pred.test <- predict(final_model, newx = test_data_clean_matrix, family ="binomial", type = "response")
+pred.test_binary <- ifelse(pred.test > 0.5, 1, 0)
+confusion_test <- table(Predicted = pred.test_binary, Actual = test_labels)
+test_balanced_accuracy <- calculate_balanced_accuracy(confusion_test)
 
+cat("Best Lambda:", best_lambda, "\n")
+cat("Highest Balanced Accuracy on CV:", best_balanced_accuracy, "\n")
+cat("Number of Predictors for Best Lambda:", best_num_predictors, "\n")
+cat("Balanced Accuracy on Test Data:", test_balanced_accuracy, "\n")
 ```
 
 ### Forward stepwise selection (FSS) (???)
@@ -274,8 +286,8 @@ xgb_test_matrix <- xgb.DMatrix(data = as.matrix(xgb_test_data[,]), label = xgb_t
 scale_pos_weight = sum(xgb_train_data$label == 0) / sum(xgb_train_data$label == 1)
 
 
-lambdas <- c(0.01, 0.1, 0.2, 0.02, 0.05)
-depths <- c(2, 4, 6, 8)
+lambdas <- c(0.01, 0.1)
+depths <- c( 4, 6)
 
 xgb_model_start <- Sys.time()
 for (lambda in lambdas){
@@ -312,6 +324,12 @@ xgb_model_end <- Sys.time()
 xgb_model_total_time <- xgb_model_end - xgb_model_start 
 cat("The xgboost model took ", xgb_model_total_time, " for the task 2 data \n")
 
+# Get feature importance
+importance_matrix <- xgb.importance(feature_names = colnames(xgb_train_matrix), model = best_model)
+print(importance_matrix)
+
+# Plot feature importance
+xgb.plot.importance(importance_matrix)
 ```
 
 
