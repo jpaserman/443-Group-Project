@@ -250,6 +250,11 @@ cat("The Misclassification rate of Logistic Regression:", misclass_log, "\n")
 
 #### Quadratic Discriminant Analysis (QDA) (Chi)
 
+Estimation of a QDA classifier fails when training on this training data.
+
+Due to the high-dimensionality of the data relative to number of data points, the covariance matrices for each class k are likely to be estimated as singular or near-singular. This leads to numerical instability and no solution can be found for the inverse of the covariance matrix. 
+
+As a result no classifier can be found without dimension reduction or regularisation.
 ```{r qda_Train}
 ## CAUTION: currently hard-coded numbers here. To be changed (Chi)
 options(expressions = 10000)
