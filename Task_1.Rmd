@@ -655,7 +655,7 @@ cat("F1 Score:", svm_f1_score, "\n") # 0.9645
 ## K-fold CV for hyperparameter tuning of 'cost' for the training data with a radial basis function (RBF) kernel
 start_time_svm_rad <- Sys.time()
 
-tune.out_rad = tune(svm, label ~ . -label_as_numeric, data = train_data, kernel = "radial", ranges = list(cost = c(0.01, 0.1, 1, 10), gamma = c(0.00003, 0.0003, 0.003, 0.03)))
+tune.out_rad = tune(svm, label ~ . -label_as_numeric, data = train_data, kernel = "radial", ranges = list(cost = c(0.01, 0.1, 1, 10), gamma = c(0.00003, 0.0003, 0.003, 0.03, 0.3, 1)))
 summary(tune.out_rad)
 
 end_time_svm_rad <- Sys.time()
