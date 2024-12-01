@@ -862,8 +862,38 @@ print(log_pca_metrics_table)
 
 #### Quadratic Discriminant Analysis (QDA) (Chi)
 
-```{r}
+```{r qda_pca_train}
+qda_start_time <- Sys.time()
+qda_pca_fit <- qda(label ~ . , data = train_data_pca)
+qda_runtime <- Sys.time() - qda_start_time
+```
 
+```{r qda_Confusion}
+qda_pca_pred <- predict(qda_pca_fit, test_data)$class
+
+table(predicted = qda_pred, observed = test_data$label)
+```
+
+```{r qda_Misclass}
+qda_misclass_rate = mean(qda_pred != test_data$label)
+
+cat("Misclassification rate:", qda_misclass_rate*100, "%")
+```
+
+```{r qda_ROC}
+qda_pred_numeric <- ifelse(qda_pred == "TREG", 1, 0)
+  
+qda_roc_curve <- roc(
+  response = test_data$label_as_numeric,
+  predictor = qda_pred_numeric, 
+  levels = c(0,1),
+  direction = "<"
+  )
+
+plot(qda_roc_curve, col = "red", main = "ROC Curve for QDA")
+
+qda_auc <- auc(qda_roc_curve)
+qda_auc
 ```
 
 #### Nearest Neighbor Classifier (k-NN) (Chi)
