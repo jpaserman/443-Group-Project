@@ -25,7 +25,8 @@ packages = list("class",
                 "ggplot2",
                 "pROC",
                 "MLmetrics",
-                "caret"
+                "caret",
+                "e1071"
 )
 
 # For knn-training
@@ -588,9 +589,92 @@ Using a random forest tree model, we see that the accuracy of the model was 0.93
 
 #### Support Vector Machine (SVM) (Peter)
 
-```{r}
+```{r svm_model}
+## Clean the test data for the SVM task
+test_data_cleaned_for_svm <- test_data[, !colnames(test_data) %in% c("label_as_numeric", "label")]
 
+## K-fold CV for hyperparameter tuning of 'cost' for the training data with a linear kernel
+start_time_svm <- Sys.time()
+
+tune.out = tune(svm, label ~ . -label_as_numeric, data = train_data, kernel = "linear", ranges = list(cost = c(0.01, 0.1, 1, 10)))
+summary(tune.out)
+
+end_time_svm <- Sys.time()
+svm_training_time <- end_time_svm - start_time_svm
+cat("SVM model training time:", svm_training_time, "\n")
 ```
+
+
+```{r svm_tuned_model}
+# Save the model with the cost that results in the lowest cross validation error rate
+bestmod <-  tune.out$best.model
+summary(bestmod)
+```
+
+```{r svm_predictions}
+# Predictions
+start_time_svm_pred <-  Sys.time()
+yhat.svm = predict(bestmod, test_data)
+
+end_time_svm_pred <- Sys.time()
+svm_prediction_time <- end_time_svm_pred - start_time_svm_pred
+cat("SVM prediction time:", svm_prediction_time, "\n")
+```
+
+```{r svm_Confusion}
+svm_confusion_matrix <- table(predict = yhat.svm, truth = test_data$label)
+print(svm_confusion_matrix)
+print(svm_confusion_matrix[2,2])
+svm_balanced_accuracy <- ((1/2) *(svm_confusion_matrix[2,2]/(svm_confusion_matrix[2,2]+svm_confusion_matrix[1,2]))+ (1/2 *(svm_confusion_matrix[1,1]/(svm_confusion_matrix[1,1] + svm_confusion_matrix[2,1]))))
+
+cat("The balanced accuracy is", svm_balanced_accuracy, "\n") # 0.9479
+```
+```{r svm_Misclass}
+svm_misclassification_rate <- mean(yhat.svm != test_data$label)
+cat("SVM Misclassification Rate:", svm_misclassification_rate, "\n") # 0.0447
+```
+
+```{r svm_Accuracy}
+accuracy_svm <- mean(yhat.svm == test_data$label)
+cat("SVM Accuracy:", accuracy_svm, "\n") # 0.9553
+```
+
+```{r svm_ROC_AUC}
+roc_svm <- roc(test_data$label, as.numeric(yhat.svm))
+cat("SVM AUC:", auc(roc_svm), "\n")
+plot(roc_svm, main = "SVM ROC Curve") # Make the limits of the axes 0-1
+```
+
+```{r rf_f1_score}
+svm_f1_score <- F1_Score(y_pred = yhat.svm, y_true = test_data$label)
+cat("F1 Score:", svm_f1_score, "\n") # 0.9645
+```
+
+
+```{r}
+## K-fold CV for hyperparameter tuning of 'cost' for the training data with a radial basis function (RBF) kernel
+start_time_svm_rad <- Sys.time()
+
+tune.out_rad = tune(svm, label ~ . -label_as_numeric, data = train_data, kernel = "radial", ranges = list(cost = c(0.01, 0.1, 1, 10), gamma = c(0.00003, 0.0003, 0.003, 0.03)))
+summary(tune.out_rad)
+
+end_time_svm_rad <- Sys.time()
+svm_training_time_rad <- end_time_svm_rad - start_time_svm_rad
+cat("SVM model training time (radial kernel):", svm_training_time_rad, "\n")
+```
+
+Note that a good rule of thumb is to start with a gamma that is (1/p)
+where p is the number of features in the model. This would result in a value of
+gamma approximately 0.0003
+
+
+```{r}
+# Save the model with the cost that results in the lowest cross validation error rate
+bestmod_rad <-  tune.out_rad$best.model
+summary(bestmod_rad)
+```
+
+
 
 ### With PCA
 
