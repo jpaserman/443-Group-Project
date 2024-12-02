@@ -328,9 +328,6 @@ xgb.plot.importance(importance_matrix)
 
 
 
-
-```
-
 ### (Sparse?) SVM (???)
 
 Is the non-sparse SVM a feature-selection method?
