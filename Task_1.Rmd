@@ -81,6 +81,7 @@ fun_calc_balanced_accuracy <- function(confusion_matrix, pos_label, neg_label){
 ## T1.1: exploratory data analysis and summary statistics (Peter?)
 
 ```{r EDA}
+### Change these nrow and ncol commands to "dim"
 nrow(task_one_df) # The data has 5471 observations
 ncol(task_one_df) # The data contains 4125 variables-- 4124 originally, 1 added (label)
 table(task_one_df$label) # 3356 observations are labelled as CD4+T and 2115 are labelled as TREG
@@ -105,7 +106,10 @@ mean_table <- task_one_df %>%
 
 ## There are decent differences between the ranking of absolute difference in means of groups
 ## and the ranking of percentage difference in means of groups
-## perhaps we create box plots of the top 5 of each metric??
+## perhaps we create box plots of the top 3-5 of each metric??
+
+## Perhaps do summary(XXX) of a few variables??
+## If want to display multiple subgraphs --> par(mfrow=c(x,y))
 
 ### Next steps --> 
   ### (1) instead of absolute value difference, include also
@@ -679,7 +683,7 @@ cat("F1 Score:", svm_f1_score, "\n") # 0.9645
 ## K-fold CV for hyperparameter tuning of 'cost' for the training data with a radial basis function (RBF) kernel
 start_time_svm_rad <- Sys.time()
 
-tune.out_rad = tune(svm, label ~ . -label_as_numeric, data = train_data, kernel = "radial", ranges = list(cost = c(0.01, 0.1, 1, 10), gamma = c(0.00003, 0.0003, 0.003, 0.03, 0.3, 1)))
+tune.out_rad = tune(svm, label ~ . -label_as_numeric, data = train_data, kernel = "radial", ranges = list(cost = c(0.01, 0.1, 1, 10), gamma = c(0.00003, 0.0003, 0.003)))
 summary(tune.out_rad)
 
 end_time_svm_rad <- Sys.time()

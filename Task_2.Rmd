@@ -285,40 +285,34 @@ xgb_test_matrix <- xgb.DMatrix(data = as.matrix(xgb_test_data[,]), label = xgb_t
 # Add weights to account for imbalanced data
 scale_pos_weight = sum(xgb_train_data$label == 0) / sum(xgb_train_data$label == 1)
 
-
-lambdas <- c(0.01, 0.1)
-depths <- c( 4, 6)
-
-xgb_model_start <- Sys.time()
-for (lambda in lambdas){
-  for (depth in depths) {
-    xgb_model <- xgboost(
+xgb_model <- xgb.cv(
       data = xgb_train_matrix,
-      eta = lambda,
-      max_depth = depth,
+      eta = 0.01,
+      max_depth = 6,
       nrounds = 5000,
       objective = "binary:logistic",
       verbose = 0,
-      scale_pos_weight = scale_pos_weight
+      scale_pos_weight = scale_pos_weight,
+      nfold = 5,
+      metrics = "auc"
       )
     
-    # Making predictions on the test set
-    xgb_predictions <- predict(xgb_model, newdata = xgb_test_matrix)
-    xgb_predictions <- ifelse(xgb_predictions > 0.5, 1, 0)
+# Making predictions on the test set
+xgb_predictions <- predict(xgb_model, newdata = xgb_test_matrix)
+xgb_predictions <- ifelse(xgb_predictions > 0.5, 1, 0)
     
-    # Calculating the Mean Squared Error on the test set
-    mse <- mean((xgb_predictions - xgb_test_data$label)^2)
-    cat("Test Mean Squared Error:", mse, "\n")
+# Calculating the Mean Squared Error on the test set
+mse <- mean((xgb_predictions - xgb_test_data$label)^2)
+cat("Test Mean Squared Error:", mse, "\n")
     
-    xgb_confusion_matrix <- table(Predicted = xgb_predictions, Actual =  xgb_test_data$label)
-    print(xgb_confusion_matrix)
+xgb_confusion_matrix <- table(Predicted = xgb_predictions, Actual =  xgb_test_data$label)
+print(xgb_confusion_matrix)
 
-    xgb_balanced_accuracy <- ((1/2) *(xgb_confusion_matrix[2,2]/(xgb_confusion_matrix[2,2]+xgb_confusion_matrix[1,2]))+ (1/2 *(xgb_confusion_matrix[1,1]/(xgb_confusion_matrix[1,1] + xgb_confusion_matrix[2,1]))))
+xgb_balanced_accuracy <- ((1/2) *(xgb_confusion_matrix[2,2]/(xgb_confusion_matrix[2,2]+xgb_confusion_matrix[1,2]))+ (1/2 *(xgb_confusion_matrix[1,1]/(xgb_confusion_matrix[1,1] + xgb_confusion_matrix[2,1]))))
 
-    cat("The balanced accuracy is", xgb_balanced_accuracy, "\n")
-    cat("Lambda:", lambda, "Depth:", depth, "Balanced Accuracy:", xgb_balanced_accuracy, "\n")
-  }
-}
+cat("The balanced accuracy is", xgb_balanced_accuracy, "\n")
+cat("Lambda:", lambda, "Depth:", depth, "Balanced Accuracy:", xgb_balanced_accuracy, "\n")
+
 
 xgb_model_end <- Sys.time()
 xgb_model_total_time <- xgb_model_end - xgb_model_start 
