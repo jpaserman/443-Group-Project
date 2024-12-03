@@ -18,7 +18,10 @@ packages = list("caret",
                 "tree",
                 "glmnet",
                 "leaps",
-                "xgboost"
+                "xgboost",
+                "tibble",
+                "dplyr",
+                "Matrix"
                 )
 
 ```
@@ -68,9 +71,9 @@ task_two_df <- read.csv(csv_file_two)
 ```
 
 ```{r EDA}
-
-nrow(task_two_df) # Our data originally has 800 observations (compounds)
-ncol(task_two_df) # Our data originally has 100,001 features (1 label as well as 50000 real variables and 50000 random probes, randomly permuted)
+# Our data originally has 800 observations (compounds)
+# Our data originally has 100,001 features (1 label as well as 50000 real variables and 50000 random probes, randomly permuted)
+dim(task_two_df)
 
 # Construct dataset of solely the binary features
 task_two_df_no_label <- task_two_df[, -1]
@@ -109,8 +112,7 @@ task_two_df <- task_two_df[, !cols_below_var_threshold]
 
 # After removing features with low variance, our data prior to feature selection 
 # has 800 observations and now only 30,122 features
-nrow(task_two_df)
-ncol(task_two_df)
+dim(task_two_df)
 
 # Labels represent whether given compound binds to target site on thrombin 
 # Possible values are -1 (compound did not bind) and 1 (compound did bind)
@@ -118,13 +120,61 @@ table(task_two_df$label) # 772 compounds did not bind and 78 compounds did bind
 
 ```
 
+```{r remove_multicollinearity}
+# Must split the data into 2 sets of variables in order for the code to run
+num_vars <- ncol(task_two_df)
+chunk_size <- num_vars / 2
+cor_indices <- seq(1, num_vars, by = chunk_size)
+
+# Initialize vector to retain the variables to be dropped
+all_redundant_vars <- c()
+
+# Return the index of variables that have high pair-wise correlation (above 0.7)
+# "If two variables have a high correlation, the function looks at the mean absolute correlation of each variable and removes the variable with the largest mean absolute correlation" (findCorrelation documentation)
+for (i in cor_indices) {
+  chunk_vars <- i:min(i + chunk_size - 1, num_vars)
+  cor_matrix <- cor(task_two_df[, chunk_vars])
+  redundant_vars <- findCorrelation(cor_matrix, cutoff = 0.7)
+  all_redundant_vars <- c(all_redundant_vars, chunk_vars[redundant_vars])
+}
+
+# Remove variables with high multicollinearity
+task_two_df <- task_two_df[, -unique(all_redundant_vars)]
+
+# After removing features with high multicollinearity, our data prior to feature selection has 800 observations and now only 29,787 features
+dim(task_two_df)
+
+```
+
+
+```{r select_top_predictors}
+# Determine the features that are most highly correlated with the label
+cor_with_label <-  data.frame(cor(task_two_df, task_two_df$label))
+cor_with_label <- tibble::rownames_to_column(cor_with_label, "feature")
+
+top_1000_cor <- cor_with_label %>% 
+  
+  mutate(abs_cor = abs(`cor.task_two_df..task_two_df.label.`)) %>% 
+  
+  top_n(1001, abs_cor)
+  
+# We will utilize this subset of features for models that are running into 
+# difficulties with computation/memory size
+top_1000_vars <- top_1000_cor$feature
+
+```
+
+
 ```{r train_test_split}
 # Split Data into Test and Train (We should all use the same data)
 train_split = as.integer(nrow(task_two_df)*training_size)
 
 train_indices <- sample(1:nrow(task_two_df), train_split)
-train_data <- task_two_df[train_indices,]
-test_data <- task_two_df[-train_indices,]
+train_data_2 <- task_two_df[train_indices,]
+test_data_2 <- task_two_df[-train_indices,]
+
+train_data_2_top_subset <- train_data_2[, top_1000_vars]
+test_data_2_top_subset <- test_data_2[, top_1000_vars]
 ```
 
 ## T2.1: exploratory data analysis and summary statistics (??? -- need to expand)
@@ -139,8 +189,8 @@ Train and evaluate feature selection methods with the goal of achieving high bal
 
 ```{r lasso with balanced accuracy}
 
-lasso_test_data <-test_data
-lasso_train_data <-train_data
+lasso_test_data <-test_data_2
+lasso_train_data <-train_data_2
 
 lasso_test_data$label[lasso_test_data$label == -1] <- 0
 lasso_train_data$label[lasso_train_data$label == -1] <- 0
@@ -208,14 +258,15 @@ cat("Number of Predictors for Best Lambda:", best_num_predictors, "\n")
 cat("Balanced Accuracy on Test Data:", test_balanced_accuracy, "\n")
 ```
 
-### Forward stepwise selection (FSS) (???)
+### Forward stepwise selection (FSS) (Peter)
 
 ```{r, results='hold'}
+# Increase protection stack size
 fss_start_time <- Sys.time()
 
 regfit_fwd <-  regsubsets(label ~ .,
-                        data = task_two_df_first_523,
-                        nvmax = 170,
+                        data = train_data_2_top_subset,
+                        nvmax = 500,
                         method = "forward")
 reg_summary <- summary(regfit_fwd)
 
