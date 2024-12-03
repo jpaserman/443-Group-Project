@@ -635,6 +635,7 @@ Using a random forest tree model, we see that the accuracy of the model was 0.93
 
 #### Support Vector Machine (SVM) (Peter)
 
+##### Linear SVM Model
 ```{r svm_linear_model}
 ## Clean the test data for the SVM task
 test_data_cleaned_for_svm <- test_data[, !colnames(test_data) %in% c("label_as_numeric", "label")]
@@ -698,6 +699,8 @@ plot(svm_roc, main = "SVM ROC Curve") # Make the limits of the axes 0-1
 svm_f1_score <- F1_Score(y_pred = yhat.svm, y_true = test_data$label)
 cat("F1 Score:", svm_f1_score, "\n") # 0.9645
 ```
+
+##### Radial SVM Model
 
 ```{r svm_radial_model}
 # ## K-fold CV for hyperparameter tuning of 'cost' for the training data with a radial basis function (RBF) kernel
@@ -1158,15 +1161,6 @@ cat("Prediction time with PCA:", gbm_prediction_time, "\n")
 
 ```
 
-
-```{r}
-# Plot cumulative variance explained
-variance_explained <- cumsum(pca_gbm_model$sdev^2 / sum(pca_gbm_model$sdev^2))
-plot(variance_explained, type = "b", xlab = "Number of Components", ylab = "Cumulative Variance Explained", main = "PCA Cumulative Variance Explained")
-abline(h = 0.9, col = "red", lty = 2)  # Add a line at 90% variance explained
-```
-
-
 ```{r gbm_pca_confusion}
 # Confusion Matrix
 gbm_confusion_matrix_pca <- table(Predicted = gbm_pred_classes_pca, Actual = test_data_pca$label_as_numeric)
@@ -1316,11 +1310,11 @@ print(svm_pca_confusion_matrix)
 ```
 
 ```{r svm_pca_balanced_accuracy}
-svm_pca_balanced_accuracy <- fun_calc_balanced_accuracy(svm_confusion_matrix,
+svm_pca_balanced_accuracy <- fun_calc_balanced_accuracy(svm_pca_confusion_matrix,
                                                     pos_label = "TREG",
                                                     neg_label = "CD4+T")
 
-cat("The balanced accuracy is", svm_pca_balanced_accuracy, "\n") # 0.9479
+cat("The balanced accuracy is", svm_pca_balanced_accuracy, "\n") # 0.9418
 ```
 
 
@@ -1343,6 +1337,74 @@ plot(svm_roc, main = "SVM ROC Curve") # Make the limits of the axes 0-1
 
 ```{r rf_f1_score}
 svm_f1_score <- F1_Score(y_pred = svm_pca_pred, y_true = test_data$label)
+cat("F1 Score:", svm_f1_score, "\n") # 0.9645
+```
+
+##### Radial SVM Model
+```{r svm_radial_model}
+## K-fold CV for hyperparameter tuning of 'cost' for the training data with a radial basis function (RBF) kernel
+start_time_svm_rad <- Sys.time()
+
+tune.out_rad = tune(svm,
+                    label ~ . -label_as_numeric,
+                    data = train_data_pca, 
+                    kernel = "radial", 
+                    ranges = list(cost = c(0.01, 0.1, 1, 10),
+                                  gamma = c(0.00003, 0.0003, 0.003)))
+summary(tune.out_rad)
+
+end_time_svm_rad <- Sys.time()
+svm_training_time_rad <- end_time_svm_rad - start_time_svm_rad
+cat("SVM model training time (radial kernel):", svm_training_time_rad, "\n")
+
+# Note that a good rule of thumb is to start with a gamma that is (1/p)
+# where p is the number of features in the model. This would result in a value of
+# gamma approximately 0.0003
+
+# Save the model with the cost that results in the lowest cross validation error rate
+bestmod_rad <-  tune.out_rad$best.model
+summary(bestmod_rad)
+```
+
+```{r svm_predictions}
+start_time_svm_pred <-  Sys.time()
+svm_rad_pca_pred = predict(bestmod_rad, test_data_pca)
+
+end_time_svm_pred <- Sys.time()
+svm_prediction_time <- end_time_svm_pred - start_time_svm_pred #Time difference of 0.01661301 secs
+```
+
+```{r svm_confusion}
+svm_rad_pca_confusion_matrix <- table(predict = svm_rad_pca_pred, truth = test_data_pca$label)
+print(svm_confusion_matrix)
+```
+
+```{r svm_balanced_accuracy}
+svm_rad_pca_balanced_accuracy <- fun_calc_balanced_accuracy(svm_rad_pca_confusion_matrix, 
+                                                    pos_label = "TREG",
+                                                    neg_label = "CD4+T")
+
+cat("The balanced accuracy is", svm_balanced_accuracy, "\n") # 0.9411
+```
+
+```{r svm_Misclass}
+svm_misclassification_rate <- mean(yhat.svm_rad != test_data$label)
+cat("SVM Misclassification Rate:", svm_misclassification_rate, "\n") # 0.0447
+```
+
+```{r svm_Accuracy}
+accuracy_svm <- mean(yhat.svm_rad == test_data$label)
+cat("SVM Accuracy:", accuracy_svm, "\n") # 0.9553
+```
+
+```{r svm_ROC_AUC}
+roc_svm <- roc(test_data$label, as.numeric(yhat.svm_rad))
+cat("SVM AUC:", auc(roc_svm), "\n")
+plot(roc_svm, main = "SVM ROC Curve") # Make the limits of the axes 0-1
+```
+
+```{r rf_f1_score}
+svm_f1_score <- F1_Score(y_pred = yhat.svm_rad, y_true = test_data$label)
 cat("F1 Score:", svm_f1_score, "\n") # 0.9645
 ```
 
