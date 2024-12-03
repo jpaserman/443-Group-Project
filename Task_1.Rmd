@@ -31,7 +31,7 @@ packages = list("class",
 )
 
 # For knn-training
-kk_vector = c(2:7) 
+kk_vector = c(1:10) 
 ```
 
 ```{r, include=FALSE}
@@ -991,8 +991,7 @@ knn_pca_pred <- sapply(kk_vector,
                    )
 knn_end_time <- Sys.time()
 
-knn_train_runtime <- knn_end_time - knn_start_time
-print(knn_train_runtime) #50 mins for k=1 to k=10 
+knn_train_runtime <- knn_end_time - knn_start_time # Time difference of 0.3525879 secs
 
 rm(knn_train_X, knn_train_Y, knn_test_X)
 ```
@@ -1025,17 +1024,17 @@ plot(knn_misclass, type = "l")
 ```
 
 ```{r kNN_ROC}
-knn_pred_numeric <- ifelse(knn_pred == "TREG", 1, 0)
+knn_pred_numeric <- ifelse(knn_pca_pred == "TREG", 1, 0)
 
 knn_roc_curves <- data.frame()
 
 knn_auc <- data.frame()
 
-for (kk in 1:ncol(knn_pred)) {
+for (kk in 1:ncol(knn_pred_numeric)) {
   roc_curve <- roc(
-    response = test_data$label, 
-    predictor = knn_pca_pred[,kk],
-    levels = c('TREG', 'CD4+T'),
+    response = test_data$label_as_numeric, 
+    predictor = knn_pred_numeric[,kk],
+    levels = c(1, 0),
     direction = ">"
     )
   
