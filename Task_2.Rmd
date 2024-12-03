@@ -211,14 +211,10 @@ Train and evaluate feature selection methods with the goal of achieving high bal
 ### Lasso (Jonathan)
 
 ```{r lasso with balanced accuracy}
-<<<<<<< HEAD
 
 lasso_test_data <-test_data_2
 lasso_train_data <-train_data_2
-=======
-lasso_test_data <-test_data
-lasso_train_data <-train_data
->>>>>>> 72c198e (XGBoost final model)
+
 
 lasso_test_data$label[lasso_test_data$label == -1] <- 0
 lasso_train_data$label[lasso_train_data$label == -1] <- 0
