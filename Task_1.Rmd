@@ -81,9 +81,7 @@ fun_calc_balanced_accuracy <- function(confusion_matrix, pos_label, neg_label){
 ## T1.1: exploratory data analysis and summary statistics (Peter?)
 
 ```{r EDA}
-### Change these nrow and ncol commands to "dim"
-nrow(task_one_df) # The data has 5471 observations
-ncol(task_one_df) # The data contains 4125 variables-- 4124 originally, 1 added (label)
+dim(task_one_df)  # The data has 5471 observations and 4125 variables-- 4124 originally, 1 added (label)
 table(task_one_df$label) # 3356 observations are labelled as CD4+T and 2115 are labelled as TREG
 
 mean_table <- task_one_df %>%
@@ -98,11 +96,32 @@ mean_table <- task_one_df %>%
 
   pivot_wider(names_from = label, values_from = mean_value) %>%
 
-  mutate(diff = abs(`CD4+T` - TREG)) %>%
+  mutate(diff = abs(`CD4+T` - TREG))
 
-  mutate(pct_diff = 100 * (diff / ((`CD4+T` + TREG)/2) )) %>%
+  # mutate(pct_diff = 100 * (diff / ((`CD4+T` + TREG)/2) )) ## This doesn't result in very nice graphs, perhaps stick to the absolute diff??
 
-  arrange(desc(diff))
+
+top_3_abs_diff <- mean_table %>% top_n(3, diff) %>% arrange(desc(diff))
+
+# top_3_pct_diff <- mean_table %>% top_n(3, pct_diff) %>% arrange(desc(pct_diff)) # Doesn't result in very good graphs... perhaps remove
+
+par(mfrow=c(1,3))
+
+### Add x-axis label and title
+for (var in top_3_abs_diff$genes) {
+  formula <- as.formula(paste(var, "~ label"))
+  plot <- boxplot(formula, data = task_one_df, col=c("blue", "red"))
+  print(plot)
+}
+
+
+# # Doesn't result in very good graphs.. perhaps remove
+# for (var in top_3_pct_diff$genes) {
+#   formula <- as.formula(paste(var, "~ label"))
+#   plot <- boxplot(formula, data = task_one_df, col=c("blue", "red"))
+#   print(plot)
+#   quantile(task_one_df$var)
+# }
 
 ## There are decent differences between the ranking of absolute difference in means of groups
 ## and the ranking of percentage difference in means of groups
@@ -125,16 +144,16 @@ mean_table <- task_one_df %>%
 #   }
 # }
 
-twenty_random_columns <- sample(names(task_one_df)[-1], 20)
-
-## Create boxplots for the random sample of columns
-for (column in twenty_random_columns) {
-    p <- ggplot(task_one_df, aes_string(x = "label", y = column)) +
-        geom_jitter(width = 0.2, height = 0) +  # Use jitter to avoid overplotting
-        ggtitle(paste("Scatter Plot of", column, "by Label")) +
-        theme_minimal()
-    print(p)
-}
+# twenty_random_columns <- sample(names(task_one_df)[-1], 20)
+# 
+# ## Create boxplots for the random sample of columns
+# for (column in twenty_random_columns) {
+#     p <- ggplot(task_one_df, aes_string(x = "label", y = column)) +
+#         geom_jitter(width = 0.2, height = 0) +  # Use jitter to avoid overplotting
+#         ggtitle(paste("Scatter Plot of", column, "by Label")) +
+#         theme_minimal()
+#     print(p)
+# }
 
 ```
 
@@ -627,7 +646,7 @@ summary(tune.out)
 
 end_time_svm <- Sys.time()
 svm_training_time <- end_time_svm - start_time_svm
-cat("SVM model training time:", svm_training_time, "\n")
+cat("SVM model training time:", svm_training_time, "\n") # 1.18 hrs (~ 1hr & 10 min)
 ```
 
 
@@ -655,6 +674,7 @@ svm_balanced_accuracy <- ((1/2) *(svm_confusion_matrix[2,2]/(svm_confusion_matri
 
 cat("The balanced accuracy is", svm_balanced_accuracy, "\n") # 0.9479
 ```
+
 ```{r svm_Misclass}
 svm_misclassification_rate <- mean(yhat.svm != test_data$label)
 cat("SVM Misclassification Rate:", svm_misclassification_rate, "\n") # 0.0447
