@@ -1227,15 +1227,78 @@ rf_f1_score_pca <- F1_Score(y_pred = rf_pca_pred, y_true = test_data_pca$label)
 cat("F1 Score with PCA:", rf_f1_score_pca, "\n")
 ```
 
-
-
-
-
-
 #### Support Vector Machine (SVM) (Peter)
 
-```{r}
+##### Linear SVM Model
+```{r svm_linear_model_pca}
+## Clean the test data for the SVM task
+test_data_cleaned_for_svm <- test_data[, !colnames(test_data) %in% c("label_as_numeric", "label")]
 
+## K-fold CV for hyperparameter tuning of 'cost' for the training data with a linear kernel
+start_time_svm <- Sys.time()
+
+tune.out = tune(svm,
+                label ~ . -label_as_numeric,
+                data = train_data_pca, kernel = "linear", 
+                ranges = list(cost = c(0.01, 0.1, 1, 10)))
+
+summary(tune.out)
+
+end_time_svm <- Sys.time()
+svm_training_time <- end_time_svm - start_time_svm # Time difference of 4.748707 secs
+```
+
+
+```{r svm_linear_tuned_model_pca}
+# Save the model with the cost that results in the lowest cross validation error rate
+bestmod <-  tune.out$best.model
+summary(bestmod)
+```
+
+```{r svm_predictions_pca}
+start_time_svm_pred <-  Sys.time()
+
+svm_pca_pred = predict(bestmod, test_data_pca)
+
+end_time_svm_pred <- Sys.time()
+svm_prediction_time <- end_time_svm_pred - start_time_svm_pred 
+# Time difference of 0.01050401 secs
+```
+
+```{r svm_pca_confusion}
+svm_pca_confusion_matrix <- table(predict = svm_pca_pred, truth = test_data_pca$label)
+print(svm_pca_confusion_matrix)
+```
+
+```{r svm_pca_balanced_accuracy}
+svm_pca_balanced_accuracy <- fun_calc_balanced_accuracy(svm_confusion_matrix,
+                                                    pos_label = "TREG",
+                                                    neg_label = "CD4+T")
+
+cat("The balanced accuracy is", svm_pca_balanced_accuracy, "\n") # 0.9479
+```
+
+
+```{r svm_pca_misclass}
+svm_misclas <- mean(svm_pca_pred != test_data$label)
+cat("SVM Misclassification Rate:", svm_misclas, "\n") # 0.0521
+```
+
+```{r svm_Accuracy}
+svm_accuracy <- mean(svm_pca_pred == test_data$label)
+cat("SVM Accuracy:", svm_accuracy, "\n") # 0.9479
+```
+
+```{r svm_ROC_AUC}
+svm_roc <- roc(test_data$label, as.numeric(svm_pca_pred))
+svm_auc <- auc(svm_roc)
+cat("SVM AUC:", svm_auc, "\n")
+plot(svm_roc, main = "SVM ROC Curve") # Make the limits of the axes 0-1
+```
+
+```{r rf_f1_score}
+svm_f1_score <- F1_Score(y_pred = svm_pca_pred, y_true = test_data$label)
+cat("F1 Score:", svm_f1_score, "\n") # 0.9645
 ```
 
 ## T1.3: Improving F1 Score (???)
