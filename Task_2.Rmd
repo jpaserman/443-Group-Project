@@ -273,57 +273,90 @@ For T2.2 and T2.3, your evaluation results should include the balanced accuracy 
 ### [[Tree-Based models]] (i.e., either XGBoost or LightGBM) (Jonathan)
 
 ```{r xgboost}
-# Replace the labels of -1 to 0 for train and test data
+# Replace -1 with 0 in labels
 xgb_train_data <- train_data
 xgb_test_data <- test_data
 xgb_test_data$label[xgb_test_data$label == -1] <- 0
 xgb_train_data$label[xgb_train_data$label == -1] <- 0
 
-xgb_train_matrix <- xgb.DMatrix(data = as.matrix(xgb_train_data[,]), label = xgb_train_data$label)
-xgb_test_matrix <- xgb.DMatrix(data = as.matrix(xgb_test_data[,]), label = xgb_test_data$label)
+# Prepare DMatrix
+xgb_train_matrix <- xgb.DMatrix(data = as.matrix(xgb_train_data[, -1]), label = xgb_train_data$label)
+xgb_test_matrix <- xgb.DMatrix(data = as.matrix(xgb_test_data[, -1]), label = xgb_test_data$label)
 
-# Add weights to account for imbalanced data
-scale_pos_weight = sum(xgb_train_data$label == 0) / sum(xgb_train_data$label == 1)
+# Set scale_pos_weight for imbalanced data
+scale_pos_weight <- sum(xgb_train_data$label == 0) / sum(xgb_train_data$label == 1)
 
-xgb_model <- xgb.cv(
+# Hyperparameter tuning
+grid_search <- expand.grid(
+  max_depth = c(3, 5, 6),
+  eta = c(0.01, 0.05,0.1, 0.5),
+  nrounds = c(500, 1000)
+)
+
+best_model <- NULL
+best_balanced_accuracy <- -Inf
+selected_features <- NULL
+
+xgb_model_start <- Sys.time()
+
+for (i in 1:nrow(grid_search)) {
+  params <- list(
+    eta = grid_search$eta[i],
+    max_depth = grid_search$max_depth[i],
+    objective = "binary:logistic",
+    scale_pos_weight = scale_pos_weight,
+    eval_metric = "auc",
+    nthread = 4 # Adjust this based on your machine's capability
+  )
+  
+  xgb_cv <- xgb.cv(
+    params = params,
+    data = xgb_train_matrix,
+    nrounds = grid_search$nrounds[i],
+    nfold = 5,
+    verbose = 0,
+    early_stopping_rounds = 50
+  )
+  
+  mean_auc <- max(xgb_cv$evaluation_log$test_auc_mean)
+  
+  # Train final model if current AUC is better
+  if (mean_auc > best_balanced_accuracy) {
+    best_balanced_accuracy <- mean_auc
+    best_model <- xgb.train(
+      params = params,
       data = xgb_train_matrix,
-      eta = 0.01,
-      max_depth = 6,
-      nrounds = 5000,
-      objective = "binary:logistic",
-      verbose = 0,
-      scale_pos_weight = scale_pos_weight,
-      nfold = 5,
-      metrics = "auc"
-      )
+      nrounds = xgb_cv$best_iteration
+    )
     
-# Making predictions on the test set
-xgb_predictions <- predict(xgb_model, newdata = xgb_test_matrix)
+    # Get feature importance for the best model
+    importance_matrix <- xgb.importance(feature_names = colnames(xgb_train_data[, -1]), model = best_model)
+    selected_features <- importance_matrix$Feature
+  }
+}
+
+# Test predictions and new balanced accuracy
+xgb_predictions <- predict(best_model, newdata = xgb_test_matrix)
 xgb_predictions <- ifelse(xgb_predictions > 0.5, 1, 0)
-    
-# Calculating the Mean Squared Error on the test set
-mse <- mean((xgb_predictions - xgb_test_data$label)^2)
-cat("Test Mean Squared Error:", mse, "\n")
-    
-xgb_confusion_matrix <- table(Predicted = xgb_predictions, Actual =  xgb_test_data$label)
-print(xgb_confusion_matrix)
 
-xgb_balanced_accuracy <- ((1/2) *(xgb_confusion_matrix[2,2]/(xgb_confusion_matrix[2,2]+xgb_confusion_matrix[1,2]))+ (1/2 *(xgb_confusion_matrix[1,1]/(xgb_confusion_matrix[1,1] + xgb_confusion_matrix[2,1]))))
+xgb_confusion_matrix <- table(Predicted = xgb_predictions, Actual = xgb_test_data$label)
 
-cat("The balanced accuracy is", xgb_balanced_accuracy, "\n")
-cat("Lambda:", lambda, "Depth:", depth, "Balanced Accuracy:", xgb_balanced_accuracy, "\n")
+# Calculate Balanced Accuracy
+sensitivity <- xgb_confusion_matrix[2, 2] / (xgb_confusion_matrix[2, 2] + xgb_confusion_matrix[1, 2])
+specificity <- xgb_confusion_matrix[1, 1] / (xgb_confusion_matrix[1, 1] + xgb_confusion_matrix[2, 1])
+final_balanced_accuracy <- (sensitivity + specificity) / 2
 
+# Output results
+cat("Final Balanced Accuracy:", final_balanced_accuracy, "\n")
+cat("Selected Features Count:", length(selected_features), "\n")
 
 xgb_model_end <- Sys.time()
-xgb_model_total_time <- xgb_model_end - xgb_model_start 
-cat("The xgboost model took ", xgb_model_total_time, " for the task 2 data \n")
+xgb_model_total_time <- xgb_model_end - xgb_model_start
+cat("Time taken for model training and selection:", xgb_model_total_time, "\n")
 
-# Get feature importance
-importance_matrix <- xgb.importance(feature_names = colnames(xgb_train_matrix), model = best_model)
-print(importance_matrix)
-
-# Plot feature importance
+# Plot Feature Importance
 xgb.plot.importance(importance_matrix)
+
 ```
 
 
