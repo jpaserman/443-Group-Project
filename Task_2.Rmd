@@ -409,8 +409,8 @@ For T2.2 and T2.3, your evaluation results should include the balanced accuracy 
 
 ```{r xgboost}
 # Replace -1 with 0 in labels
-xgb_train_data <- train_data
-xgb_test_data <- test_data
+xgb_train_data <- train_data_2
+xgb_test_data <- test_data_2
 xgb_test_data$label[xgb_test_data$label == -1] <- 0
 xgb_train_data$label[xgb_train_data$label == -1] <- 0
 
