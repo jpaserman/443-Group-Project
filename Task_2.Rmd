@@ -21,7 +21,8 @@ packages = list("caret",
                 "xgboost",
                 "tibble",
                 "dplyr",
-                "Matrix"
+                "pROC",
+                "MLmetrics"
                 )
 
 ```
@@ -34,6 +35,20 @@ for (package in packages){
     library(package, character.only = TRUE)
   }
 }
+```
+
+```{r functions}
+fun_calc_balanced_accuracy <- function(confusion_matrix, pos_label, neg_label){
+  tp <- confusion_matrix[pos_label, pos_label]
+  tn <- confusion_matrix[neg_label, neg_label]
+  fp <- confusion_matrix[pos_label, neg_label]
+  fn <- confusion_matrix[neg_label, pos_label]
+  
+  balanced_accuracy <- 0.5 * (tp / (tp + fn) + tn / (tn + fp)) 
+  
+  return(balanced_accuracy)
+}
+
 ```
 
 # Task 2: feature selection
@@ -159,13 +174,15 @@ top_1000_cor <- cor_with_label %>%
   top_n(1001, abs_cor)
   
 # We will utilize this subset of features for models that are running into 
-# difficulties with computation/memory size
+# difficulties with computation/memory size (such as FSS)
 top_1000_vars <- top_1000_cor$feature
 
 ```
 
 
 ```{r train_test_split}
+set.seed(seed) # Not sure why, but was required to reset the seed in this location
+
 # Split Data into Test and Train (We should all use the same data)
 train_split = as.integer(nrow(task_two_df)*training_size)
 
@@ -173,8 +190,14 @@ train_indices <- sample(1:nrow(task_two_df), train_split)
 train_data_2 <- task_two_df[train_indices,]
 test_data_2 <- task_two_df[-train_indices,]
 
+table(train_data_2$label) # The training data has 581 compounds not bind and 63 compounds do bind
+table(test_data_2$label) # The testing data has 141 compounds not bind and 15 compounds do bind
+
+# We will utilize this subset of features for models that are running into 
+# difficulties with computation/memory size (such as FSS)
 train_data_2_top_subset <- train_data_2[, top_1000_vars]
 test_data_2_top_subset <- test_data_2[, top_1000_vars]
+
 ```
 
 ## T2.1: exploratory data analysis and summary statistics (??? -- need to expand)
@@ -261,11 +284,20 @@ cat("Balanced Accuracy on Test Data:", test_balanced_accuracy, "\n")
 ### Forward stepwise selection (FSS) (Peter)
 
 ```{r, results='hold'}
+fss_test_data <- test_data_2_top_subset
+fss_train_data <- train_data_2_top_subset
+
+# # Prepare the data
+# test_data_clean_matrix <- as.matrix(lasso_test_data[, -1])
+# train_data_matrix <- as.matrix(lasso_train_data[, -1])
+# train_labels <- lasso_train_data$label
+# test_labels <- lasso_test_data$label
+
 # Increase protection stack size
 fss_start_time <- Sys.time()
 
 regfit_fwd <-  regsubsets(label ~ .,
-                        data = train_data_2_top_subset,
+                        data = fss_train_data,
                         nvmax = 500,
                         method = "forward")
 reg_summary <- summary(regfit_fwd)
@@ -274,34 +306,84 @@ fss_end_time <- Sys.time()
 fss_runtime <- fss_end_time - fss_start_time
 print(fss_runtime)
 
-par(mfrow=c(2,2))
-plot(reg_summary$rss, xlab="Number of Variables", ylab="RSS")
+par(mfrow=c(1,2))
 
 # Plot adjusted R2 vs Number of Variables
 plot(reg_summary$adjr2, xlab="Number of Variables", ylab="Adjusted RSq", type="l")
 # which_max() function is used to identify the location of the maximum point of a vector
-best_model = which.max(reg_summary$adjr2)
+best_model_adjr2 = which.max(reg_summary$adjr2) #
 # Plot a red dot to indicate the model with the largest adjusted R2
-points(best_model, reg_summary$adjr2[best_model], col="red", cex=2, pch=20)
+points(best_model_adjr2, reg_summary$adjr2[best_model_adjr2], col="red", cex=2, pch=20)
+print(best_model_adjr2)
 
-## In a similar fashion, we can plot Cp and BIC
-plot(reg_summary$cp, xlab="Number of Variables", ylab="Cp", type="l")
-best_model = which.min(reg_summary$cp)
-points(best_model, reg_summary$cp[best_model], col="red", cex=2, pch=20)
-
+## In a similar fashion, we can plot BIC
 plot(reg_summary$bic, xlab="Number of Variables", ylab="BIC", type="l")
-best_model = which.min(reg_summary$bic)
-points(best_model, reg_summary$bic[best_model], col="red", cex=2, pch=20)
+best_model_bic = which.min(reg_summary$bic)
+points(best_model_bic, reg_summary$bic[best_model_bic], col="red", cex=2, pch=20)
+print(best_model_bic)
 
 ```
+
+The best model according to maximizing RSS on the training data has 440 features
+The best model according to minimizing BIC on the training data has 193 features
+
+We will proceed with the model recommended by minimizing BIC (193 features).
 
 ```{r, fig.height = 20, fig.width = 50, fig.align = "center"}
-par(mfrow = c(2, 2))
-plot(regfit_fwd, scale = "r2")
+par(mfrow = c(1, 2))
 plot(regfit_fwd, scale = "adjr2")
-plot(regfit_fwd, scale = "Cp")
 plot(regfit_fwd, scale = "bic")
+
 ```
+
+```{r fss_Prediction}
+# There is no `predict()` method for `regsubsets()`
+# we write our own version of the predict function as
+predict_regsubsets = function(object, newdata, id) {
+  form = as.formula(object$call[[2]])   #label~.
+  mat = model.matrix(form, newdata)
+  coef_i = coef(object, id = id)
+  mat[, names(coef_i)] %*% coef_i
+}
+
+# test the function
+fss_test_data["value"] <- predict_regsubsets(regfit_fwd, fss_test_data, id=best_model_bic)
+fss_test_data["label_pred"] <- ifelse(fss_test_data["value"] < 0, -1, 1)
+
+```
+
+```{r fss_Confusion}
+fss_confusion_matrix <- table(predict = fss_test_data$label_pred, truth = fss_test_data$label)
+print(fss_confusion_matrix)
+print(fss_confusion_matrix[2,2])
+fss_balanced_accuracy <- fun_calc_balanced_accuracy(fss_confusion_matrix,
+                                                    pos_label = "1",
+                                                    neg_label = "-1")
+cat("The balanced accuracy is", fss_balanced_accuracy, "\n") # 0.7931
+
+```
+```{r fss_Misclass}
+fss_misclass <- mean(fss_test_data$label_pred != fss_test_data$label)
+cat("FSS Misclassification Rate:", fss_misclass, "\n") # 0.05
+```
+
+```{r fss_Accuracy}
+fss_accuracy <- mean(fss_test_data$label_pred == fss_test_data$label)
+cat("fss Accuracy:", fss_accuracy, "\n") # 0.95
+```
+
+```{r fss_ROC_AUC}
+fss_roc <- roc(fss_test_data$label, fss_test_data$label_pred)
+fss_auc <- auc(fss_roc)
+cat("fss AUC:", fss_auc, "\n") # 0.7931
+plot(fss_roc, main = "fss ROC Curve") # Make the limits of the axes 0-1
+```
+
+```{r fss_f1_score}
+fss_f1_score <- F1_Score(y_pred = fss_test_data$label_pred, y_true = fss_test_data$label)
+cat("F1 Score:", fss_f1_score, "\n") # 0.9727
+```
+
 
 ### Random forest (???)
 
