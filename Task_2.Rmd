@@ -380,7 +380,8 @@ plot(fss_roc, main = "fss ROC Curve") # Make the limits of the axes 0-1
 ```
 
 ```{r fss_f1_score}
-fss_f1_score <- F1_Score(y_pred = fss_test_data$label_pred, y_true = fss_test_data$label)
+fss_f1_score <- F1_Score(y_pred = fss_test_data$label_pred, y_true = fss_test_data$label, positive = "-1")
+fss_f1_score <- F1_Score(y_pred = fss_test_data$label_pred, y_true = fss_test_data$label, positive = "1")
 cat("F1 Score:", fss_f1_score, "\n") # 0.9727
 ```
 
