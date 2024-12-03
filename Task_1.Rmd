@@ -769,28 +769,32 @@ cat("F1 Score:", svm_f1_score, "\n") # 0.9645
 # Standardize the data (important for PCA)
 task_one_df_scaled <- task_one_df %>%
   
-  select(-label, - label_as_numeric) %>% 
+  dplyr::select(-label, - label_as_numeric) %>% 
   
   scale()
   
-# Perform PCA
+# Perform PCA to get first 10 principal components
 pca_start <- Sys.time()
 task_one_df_pca <- task_one_df_scaled %>% 
   
-  prcomp(center = FALSE, scale. = FALSE)
+  prcomp(center = FALSE, scale. = FALSE, rank. = 10)
 
 pca_end <- Sys.time()
 
-pca_runtime <- pca_end_time - pca_start_time
+pca_runtime <- pca_end - pca_start # Time difference of 3.813981 mins
 
-# Get the first 10 principal components
-train_data_pca <- as.data.frame(task_one_df_pca$x[train_indices, 1:10])
+# Split into training and test data
+train_data_pca <- as.data.frame(task_one_df_pca$x[train_indices,])
 
-test_data_pca <- as.data.frame(task_one_df_pca$x[-train_indices, 1:10])
+test_data_pca <- as.data.frame(task_one_df_pca$x[-train_indices,])
 
-train_data_pca$label <- train_data$label # Add the target variable
+train_data_pca$label <- train_data$label
 
-train_data_pca$label_as_numeric <- train_data$label_as_numeric # Add the target variable
+train_data_pca$label_as_numeric <- train_data$label_as_numeric
+
+test_data_pca$label <- test_data$label
+
+test_data_pca$label_as_numeric <- test_data$label_as_numeric
 ```
 
 
