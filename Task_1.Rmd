@@ -678,8 +678,8 @@ cat("The balanced accuracy is", svm_balanced_accuracy, "\n") # 0.9479
 ```
 
 ```{r svm_Misclass}
-svm_misclas <- mean(yhat.svm != test_data$label)
-cat("SVM Misclassification Rate:", svm_misclas, "\n") # 0.0447
+svm_misclass <- mean(yhat.svm != test_data$label)
+cat("SVM Misclassification Rate:", svm_misclass, "\n") # 0.0447
 ```
 
 ```{r svm_Accuracy}
