@@ -26,7 +26,8 @@ packages = list("class",
                 "pROC",
                 "MLmetrics",
                 "caret",
-                "e1071"
+                "e1071",
+                "glmnet"
 )
 
 # For knn-training
@@ -172,8 +173,6 @@ lda_runtime <- lda_end_time - lda_start_time # Time difference of 4.937018 mins
 lda_pred <- predict(lda_fit, test_data)$class
 ```
 
-LDA Evaluation
-
 ```{r lda_confusion}
 lda_confusion <- table(predicted_label = lda_pred, true_label = test_data$label)
 lda_confusion
@@ -214,8 +213,8 @@ lda_auc
 ```
 
 ```{r lda_misclass}
-misclas_lda <- mean(lda_pred != test_data$label)
-cat("Misclassification error rate of LDA:", misclas_lda, "\n")
+lda_misclas <- mean(lda_pred != test_data$label)
+cat("Misclassification error rate of LDA:", lda_misclas, "\n")
 ```
 
 #### Logistic classifier (Imar)
@@ -232,8 +231,6 @@ logreg_run_time <- Sys.time() - logreg_start_time # Time difference of 17.64516 
 logreg_probs <- predict(logreg_fit, newdata = test_data, type = "response")
 logreg_pred <- ifelse(logreg_probs > 0.5, 'TREG', 'CD4+T')
 ```
-
-Logistic Regression Evaluation
 
 ```{r logreg_confusion}
 log_confusion <- table(prediction = logreg_pred, truth = test_data$label)
@@ -268,8 +265,8 @@ cat("The AUC of the ROC of Logistic Regression:", log_auc, "\n")
 ```
 
 ```{r logreg_Misclass}
-misclass_log <- mean(glm_pred != test_data_log$label)
-cat("The Misclassification rate of Logistic Regression:", misclass_log, "\n")
+log_misclas <- mean(glm_pred != test_data_log$label)
+cat("The Misclassification rate of Logistic Regression:", log_misclas, "\n")
 ```
 
 #### Quadratic Discriminant Analysis (QDA) (Chi)
@@ -301,9 +298,9 @@ table(predicted = qda_pred, observed = test_data$label)
 ```
 
 ```{r qda_Misclass}
-qda_misclass_rate = mean(qda_pred != test_data$label)
+qda_misclas = mean(qda_pred != test_data$label)
 
-cat("Misclassification rate:", qda_misclass_rate*100, "%")
+cat("Misclassification rate:", qda_misclas*100, "%")
 ```
 
 ```{r qda_ROC}
@@ -365,12 +362,12 @@ for (i in kk_vector){
 ```
 
 ```{r kNN_Misclass}
-knn_misclass = c(rep(0,length(kk_vector)))
+knn_misclas = c(rep(0,length(kk_vector)))
 
 for (i in kk_vector){
-  knn_misclass[i] = mean(knn_pred[,i] != test_data$label)
+  knn_misclas[i] = mean(knn_pred[,i] != test_data$label)
 }
-plot(knn_misclass, type = "l")
+plot(knn_misclas, type = "l")
 ```
 
 ```{r kNN_ROC}
@@ -523,14 +520,16 @@ cat("Prediction time:", gbm_prediction_time, "\n")
 gbm_confusion_matrix <- table(Predicted = gbm_pred_classes, Actual = test_data_cleaned_gbm$label_as_numeric)
 print(gbm_confusion_matrix)
 
-gbm_balanced_accuracy <- ((1/2) *(gbm_confusion_matrix[2,2]/(gbm_confusion_matrix[2,2]+gbm_confusion_matrix[1,2]))+ (1/2 *(gbm_confusion_matrix[1,1]/(gbm_confusion_matrix[1,1] + gbm_confusion_matrix[2,1]))))
+gbm_balanced_accuracy <- fun_calc_balanced_accuracy(gbm_confusion_matrix, 
+                                  pos_label = "TREG", 
+                                  neg_label = "CD4+T")
 
 cat("The balanced accuracy is", gbm_balanced_accuracy, "\n")
 ```
 
 ```{r gbm_Misclass}
-gbm_misclassification_rate <- mean(gbm_pred_classes != test_data_cleaned_gbm$label_as_numeric)
-cat("Misclassification Rate:", gbm_misclassification_rate, "\n")
+gbm_misclas <- mean(gbm_pred_classes != test_data_cleaned_gbm$label_as_numeric)
+cat("Misclassification Rate:", gbm_misclas, "\n")
 ```
 
 ```{r gbm_Accuracy}
@@ -540,7 +539,8 @@ cat("Accuracy:", gbm_accuracy, "\n")
 
 ```{r gbm_ROC_AUC}
 gbm_roc_curve <- roc(test_data_cleaned_gbm$label_as_numeric, gbm_pred_probs)
-cat("AUC:", auc(gbm_roc_curve), "\n")
+gbm_auc <- auc(gbm_roc_curve)
+cat("AUC:", gbm_auc, "\n")
 plot(gbm_roc_curve, main = "ROC Curve")
 ```
 
@@ -577,7 +577,7 @@ cv.rna_data <- cv.tree(tree.rna_features)
 plot(cv.rna_data$size, cv.rna_data$dev, type ='b')
 ```
 
-Above we use a tree search to find.... When using the tree search, we get that there are 11 features that are the most important to classifying whether a cell is a T Regulatory Cell or a CD4-positive cell. However, we can see based on the tree that there are certain features that appear more than once. Based on the tree plot, we can determine that the most important regressor that helps determine if a cell is a Regulatory T cell or a CD4-positive cell is the IL7R. From the National Library of medicine ("<https://www.ncbi.nlm.nih.gov/gene/3575>"), IL7R is a protein encoded by a gene that plays a critical role in the development of lymph nodes. Based on the analysis above, we decided to create a Random Forest regression that will have 12 terminal nodes.
+Above we use a tree search to find.... When using the tree search, we get that there are 11 features that are the most important to classifying whether a cell is a TREG cell or a CD4+T cell. However, we can see based on the tree that there are certain features that appear more than once. Based on the tree plot, we can determine that the most important regressor that helps determine if a cell is a TREG cell or a CD4+T cell is the IL7R. From the National Library of medicine ("<https://www.ncbi.nlm.nih.gov/gene/3575>"), IL7R is a protein encoded by a gene that plays a critical role in the development of lymph nodes. Based on the analysis above, we decided to create a Random Forest regression that will have 12 terminal nodes.
 
 ```{r rfmodel}
 # RF model
@@ -604,7 +604,9 @@ cat("Random Forest prediction time:", rf_prediction_time, "\n")
 ```{r rf_Confusion}
 rf_confusion_matrix <- confusion_matrix <- table(Predicted = yhat.rf, Actual = test_data_cleaned_for_rf$label)
 print(rf_confusion_matrix)
-rf_balanced_accuracy <- ((1/2) *(rf_confusion_matrix[2,2]/(rf_confusion_matrix[2,2]+rf_confusion_matrix[1,2]))+ (1/2 *(rf_confusion_matrix[1,1]/(rf_confusion_matrix[1,1] + rf_confusion_matrix[2,1]))))
+rf_balanced_accuracy <- fun_calc_balanced_accuracy(rf_confusion_matrix,
+                                                   pos_label = "TREG",
+                                                   neg_label = "CD4+T")
 
 cat("The balanced accuracy is", rf_balanced_accuracy, "\n")
 ```
@@ -670,25 +672,28 @@ cat("SVM prediction time:", svm_prediction_time, "\n")
 svm_confusion_matrix <- table(predict = yhat.svm, truth = test_data$label)
 print(svm_confusion_matrix)
 print(svm_confusion_matrix[2,2])
-svm_balanced_accuracy <- ((1/2) *(svm_confusion_matrix[2,2]/(svm_confusion_matrix[2,2]+svm_confusion_matrix[1,2]))+ (1/2 *(svm_confusion_matrix[1,1]/(svm_confusion_matrix[1,1] + svm_confusion_matrix[2,1]))))
+svm_balanced_accuracy <- fun_calc_balanced_accuracy(svm_confusion_matrix,
+                                                    pos_label = "TREG",
+                                                    neg_label = "CD4+T")
 
 cat("The balanced accuracy is", svm_balanced_accuracy, "\n") # 0.9479
 ```
 
 ```{r svm_Misclass}
-svm_misclassification_rate <- mean(yhat.svm != test_data$label)
-cat("SVM Misclassification Rate:", svm_misclassification_rate, "\n") # 0.0447
+svm_misclas <- mean(yhat.svm != test_data$label)
+cat("SVM Misclassification Rate:", svm_misclas, "\n") # 0.0447
 ```
 
 ```{r svm_Accuracy}
-accuracy_svm <- mean(yhat.svm == test_data$label)
-cat("SVM Accuracy:", accuracy_svm, "\n") # 0.9553
+svm_accuracy <- mean(yhat.svm == test_data$label)
+cat("SVM Accuracy:", svm_accuracy, "\n") # 0.9553
 ```
 
 ```{r svm_ROC_AUC}
-roc_svm <- roc(test_data$label, as.numeric(yhat.svm))
-cat("SVM AUC:", auc(roc_svm), "\n")
-plot(roc_svm, main = "SVM ROC Curve") # Make the limits of the axes 0-1
+svm_roc <- roc(test_data$label, as.numeric(yhat.svm))
+svm_auc <- auc(svm_roc)
+cat("SVM AUC:", svm_auc, "\n")
+plot(svm_roc, main = "SVM ROC Curve") # Make the limits of the axes 0-1
 ```
 
 ```{r rf_f1_score}
@@ -761,6 +766,52 @@ svm_f1_score <- F1_Score(y_pred = yhat.svm_rad, y_true = test_data$label)
 cat("F1 Score:", svm_f1_score, "\n") # 0.9645
 ```
 
+#### Summary without PCA
+
+insert data frame with all the metrics of the classifiers
+```{r}
+lda_accuracy
+lda_balanced_accuracy
+lda_f1_score
+lda_auc
+lda_misclas
+lda_runtime
+
+log_accuracy
+log_balanced_accuracy
+log_f1_score
+log_auc
+log_misclas
+logreg_run_time
+
+# n/a qda_accuracy
+# n/a qda_balanced_accuracy
+# n/a qda_f1_score
+qda_auc
+qda_misclas
+# n/a qda_runtime
+
+# n/a knn_accuracy
+# n/a knn_balanced_accuracy
+# n/a knn_f1_score
+knn_auc
+knn_mislas
+knn_train_runtime
+
+gbm_accuracy
+gbm_balanced_accuracy
+gbm_f1_score
+gbm_auc
+gbm_misclas
+gbm_model_training_time
+
+svm_accuracy
+svm_balanced_accuracy
+svm_f1_score
+svm_auc
+svm_misclas
+svm_training_time
+```
 
 
 ### With PCA
@@ -804,11 +855,11 @@ test_data_pca$label_as_numeric <- test_data$label_as_numeric
 # Step 1: Prepare the training and test data
 set.seed(123)
 lda2_train_data <- train_data
-lda2_train_data <- lda2_train_data[, !(names(lda2_train_data) %in% c("label", "label_as_numeric"))]
+lda2_train_data <- lda2_train_data[, !(names(lda2_train_data) %in% c("label_as_factor", "label_as_numeric"))]
 lda2_train_data$label <- ifelse(lda2_train_data$label == "TREG", 1, 0)
 
 lda2_test_data <- test_data
-lda2_test_data <- lda2_test_data[, !(names(lda2_test_data) %in% c("label", "label_as_numeric"))]
+lda2_test_data <- lda2_test_data[, !(names(lda2_test_data) %in% c("label_as_factor", "label_as_numeric"))]
 lda2_test_data$label <- ifelse(lda2_test_data$label == "TREG", 1, 0)
 
 # Step 2: Scale the data (excluding the target variable)
@@ -1224,8 +1275,31 @@ Train and evaluating three classifiers of our choice with the goal of improving 
 #### Logistic Regression (w talk about why not adaBoost - confirm with GPT, improve model with ridge/lasso (regularisation), check on ) (Imar)
 
 ```{r}
+logreg_start_time <- Sys.time()
+
+# Prepare the input data (removing the target column from the predictor variables)
+x_train_log_regularized <- as.matrix(train_data[, setdiff(names(train_data), "label")])
+y_train_log_regularized <- train_data$label_as_numeric
+
+# Fit a regularized logistic regression model
+logreg_fit_regularized <- glmnet(x_train_log_regularized, y_train_log_regularized, family = "binomial", alpha = 0)  
+# alpha=1 for Lasso, alpha=0 for Ridge, or between 0 and 1 for Elastic Net
+
+logreg_run_time <- Sys.time() - logreg_start_time 
+
+# Make predictions on the test data
+x_test_log_regularized <- as.matrix(test_data[, setdiff(names(test_data), "label")])
+logreg_probs_regularized <- predict(logreg_fit_regularized, newx = x_test_log_regularized, type = "response", s = 0.1)  # s = 0.1 is the regularization parameter
+
+logreg_pred_regularized <- ifelse(logreg_probs_regularized > 0.5, 'TREG', 'CD4+T')
 
 ```
+
+```{r}
+log_confusion_regularized <- table(prediction = logreg_pred_regularized, truth = test_data$label)
+log_confusion_regularized
+```
+
 
 #### Random Forest (It's already bagged, use cross-validation) (Imar)
 
