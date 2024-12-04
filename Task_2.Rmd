@@ -22,7 +22,9 @@ packages = list("caret",
                 "tibble",
                 "dplyr",
                 "pROC",
-                "MLmetrics"
+                "MLmetrics",
+                "catboost",
+                "data.table"
                 )
 
 ```
@@ -399,10 +401,9 @@ Train and evaluate up to three additional feature selection methods, other than 
 
 For T2.2 and T2.3, your evaluation results should include the balanced accuracy and the number of selected features achieved by each method for various numbers of selected features. You may also compare the balanced accuracy achieved by different methods for a similar number of selected features.
 
-### Elastic net (not covered in class) (???)
+### Other method? Elastic net?
 
 ```{r}
-
 ```
 
 ### [[Tree-Based models]] (i.e., either XGBoost or LightGBM) (Jonathan)
@@ -440,7 +441,7 @@ grid_search <- expand.grid(
 )
 
 best_model <- NULL
-best_balanced_accuracy <- -Inf
+xgb_best_balanced_accuracy <- 0
 selected_features <- NULL
 
 xgb_model_start <- Sys.time()
@@ -473,11 +474,11 @@ for (i in 1:nrow(grid_search)) {
     calculate_balanced_accuracy(fold_confusion_matrix)
   })
   
-  mean_balanced_accuracy <- mean(balanced_accuracies, na.rm = TRUE)
+  xgb_mean_balanced_accuracy <- mean(balanced_accuracies, na.rm = TRUE)
   
   # Train final model if current balanced accuracy is better
-  if (!is.na(mean_balanced_accuracy) && mean_balanced_accuracy > best_balanced_accuracy) {
-    best_balanced_accuracy <- mean_balanced_accuracy
+  if (!is.na(xgb_mean_balanced_accuracy) && xgb_mean_balanced_accuracy > xgb_best_balanced_accuracy) {
+    xgb_best_balanced_accuracy <- xgb_mean_balanced_accuracy
     best_model <- xgb.train(
       params = params,
       data = xgb_train_matrix,
@@ -504,6 +505,7 @@ final_balanced_accuracy <- (sensitivity + specificity) / 2
 # Output results
 cat("Final Balanced Accuracy:", final_balanced_accuracy, "\n")
 cat("Selected Features Count:", length(selected_features), "\n")
+cat("The best parameters for our model were: eta:", best_model$params$eta, " and max depths: ", best_model$params$max_depth, "\n")
 
 xgb_model_end <- Sys.time()
 xgb_model_total_time <- xgb_model_end - xgb_model_start
