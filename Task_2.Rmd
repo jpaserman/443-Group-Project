@@ -402,6 +402,75 @@ For T2.2 and T2.3, your evaluation results should include the balanced accuracy 
 ### Other method? Elastic net?
 
 ```{r}
+elastic_net_test_data <-test_data_2
+elastic_net_train_data <-train_data_2
+
+
+elastic_net_test_data$label[elastic_net_test_data$label == -1] <- 0
+elastic_net_train_data$label[elastic_net_train_data$label == -1] <- 0
+# Prepare the data
+elastic_net_test_data_clean_matrix <- as.matrix(elastic_net_test_data[, -1])
+elastic_net_train_data_matrix <- as.matrix(elastic_net_train_data[, -1])
+train_labels <- elastic_net_train_data$label
+test_labels <- elastic_net_test_data$label
+
+# Define the lambda grid
+grid <- 10^seq(1, -4, length = 100)
+
+# Function to calculate balanced accuracy
+calculate_balanced_accuracy <- function(confusion) {
+  if (all(dim(confusion) == c(2, 2))) {
+    balanced_acc <- (1/2) * (confusion[2,2] / (confusion[2,2] + confusion[1,2])) + 
+                    (1/2) * (confusion[1,1] / (confusion[1,1] + confusion[2,1]))
+  } else {
+    balanced_acc <- NA
+  }
+  return(balanced_acc)
+}
+
+# Adding weights because of the unbalanced data
+class_weights <- ifelse(train_labels == 1, 1, sum(train_labels == 1) / sum(train_labels == 0))
+
+
+# Perform cross-validation with a sequence of lambda values
+start_task_two_elastic <- Sys.time()
+elastic_cv_fit <- cv.glmnet(elastic_net_train_data_matrix, train_labels, alpha = 0.5, lambda = grid, nfolds = 5, family = "binomial", weights = class_weights)
+end_task_two_elastic <- Sys.time()
+total_elastic_time <- end_task_two_elastic - start_task_two_elastic
+print(total_elastic_time)
+
+# Extract the lambda values and their corresponding balanced accuracies
+elastic_lambdas <- elastic_cv_fit$lambda
+elastic_cv_results <- sapply(elastic_lambdas, function(lambda) {
+  pred.cv <- predict(elastic_cv_fit, newx = elastic_net_train_data_matrix, s = lambda, family = "binomial", type ="response")
+  elastic_pred.cv_binary <- ifelse(pred.cv > 0.5, 1, 0)
+  confusion <- table(Predicted = elastic_pred.cv_binary, Actual = train_labels)
+  balanced_acc <- calculate_balanced_accuracy(confusion)
+  num_predictors <- sum(coef(elastic_cv_fit, s = lambda) != 0) - 1
+  return(c(balanced_acc, num_predictors))
+})
+
+elastic_balanced_accuracies <- elastic_cv_results[1, ]
+elastic_num_predictors <- elastic_cv_results[2, ]
+
+# Find the lambda with the highest balanced accuracy
+elastic_best_lambda_index <- which.max(elastic_balanced_accuracies)
+elastic_best_lambda <- elastic_lambdas[elastic_best_lambda_index]
+elastic_best_balanced_accuracy <- elastic_balanced_accuracies[elastic_best_lambda_index]
+elastic_best_num_predictors <- elastic_num_predictors[elastic_best_lambda_index]
+
+# Fit the final model using the best lambda
+elastic_final_model <- glmnet(elastic_net_train_data_matrix, train_labels, alpha = 0.5, lambda = elastic_lambdas[elastic_best_lambda_index], family = "binomial", weights = class_weights)
+elastic_pred.test <- predict(elastic_final_model, newx = elastic_net_test_data_clean_matrix, family ="binomial", type = "response")
+elastic_pred.test_binary <- ifelse(elastic_pred.test > 0.5, 1, 0)
+elastic_confusion_test <- table(Predicted = elastic_pred.test_binary, Actual = test_labels)
+elastic_test_balanced_accuracy <- calculate_balanced_accuracy(confusion_test)
+
+cat("Best Lambda:", elastic_best_lambda, "\n")
+cat("Highest Balanced Accuracy on CV:", elastic_best_balanced_accuracy, "\n")
+cat("Number of Predictors for Best Lambda:", elastic_best_num_predictors, "\n")
+cat("Balanced Accuracy on Test Data:", elastic_test_balanced_accuracy, "\n")
+
 ```
 
 ### [[Tree-Based models]] (i.e., either XGBoost or LightGBM) (Jonathan)
