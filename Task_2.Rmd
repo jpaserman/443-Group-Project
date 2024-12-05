@@ -22,9 +22,7 @@ packages = list("caret",
                 "tibble",
                 "dplyr",
                 "pROC",
-                "MLmetrics",
-                "catboost",
-                "data.table"
+                "MLmetrics"
                 )
 
 ```
