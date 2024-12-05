@@ -501,13 +501,13 @@ specificity <- xgb_confusion_matrix[1, 1] / (xgb_confusion_matrix[1, 1] + xgb_co
 final_balanced_accuracy <- (sensitivity + specificity) / 2
 
 # Output results
-cat("Final Balanced Accuracy:", final_balanced_accuracy, "\n")
-cat("Selected Features Count:", length(selected_features), "\n")
-cat("The best parameters for our model were: eta:", best_model$params$eta, " and max depths: ", best_model$params$max_depth, "\n")
+cat("Final Balanced Accuracy for XGboost:", final_balanced_accuracy, "\n")
+cat("Selected Features Count XGboost:", length(selected_features), "\n")
+cat("The best parameters for our xgboost model were: eta :", best_model$params$eta, " and max depths: ", best_model$params$max_depth, "\n")
 
 xgb_model_end <- Sys.time()
 xgb_model_total_time <- xgb_model_end - xgb_model_start
-cat("Time taken for model training and selection:", xgb_model_total_time, "\n")
+cat("Time taken for xgb model training and selection:", xgb_model_total_time, "\n")
 
 # Plot Feature Importance
 xgb.plot.importance(importance_matrix)
