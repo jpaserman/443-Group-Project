@@ -464,7 +464,7 @@ elastic_final_model <- glmnet(elastic_net_train_data_matrix, train_labels, alpha
 elastic_pred.test <- predict(elastic_final_model, newx = elastic_net_test_data_clean_matrix, family ="binomial", type = "response")
 elastic_pred.test_binary <- ifelse(elastic_pred.test > 0.5, 1, 0)
 elastic_confusion_test <- table(Predicted = elastic_pred.test_binary, Actual = test_labels)
-elastic_test_balanced_accuracy <- calculate_balanced_accuracy(confusion_test)
+elastic_test_balanced_accuracy <- calculate_balanced_accuracy(elastic_confusion_test)
 
 cat("Best Lambda:", elastic_best_lambda, "\n")
 cat("Highest Balanced Accuracy on CV:", elastic_best_balanced_accuracy, "\n")
