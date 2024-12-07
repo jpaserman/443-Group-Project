@@ -282,6 +282,23 @@ cat("Number of Predictors for Best Lambda:", best_num_predictors, "\n")
 cat("Balanced Accuracy on Test Data:", test_balanced_accuracy, "\n")
 ```
 
+```{r lasso_Accuracy}
+lasso_accuracy <- mean(pred.test_binary == lasso_test_data$label)
+cat("Lasso Accuracy:", lasso_accuracy, "\n") # .93125
+```
+
+```{r lasso_ROC_AUC}
+lasso_roc <- roc(lasso_test_data$label, pred.test_binary)
+lasso_auc <- auc(lasso_roc)
+cat("Lasso AUC:", lasso_auc, "\n") #
+plot(lasso_roc, main = "Lasso ROC Curve") # Make the limits of the axes 0-1
+```
+
+```{r lasso_f1_score}
+lasso_f1_score <- F1_Score(y_pred = pred.test_binary, y_true = lasso_test_data$label, positive = )
+cat("F1 Score:", lasso_f1_score, "\n") 
+```
+
 ### Forward stepwise selection (FSS) (Peter)
 
 ```{r, results='hold'}
@@ -434,7 +451,7 @@ class_weights <- ifelse(train_labels == 1, 1, sum(train_labels == 1) / sum(train
 
 # Perform cross-validation with a sequence of lambda values
 start_task_two_elastic <- Sys.time()
-elastic_cv_fit <- cv.glmnet(elastic_net_train_data_matrix, train_labels, alpha = 0.5, lambda = grid, nfolds = 5, family = "binomial", weights = class_weights)
+elastic_cv_fit <- cv.glmnet(elastic_net_train_data_matrix, train_labels, alpha = 0.60, lambda = grid, nfolds = 5, family = "binomial", weights = class_weights)
 end_task_two_elastic <- Sys.time()
 total_elastic_time <- end_task_two_elastic - start_task_two_elastic
 print(total_elastic_time)
@@ -460,7 +477,7 @@ elastic_best_balanced_accuracy <- elastic_balanced_accuracies[elastic_best_lambd
 elastic_best_num_predictors <- elastic_num_predictors[elastic_best_lambda_index]
 
 # Fit the final model using the best lambda
-elastic_final_model <- glmnet(elastic_net_train_data_matrix, train_labels, alpha = 0.5, lambda = elastic_lambdas[elastic_best_lambda_index], family = "binomial", weights = class_weights)
+elastic_final_model <- glmnet(elastic_net_train_data_matrix, train_labels, alpha = 0.6, lambda = elastic_lambdas[elastic_best_lambda_index], family = "binomial", weights = class_weights)
 elastic_pred.test <- predict(elastic_final_model, newx = elastic_net_test_data_clean_matrix, family ="binomial", type = "response")
 elastic_pred.test_binary <- ifelse(elastic_pred.test > 0.5, 1, 0)
 elastic_confusion_test <- table(Predicted = elastic_pred.test_binary, Actual = test_labels)
@@ -472,6 +489,24 @@ cat("Number of Predictors for Best Lambda:", elastic_best_num_predictors, "\n")
 cat("Balanced Accuracy on Test Data:", elastic_test_balanced_accuracy, "\n")
 
 ```
+```{r elastic_Accuracy}
+elastic_accuracy <- mean(elastic_pred.test_binary == elastic_net_test_data$label)
+cat("Elastic Net Accuracy:", elastic_accuracy, "\n") 
+```
+
+```{r elastic_ROC_AUC}
+elastic_roc <- roc(elastic_net_test_data$label, elastic_pred.test_binary)
+elastic_auc <- auc(elastic_roc)
+cat("Elastic net AUC:", elastic_auc, "\n") #
+plot(elastic_roc, main = "Elastic net ROC Curve") # Make the limits of the axes 0-1
+```
+
+```{r elastic_f1_score}
+elastic_f1_score <- F1_Score(y_pred = elastic_pred.test_binary, y_true = elastic_net_test_data$label, positive = "1")
+cat("F1 Score:", elastic_f1_score, "\n") 
+```
+
+
 
 ### [[Tree-Based models]] (i.e., either XGBoost or LightGBM) (Jonathan)
 
@@ -582,6 +617,25 @@ cat("Time taken for xgb model training and selection:", xgb_model_total_time, "\
 xgb.plot.importance(importance_matrix)
 
 ```
+
+```{r xgb_Accuracy}
+xgb_accuracy <- mean(xgb_predictions == xgb_test_data$label)
+cat("XGboost Accuracy:", xgb_accuracy, "\n") 
+```
+
+```{r xgb_ROC_AUC}
+xgb_roc <- roc(xgb_test_data$label, xgb_predictions)
+xgb_auc <- auc(xgb_roc)
+cat("XGboost AUC:", xgb_auc, "\n") #
+plot(xgb_roc, main = "XGboost ROC Curve") # Make the limits of the axes 0-1
+```
+
+```{r xgb_f1_score}
+xgb_f1_score <- F1_Score(y_pred = xgb_predictions, y_true = xgb_test_data$label, positive = "1")
+cat("F1 Score:", xgb_f1_score, "\n") 
+```
+
+
 
 
 
