@@ -257,15 +257,17 @@ cv_results <- sapply(lambdas, function(lambda) {
   confusion <- table(Predicted = pred.cv_binary, Actual = train_labels)
   balanced_acc <- calculate_balanced_accuracy(confusion)
   num_predictors <- sum(coef(cv_fit, s = lambda) != 0) - 1 # Counting the coefficients, subtracting the intercept coef. 
-  return(c(balanced_acc, num_predictors))
+  custom_scores <- balanced_acc - (0.001 * num_predictors)
+  return(c(balanced_acc, num_predictors, custom_scores))
 })
 # Saving the balanced accuracies from the new matrix formed
 balanced_accuracies <- cv_results[1, ]
 # Saving the number of predictors from the new matrix formed
 num_predictors <- cv_results[2, ]
+custom_scores <- cv_results[3, ]
 
 # Find the lambda with the highest balanced accuracy
-best_lambda_index <- which.max(balanced_accuracies) #Max balanaced accuracy for the predictions. 
+best_lambda_index <- which.max(custom_scores) #Max balanaced accuracy for the predictions. 
 best_lambda <- lambdas[best_lambda_index] # Extracting the best lambda
 best_balanced_accuracy <- balanced_accuracies[best_lambda_index] # Taking the best balanced accuracy 
 best_num_predictors <- num_predictors[best_lambda_index] # Taking the best number of predictors for the given lambda 
