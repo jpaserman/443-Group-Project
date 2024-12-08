@@ -1666,6 +1666,7 @@ for (prin_comps in no_prin_comps) {
 ##### with Ridge Regression (Regularisation)
 
 ```{r}
+logreg_cv_time <- Sys.time()
 logreg_cv_scores <- data.frame(no_pc = c(),
                         alpha = c(),
                         lambda = c(),
@@ -1697,7 +1698,7 @@ for (prin_comps in no_prin_comps) {
   
   result <- logistic_regression_model$results
     
-  scores <- data.frame(no_pc = c(rep(prin_comps, length(result))),
+  scores <- data.frame(no_pc = c(rep(prin_comps, length(result$alpha))),
                        alpha = c(result$alpha),
                        lambda = c(result$lambda),
                        accuracy = c(result$Accuracy),
@@ -1706,7 +1707,24 @@ for (prin_comps in no_prin_comps) {
   # Store the cross-validation accuracy
   logreg_cv_scores <- rbind(logreg_cv_scores, scores)
 }
+
+logreg_cv_time <- Sys.time() - logreg_cv_time # Time difference of 3.394877 mins
 ```
+
+```{r}
+graph_cv <- logreg_cv_scores %>% filter(no_pc == 30)
+
+ggplot(graph_cv, aes(x = alpha, y = lambda, fill = f1, labels = f1)) +
+
+  geom_tile() + 
+  
+  scale_fill_gradient(low = 'white', high = 'blue', limits = c(0.94,0.95)) + 
+  
+  geom_text(aes(label = round(f1, 5)), color = 'black', size = 3)
+  
+# alpha=1 for Lasso, alpha=0 for Ridge, or between 0 and 1 for Elastic Net
+```
+
 
 #### Logistic Regression with Ridge Regression (Regularisation)
 
