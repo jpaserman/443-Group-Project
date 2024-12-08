@@ -532,7 +532,7 @@ Train and evaluate up to three additional feature selection methods, other than 
 
 For T2.2 and T2.3, your evaluation results should include the balanced accuracy and the number of selected features achieved by each method for various numbers of selected features. You may also compare the balanced accuracy achieved by different methods for a similar number of selected features.
 
-### Other method? Elastic net?
+### Elastic net
 
 ```{r}
 # Define a range of alpha values to loop over
