@@ -361,9 +361,12 @@ print(knn_train_runtime) #50 mins for k=1 to k=10
 rm(knn_train_X, knn_train_Y, knn_test_X)
 ```
 
-```{r kNN_save_load, include = FALSE}
+```{r kNN_save, include = FALSE}
 write.csv(knn_pred, file = "knn_predictions.csv", row.names = TRUE)
+```
 
+
+```{r kNN_load, include = FALSE}
 knn_pred <- read.csv("knn_predictions.csv") %>% 
   dplyr::select(-X)
 
@@ -375,7 +378,8 @@ colnames(knn_pred) <- paste0("k=", 1:10)
 ```{r kNN_Confusion}
 for (i in kk_vector){
   print(paste("k =", i))
-  print(table(predicted = knn_pred[,i], observed = test_data$label))
+  print(table(predicted = knn_pred[,i], 
+              observed = test_data$label))
 }
 ```
 
@@ -832,7 +836,7 @@ metrics_df
 
 ### With PCA
 
-```{r}
+```{r pc_decomp}
 # Standardize the data (important for PCA)
 task_one_df_scaled <- task_one_df %>%
   
@@ -844,7 +848,7 @@ task_one_df_scaled <- task_one_df %>%
 pca_start <- Sys.time()
 task_one_df_pca <- task_one_df_scaled %>% 
   
-  prcomp(center = FALSE, scale. = FALSE, rank. = 10)
+  prcomp(center = FALSE, scale. = FALSE, rank. = 25)
 
 pca_end <- Sys.time()
 
@@ -870,7 +874,7 @@ test_data_pca$label_as_numeric <- test_data$label_as_numeric
 ```{r LDA_with_PCA}
 lda_pca_model <- lda(label ~ .-label_as_numeric, data = train_data_pca)
 lda_pca_pred <- predict(lda_pca_model, test_data_pca)
-lda_test_data_labels <- as.factor(pca_test_data$label)
+lda_test_data_labels <- as.factor(test_data_pca$label)
 ```
 
 ```{r lda_pca_confusion}
@@ -891,7 +895,8 @@ cat("Balanced Accuracy of LDA with PCA:", lda_pca_balanced_accuracy, "\n")
 ```
 
 ```{r lda_pca_f1_score}
-lda_pca_f1_score <- F1_Score(y_true = test_data_pca$label, y_pred = lda_pca_pred$class)
+lda_pca_f1_score <- F1_Score(y_true = test_data_pca$label, 
+                             y_pred = lda_pca_pred$class)
 cat("F1 Score of LDA with PCA:", lda_pca_f1_score, "\n")
 ```
 
@@ -999,9 +1004,10 @@ cat("Balanced Accuracy of QDA with PCA:", log_pca_balanced_accuracy, "\n")
 
 ```{r qda_pca_f1_score}
 qda_pca_f1_score <- F1_Score(y_true = test_data_pca$label, 
-                             y_pred = qda_pca_pred)
+                             y_pred = qda_pca_pred,
+                             positive = "TREG")
 
-cat("F1 Score of QDA with PCA:", log_pca_f1_score, "\n")
+cat("F1 Score of QDA with PCA:", qda_pca_f1_score, "\n")
 ```
 
 ```{r qda_pca_roc_auc}
@@ -1026,7 +1032,7 @@ qda_pca_misclas <- mean(qda_pca_pred != test_data_pca$label)
 cat("Misclassification rate of QDA with PCA:", qda_pca_misclas, "\n")
 ```
 
-```{r Log_PCA_evaluation}
+```{r qda_PCA_evaluation}
 # Create a table of the evaluation metrics
 qda_pca_metrics_table <- data.frame(
   Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
@@ -1276,7 +1282,7 @@ cat("F1 Score with PCA:", rf_f1_score_pca, "\n")
 ##### Linear SVM Model
 ```{r svm_linear_model_pca}
 ## Clean the test data for the SVM task
-test_data_cleaned_for_svm <- test_data[, !colnames(test_data) %in% c("label_as_numeric", "label")]
+test_data_cleaned_for_svm <- test_data_pca[, !colnames(test_data_pca) %in% c("label_as_numeric", "label")]
 
 ## K-fold CV for hyperparameter tuning of 'cost' for the training data with a linear kernel
 start_time_svm <- Sys.time()
@@ -1334,14 +1340,19 @@ cat("SVM Accuracy:", svm_accuracy, "\n") # 0.9479
 ```
 
 ```{r svm_ROC_AUC}
-svm_roc <- roc(test_data$label, as.numeric(svm_pca_pred))
+svm_roc <- roc(test_data$label_as_numeric,
+               as.numeric(svm_pca_pred), 
+               levels = c(0,1),
+               direction = "<")
 svm_auc <- auc(svm_roc)
-cat("SVM AUC:", svm_auc, "\n")
+svm_auc
 plot(svm_roc, main = "SVM ROC Curve") # Make the limits of the axes 0-1
 ```
 
 ```{r rf_f1_score}
-svm_f1_score <- F1_Score(y_pred = svm_pca_pred, y_true = test_data$label)
+svm_f1_score <- F1_Score(y_pred = svm_pca_pred, 
+                         y_true = test_data$label,
+                         positive = "TREG")
 cat("F1 Score:", svm_f1_score, "\n") # 0.9645
 ```
 
@@ -1409,18 +1420,99 @@ plot(roc_svm, main = "SVM ROC Curve") # Make the limits of the axes 0-1
 ```
 
 ```{r rf_f1_score}
-svm_f1_score <- F1_Score(y_pred = yhat.svm_rad, y_true = test_data$label)
+svm_f1_score <- F1_Score(y_pred = yhat.svm_rad, 
+                         y_true = test_data$label)
 cat("F1 Score:", svm_f1_score, "\n") # 0.9645
+```
+
+#### Summary with PCA
+
+insert data frame with all the metrics of the classifiers
+```{r train_pca_summary}
+# lda_accuracy
+# lda_balanced_accuracy
+# lda_f1_score
+# lda_auc
+# lda_misclas
+# lda_runtime
+# 
+# log_accuracy
+# log_balanced_accuracy
+# log_f1_score
+# log_auc
+# log_misclas
+# logreg_run_time
+# 
+# # n/a qda_accuracy
+# # n/a qda_balanced_accuracy
+# # n/a qda_f1_score
+# qda_auc
+# qda_misclas
+# # n/a qda_runtime
+# 
+# # n/a knn_accuracy
+# # n/a knn_balanced_accuracy
+# # n/a knn_f1_score
+# knn_auc
+# knn_mislas
+# knn_train_runtime
+# 
+# gbm_accuracy
+# gbm_balanced_accuracy
+# gbm_f1_score
+# gbm_auc
+# gbm_misclas
+# gbm_model_training_time
+# 
+# svm_accuracy
+# svm_balanced_accuracy
+# svm_f1_score
+# svm_auc
+# svm_misclas
+# svm_training_time
+
+
+summary_with_PCA <- data.frame(
+    Model = c("LDA", "Logistic Regression", "QDA", "KNN", "GBM", "RF", "SVM"),
+    
+    accuracy = c(lda_pca_accuracy, log_pca_accuracy, qda_pca_accuracy, knn_pca_accuracy, gbm_pca_accuracy, rf_pca_accuracy, svm_pca_accuracy),
+    
+    balanced_accuracy = c(lda_pca_balanced_accuracy, log_pca_balanced_accuracy, qda_pca_balanced_accuracy, knn_pca_balanced_accuracy, gbm_pca_balanced_accuracy, rf_pca_balanced_accuracy, svm_pca_balanced_accuracy),
+    
+    f1_score = c(lda_pca_f1_score),
+    
+    auc = c(lda_pca_auc, log_pca_auc, qda_pca_auc, knn_pca_auc$AUC[1], gbm_pca_auc, rf_pca_auc, svm_pca_auc),
+    
+    misclas = c(lda_pca_misclas, log_pca_misclas, qda_pca_misclas, knn_pca_misclas[1], gbm_pca_misclas, rf_pca_misclas, svm_pca_misclas),
+    
+    model_training_time = c(lda_runtime, logreg_run_time, qda_runtime, knn_train_runtime, gbm_model_training_time, rf_training_time, svm_training_time)
+
+    )
+
+display(summary_with_PCA)
 ```
 
 ## T1.3: Improving F1 Score (???)
 
 Train and evaluating three classifiers of our choice with the goal of improving the F1 score (can use methods like bagging, boosting, and regularization (cross-fold validation, ridge/lasso)).
 
-#### QDA? - confirm theory to identify techniques of improvement (Chi)
+#### LDA/QDA? - improve through PCA and CV (Chi)
 
-```{r}
+```{r scree_plot}
+variance_explained <- (task_one_df_pca$sdev)^2 / sum((task_one_df_pca$sdev)^2)
 
+scree_data <- data.frame(
+  Component = c(1:30),
+  Variance = variance_explained[1:30]
+)
+
+ggplot(scree_data, aes(x = Component, y = Variance)) + 
+  geom_point(size = 3) + 
+  geom_line() +
+  labs(title= 'Scree Plot', 
+       x = 'Principal Component',
+       y = 'Proportion of Variance Explained') +
+  scale_x_continuous(limits = c(0, 30))
 ```
 
 #### Logistic Regression with Ridge Regression (Regularisation)
