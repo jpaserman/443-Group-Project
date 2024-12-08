@@ -1649,6 +1649,51 @@ for (prin_comps in no_prin_comps) {
 ```
 
 
+#### Logistic Regression 
+
+##### with Ridge Regression (Regularisation)
+
+```{r}
+logreg_cv_scores <- data.frame(no_pc = c(),
+                        alpha = c(),
+                        lambda = c(),
+                        accuracy = c(),
+                        f1 = c())
+
+for (prin_comps in no_prin_comps) {
+  
+  set.seed(seed)
+  
+  X_pca <- task_one_df_pca[, 1:prin_comps]  # Use the first n_components
+  
+  # Combine PCA-transformed data with the target
+  data_pca <- data.frame(X_pca, label = task_one_df$label)
+  
+  # Perform LDA with 5-fold cross-validation
+  train_control <- trainControl(method = "cv", 
+                                number = 10,
+                                summaryFunction = cv_f1_score)
+  
+  logistic_regression_model <- train(label ~ ., 
+                                     data = data_pca, 
+                                     method = "glmnet", 
+                                     trControl = train_control,
+                                     tuneGrid = expand.grid(
+                                       alpha = seq(0, 1, 0.25),
+                                       lambda = lambda_grid
+                                     ))
+  
+  result <- logistic_regression_model$results
+    
+  scores <- data.frame(no_pc = c(rep(prin_comps, length(result))),
+                       alpha = c(result$alpha),
+                       lambda = c(result$lambda),
+                       accuracy = c(result$Accuracy),
+                       f1 = c(result$F1))  
+  
+  # Store the cross-validation accuracy
+  logreg_cv_scores <- rbind(logreg_cv_scores, scores)
+}
 ```
 
 #### Logistic Regression with Ridge Regression (Regularisation)
@@ -1684,6 +1729,9 @@ cat("F1 Score of Logistic Regression with Ridge Regularization:", log_ridge_f1_s
 ```
 
 graph for f1 score with changing the s parameter = regularization parameter
+
+##### with Boosting??
+
 
 #### Random Forest with CV (Imar)
 
