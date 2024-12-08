@@ -43,7 +43,7 @@ lambda_grid <- c(0.001, 0.01,0.03,0.05)
 test_errors <- numeric(length(lambda_grid))
 
 ## Number of Principal Components to train with
-prin_comps <- c(5:20)
+no_prin_comps <- c(2:50)
 
 ```
 
@@ -911,24 +911,33 @@ metrics_df
 
 ### With PCA
 
-```{r pc_decomp}
-# Standardize the data (important for PCA)
-task_one_df_scaled <- task_one_df %>%
+```{r pc_decomp, eval = FALSE}
+# Perform PCA to get first 10 principal components
+pca_start <- Sys.time()
+
+task_one_df_pca <- task_one_df %>% 
   
   dplyr::select(-label, - label_as_numeric) %>% 
   
-  scale()
-  
-# Perform PCA to get first 10 principal components
-pca_start <- Sys.time()
-task_one_df_pca <- task_one_df_scaled %>% 
-  
-  prcomp(center = FALSE, scale. = FALSE, rank. = 25)
+  prcomp(center = TRUE, scale. = TRUE)
 
 pca_end <- Sys.time()
 
-pca_runtime <- pca_end - pca_start # Time difference of 3.813981 mins
+pca_runtime <- pca_end - pca_start # Time difference of 4.244169 mins
+```
 
+```{r pca_save, eval = FALSE}
+write.csv(task_one_df_pca$x, file = "predictions_1.2/task_one_df_pca.csv", row.names = TRUE)
+```
+
+
+```{r logreg_load, include = FALSE}
+task_one_df_pca <- read.csv("predictions_1.2/task_one_df_pca.csv") %>% 
+  
+  dplyr::select(-X)
+```
+
+```{r pca_split}
 # Split into training and test data
 train_data_pca <- as.data.frame(task_one_df_pca$x[train_indices,])
 
@@ -1571,23 +1580,120 @@ display(summary_with_PCA)
 
 Train and evaluating three classifiers of our choice with the goal of improving the F1 score (can use methods like bagging, boosting, and regularization (cross-fold validation, ridge/lasso)).
 
-#### LDA/QDA? - improve through PCA and CV (Chi)
-
+### Identifying the number of Principle Components to use 
 ```{r scree_plot}
 variance_explained <- (task_one_df_pca$sdev)^2 / sum((task_one_df_pca$sdev)^2)
 
 scree_data <- data.frame(
-  Component = c(1:30),
-  Variance = variance_explained[1:30]
+  Component = c(1:100),
+  Variance = variance_explained[1:100]
 )
 
 ggplot(scree_data, aes(x = Component, y = Variance)) + 
-  geom_point(size = 3) + 
+   
   geom_line() +
   labs(title= 'Scree Plot', 
        x = 'Principal Component',
        y = 'Proportion of Variance Explained') +
-  scale_x_continuous(limits = c(0, 30))
+  scale_x_continuous(limits = c(0, 100))
+```
+
+#### LDA/QDA? - improve through PCA and CV (Chi)
+
+```{r}
+cv_f1_score <- function(data, lev = NULL, model = NULL) {
+  # Calculate confusion matrix
+  cm <- table(data$pred, data$obs)
+  
+  tp <- cm["TREG", "TREG"]
+  fp <- cm["TREG", "CD4+T"]
+  fn <- cm["CD4+T", "TREG"]
+  
+  precision <- tp / (tp + fp)
+  
+  recall <- tp / (tp + fn)
+  
+  # Extract precision, recall, and F1-score
+  f1 <- 2 * (precision * recall) / (precision + recall)
+  
+  accuracy <- mean(data$pred == data$obs)
+  
+  # Return a named vector
+  c(Accuracy = accuracy, F1 = f1)
+}
+
+cv_scores <- c()
+
+for (prin_comps in no_prin_comps) {
+  
+  set.seed(seed)
+  
+  X_pca <- task_one_df_pca[, 1:prin_comps]  # Use the first n_components
+  
+  # Combine PCA-transformed data with the target
+  data_pca <- data.frame(X_pca, label = task_one_df$label)
+  
+  # Perform LDA with 5-fold cross-validation
+  train_control <- trainControl(method = "cv", 
+                                number = 10,
+                                summaryFunction = cv_f1_score)
+  
+  lda_model <- train(label ~ ., 
+                     data = data_pca, 
+                     method = "lda", 
+                     trControl = train_control)
+  
+  # Store the cross-validation accuracy
+  cv_scores <- c(cv_scores, lda_model$results$F1)
+}
+```
+
+
+#### Logistic Regression 
+
+##### with Ridge Regression (Regularisation)
+
+```{r}
+logreg_cv_scores <- data.frame(no_pc = c(),
+                        alpha = c(),
+                        lambda = c(),
+                        accuracy = c(),
+                        f1 = c())
+
+for (prin_comps in no_prin_comps) {
+  
+  set.seed(seed)
+  
+  X_pca <- task_one_df_pca[, 1:prin_comps]  # Use the first n_components
+  
+  # Combine PCA-transformed data with the target
+  data_pca <- data.frame(X_pca, label = task_one_df$label)
+  
+  # Perform LDA with 5-fold cross-validation
+  train_control <- trainControl(method = "cv", 
+                                number = 10,
+                                summaryFunction = cv_f1_score)
+  
+  logistic_regression_model <- train(label ~ ., 
+                                     data = data_pca, 
+                                     method = "glmnet", 
+                                     trControl = train_control,
+                                     tuneGrid = expand.grid(
+                                       alpha = seq(0, 1, 0.25),
+                                       lambda = lambda_grid
+                                     ))
+  
+  result <- logistic_regression_model$results
+    
+  scores <- data.frame(no_pc = c(rep(prin_comps, length(result))),
+                       alpha = c(result$alpha),
+                       lambda = c(result$lambda),
+                       accuracy = c(result$Accuracy),
+                       f1 = c(result$F1))  
+  
+  # Store the cross-validation accuracy
+  logreg_cv_scores <- rbind(logreg_cv_scores, scores)
+}
 ```
 
 #### Logistic Regression with Ridge Regression (Regularisation)
@@ -1623,6 +1729,9 @@ cat("F1 Score of Logistic Regression with Ridge Regularization:", log_ridge_f1_s
 ```
 
 graph for f1 score with changing the s parameter = regularization parameter
+
+##### with Boosting??
+
 
 #### Random Forest with CV (Imar)
 
