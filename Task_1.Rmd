@@ -43,7 +43,7 @@ lambda_grid <- c(0.001, 0.01,0.03,0.05)
 test_errors <- numeric(length(lambda_grid))
 
 ## Number of Principal Components to train with
-prin_comps <- c(5:20)
+no_prin_comps <- c(2:50)
 
 ```
 
@@ -1580,23 +1580,75 @@ display(summary_with_PCA)
 
 Train and evaluating three classifiers of our choice with the goal of improving the F1 score (can use methods like bagging, boosting, and regularization (cross-fold validation, ridge/lasso)).
 
-#### LDA/QDA? - improve through PCA and CV (Chi)
-
+### Identifying the number of Principle Components to use 
 ```{r scree_plot}
 variance_explained <- (task_one_df_pca$sdev)^2 / sum((task_one_df_pca$sdev)^2)
 
 scree_data <- data.frame(
-  Component = c(1:30),
-  Variance = variance_explained[1:30]
+  Component = c(1:100),
+  Variance = variance_explained[1:100]
 )
 
 ggplot(scree_data, aes(x = Component, y = Variance)) + 
-  geom_point(size = 3) + 
+   
   geom_line() +
   labs(title= 'Scree Plot', 
        x = 'Principal Component',
        y = 'Proportion of Variance Explained') +
-  scale_x_continuous(limits = c(0, 30))
+  scale_x_continuous(limits = c(0, 100))
+```
+
+#### LDA/QDA? - improve through PCA and CV (Chi)
+
+```{r}
+cv_f1_score <- function(data, lev = NULL, model = NULL) {
+  # Calculate confusion matrix
+  cm <- table(data$pred, data$obs)
+  
+  tp <- cm["TREG", "TREG"]
+  fp <- cm["TREG", "CD4+T"]
+  fn <- cm["CD4+T", "TREG"]
+  
+  precision <- tp / (tp + fp)
+  
+  recall <- tp / (tp + fn)
+  
+  # Extract precision, recall, and F1-score
+  f1 <- 2 * (precision * recall) / (precision + recall)
+  
+  accuracy <- mean(data$pred == data$obs)
+  
+  # Return a named vector
+  c(Accuracy = accuracy, F1 = f1)
+}
+
+cv_scores <- c()
+
+for (prin_comps in no_prin_comps) {
+  
+  set.seed(seed)
+  
+  X_pca <- task_one_df_pca[, 1:prin_comps]  # Use the first n_components
+  
+  # Combine PCA-transformed data with the target
+  data_pca <- data.frame(X_pca, label = task_one_df$label)
+  
+  # Perform LDA with 5-fold cross-validation
+  train_control <- trainControl(method = "cv", 
+                                number = 10,
+                                summaryFunction = cv_f1_score)
+  
+  lda_model <- train(label ~ ., 
+                     data = data_pca, 
+                     method = "lda", 
+                     trControl = train_control)
+  
+  # Store the cross-validation accuracy
+  cv_scores <- c(cv_scores, lda_model$results$F1)
+}
+```
+
+
 ```
 
 #### Logistic Regression with Ridge Regression (Regularisation)
