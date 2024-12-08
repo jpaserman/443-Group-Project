@@ -260,12 +260,12 @@ logreg_pred <- ifelse(logreg_probs > 0.5, 'TREG', 'CD4+T')
 ```
 
 ```{r logreg_save, include = FALSE}
-write.csv(logreg_pred, file = "logreg_predictions.csv", row.names = TRUE)
+write.csv(logreg_pred, file = "predictions_1.2/logreg_predictions.csv", row.names = TRUE)
 ```
 
 
 ```{r logreg_load, include = FALSE}
-logreg_pred <- read.csv("logreg_predictions.csv") %>% 
+logreg_pred <- read.csv("predictions_1.2/logreg_predictions.csv") %>% 
   
   dplyr::select(x)
 
@@ -575,6 +575,21 @@ gbm_prediction_time <- gbm_end_time_pred - gbm_start_time_pred
 cat("Prediction time:", gbm_prediction_time, "\n")
 ```
 
+```{r gbm_save, include = FALSE}
+write.csv(gbm_pred_classes, 
+          file = "predictions_1.2/gbm_predictions.csv",
+          row.names = TRUE)
+```
+
+
+```{r gbm_load, include = FALSE}
+gbm_pred_classes <- read.csv("predictions_1.2/gbm_predictions.csv") %>% 
+  
+  dplyr::select(x)
+
+gbm_pred_classes <- gbm_pred_classes[,'x']
+```
+
 ```{r gbm_Confusion}
 gbm_confusion_matrix <- table(Predicted = gbm_pred_classes, Actual = test_data_cleaned_gbm$label_as_numeric)
 print(gbm_confusion_matrix)
@@ -632,6 +647,21 @@ end_time_rf_pred <- Sys.time()
 rf_prediction_time <- end_time_rf_pred - start_time_rf_pred
 cat("Random Forest prediction time:", rf_prediction_time, "\n")
 
+```
+
+```{r rf_save, include = FALSE}
+write.csv(yhat.rf, 
+          file = "predictions_1.2/rf_predictions.csv",
+          row.names = TRUE)
+```
+
+
+```{r rf_load, include = FALSE}
+yhat.rf <- read.csv("predictions_1.2/rf_predictions.csv") %>% 
+  
+  dplyr::select(x)
+
+yhat.rf <- yhat.rf[,'x']
 ```
 
 ```{r rf_confusion}
@@ -700,6 +730,21 @@ yhat.svm = predict(bestmod, test_data)
 end_time_svm_pred <- Sys.time()
 svm_prediction_time <- end_time_svm_pred - start_time_svm_pred
 cat("SVM prediction time:", svm_prediction_time, "\n")
+```
+
+```{r svm_save, include = FALSE}
+write.csv(yhat.svm, 
+          file = "predictions_1.2/svm_predictions.csv",
+          row.names = TRUE)
+```
+
+
+```{r svm_load, include = FALSE}
+yhat.svm <- read.csv("predictions_1.2/svm_predictions.csv") %>% 
+  
+  dplyr::select(x)
+
+yhat.svm <- yhat.svm[,'x']
 ```
 
 ```{r svm_Confusion}
