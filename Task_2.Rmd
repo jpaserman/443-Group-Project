@@ -453,6 +453,8 @@ cat("Number of features utilized in Random Forest model (randomForest):", rf_imp
 
 ```
 
+We run into memory issues when trying to run randomForest::randomForest on the entirety of the task 2 training data (with 29788 features). As such, we proceed with only running the random forest on the subset of the top 1000 features that are most highly correlated with the label. After researching, found that conducting a random forest with ranger::ranger is much more computationally efficient (https://www.css.cornell.edu/faculty/dgr2/_static/files/R_html/CompareRandomForestPackages.html#4_Conclusion). When we use ranger:ranger we are able to build our randomForest on the entirity of the training data!
+
 ```{r rf_Prediction}
 # Predictions
 start_time_rf_pred <- Sys.time()
@@ -492,6 +494,10 @@ rf_balanced_accuracy_ranger <- fun_calc_balanced_accuracy(rf_confusion_matrix_ra
 
 cat("The balanced accuracy (ranger) is", rf_balanced_accuracy_ranger, "\n") # 0.7590267
 ```
+
+We notice that both the random forest built on only the subset of top 1000 features (randomForest), as well as the random forest built on the entire training data (ranger) have very similar results. This provides us with confidence in our approach of utilizing the subset of the training data for the FSS model. Moving forward for the random forest, we will utilize the ranger:ranger random forest built on the entire training data as it performs slightly better in terms of balanced accuracy.  
+
+(or should we use the randomForest::randomForest because it is almost the same balanced accuracy yet only uses 755 instead of 23,063 features???)
 
 ```{r rf_misclass}
 rf_misclassification_rate <- mean(yhat.rf_ranger$predictions != rf_test_data$label)
