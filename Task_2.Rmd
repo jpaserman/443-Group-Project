@@ -22,7 +22,8 @@ packages = list("caret",
                 "tibble",
                 "dplyr",
                 "pROC",
-                "MLmetrics"
+                "MLmetrics",
+                "ranger"
                 )
 
 ```
@@ -119,7 +120,7 @@ sum(variance_vector <= .01)
 
 ```
 
-```{r drop_columns less than 0.01 variance}
+```{r drop_columns less than 0.01 variance, cache=TRUE}
 # Remove features that have less than or equal to 0.01 variance
 cols_below_var_threshold <- apply(task_two_df, 2, var) <= 0.01
 table(cols_below_var_threshold)
@@ -135,7 +136,7 @@ table(task_two_df$label) # 772 compounds did not bind and 78 compounds did bind
 
 ```
 
-```{r remove_multicollinearity}
+```{r remove_multicollinearity, cache=TRUE}
 # Must split the data into 2 sets of variables in order for the code to run
 num_vars <- ncol(task_two_df)
 chunk_size <- num_vars / 2
@@ -162,7 +163,7 @@ dim(task_two_df)
 ```
 
 
-```{r select_top_predictors}
+```{r select_top_predictors, cache=TRUE}
 # Determine the features that are most highly correlated with the label
 cor_with_label <-  data.frame(cor(task_two_df, task_two_df$label))
 cor_with_label <- tibble::rownames_to_column(cor_with_label, "feature")
@@ -190,8 +191,8 @@ train_indices <- sample(1:nrow(task_two_df), train_split)
 train_data_2 <- task_two_df[train_indices,]
 test_data_2 <- task_two_df[-train_indices,]
 
-table(train_data_2$label) # The training data has 581 compounds not bind and 63 compounds do bind
-table(test_data_2$label) # The testing data has 141 compounds not bind and 15 compounds do bind
+table(train_data_2$label) # The training data has 575 compounds not bind and 65 compounds do bind
+table(test_data_2$label) # The testing data has 147 compounds not bind and 13 compounds do bind
 
 # We will utilize this subset of features for models that are running into 
 # difficulties with computation/memory size (such as FSS)
@@ -304,17 +305,11 @@ cat("F1 Score:", lasso_f1_score, "\n")
 
 ### Forward stepwise selection (FSS) (Peter)
 
-```{r, results='hold'}
+```{r fss_Training, results='hold'}
 fss_test_data <- test_data_2_top_subset
 fss_train_data <- train_data_2_top_subset
 
-# # Prepare the data
-# test_data_clean_matrix <- as.matrix(lasso_test_data[, -1])
-# train_data_matrix <- as.matrix(lasso_train_data[, -1])
-# train_labels <- lasso_train_data$label
-# test_labels <- lasso_test_data$label
-
-# Increase protection stack size
+# Perform FSS iteratively to generate 500 models each with 1, 2, 3, ..., 500 features
 fss_start_time <- Sys.time()
 
 regfit_fwd <-  regsubsets(label ~ .,
@@ -345,12 +340,12 @@ print(best_model_bic)
 
 ```
 
-The best model according to maximizing RSS on the training data has 440 features
-The best model according to minimizing BIC on the training data has 193 features
+The best model according to maximizing RSS on the training data has 437 features
+The best model according to minimizing BIC on the training data has 140 features
 
-We will proceed with the model recommended by minimizing BIC (193 features).
+We will proceed with the model recommended by minimizing BIC (140 features).
 
-```{r, fig.height = 20, fig.width = 50, fig.align = "center"}
+```{r fss_Plots, fig.height = 20, fig.width = 50, fig.align = "center"}
 par(mfrow = c(1, 2))
 plot(regfit_fwd, scale = "adjr2")
 plot(regfit_fwd, scale = "bic")
@@ -380,38 +375,156 @@ print(fss_confusion_matrix[2,2])
 fss_balanced_accuracy <- fun_calc_balanced_accuracy(fss_confusion_matrix,
                                                     pos_label = "1",
                                                     neg_label = "-1")
-cat("The balanced accuracy is", fss_balanced_accuracy, "\n") # 0.7931
+cat("The balanced accuracy is", fss_balanced_accuracy, "\n") # 0.7318
 
 ```
+
 ```{r fss_Misclass}
 fss_misclass <- mean(fss_test_data$label_pred != fss_test_data$label)
-cat("FSS Misclassification Rate:", fss_misclass, "\n") # 0.05
+cat("FSS Misclassification Rate:", fss_misclass, "\n") # 0.10625
 ```
 
 ```{r fss_Accuracy}
 fss_accuracy <- mean(fss_test_data$label_pred == fss_test_data$label)
-cat("fss Accuracy:", fss_accuracy, "\n") # 0.95
+cat("fss Accuracy:", fss_accuracy, "\n") # 0.89375
 ```
 
 ```{r fss_ROC_AUC}
 fss_roc <- roc(fss_test_data$label, fss_test_data$label_pred)
 fss_auc <- auc(fss_roc)
-cat("fss AUC:", fss_auc, "\n") # 0.7931
+cat("fss AUC:", fss_auc, "\n") # 0.7318
 plot(fss_roc, main = "fss ROC Curve") # Make the limits of the axes 0-1
 ```
 
 ```{r fss_f1_score}
-fss_f1_score <- F1_Score(y_pred = fss_test_data$label_pred, y_true = fss_test_data$label, positive = "-1")
-fss_f1_score <- F1_Score(y_pred = fss_test_data$label_pred, y_true = fss_test_data$label, positive = "1")
-cat("F1 Score:", fss_f1_score, "\n") # 0.9727
+fss_f1_score <- F1_Score(y_pred = fss_test_data$label_pred, y_true = fss_test_data$label)
+# fss_f1_score <- F1_Score(y_pred = fss_test_data$label_pred, y_true = fss_test_data$label, positive = "-1")
+# fss_f1_score <- F1_Score(y_pred = fss_test_data$label_pred, y_true = fss_test_data$label, positive = "1")
+cat("F1 Score:", fss_f1_score, "\n") # 0.9411
 ```
 
 
-### Random forest (???)
+### Random forest (Peter)
 
-```{r}
+```{r rf_Training_randomForest}
+set.seed(seed)
+
+rf_test_data_top_subset <- test_data_2_top_subset
+rf_train_data_top_subset <- train_data_2_top_subset
+
+rf_train_data_top_subset$label <- as.factor(rf_train_data_top_subset$label) 
+rf_test_data_top_subset$label <- as.factor(rf_test_data_top_subset$label) 
+
+# RF model
+start_time_rf <- Sys.time()
+
+rf.rna_features_rf <- randomForest(label ~ ., data = rf_train_data_top_subset, mtry = 100, num.trees = 10000, importance = TRUE) # RF Model
+
+end_time_rf <- Sys.time()
+rf_training_time <- end_time_rf - start_time_rf
+cat("Random Forest model (randomForest) training time:", rf_training_time, "\n")
+
+rf_importance <- importance(rf.rna_features_rf)
+rf_importance_vars <- sum(abs(rf_importance[, 3]) > 0)
+cat("Number of features utilized in Random Forest model (randomForest):", rf_importance_vars, "\n") # This model has 755 "important" variables based on the metric of "MeanDecreaseAccuracy" 
 
 ```
+
+```{r rf_Training_ranger}
+set.seed(seed)
+
+rf_test_data <- as.data.frame(test_data_2)
+rf_train_data <- as.data.frame(train_data_2)
+
+rf_train_data$label <- as.factor(rf_train_data$label) 
+rf_test_data$label <- as.factor(rf_test_data$label)
+
+x <- rf_train_data[, -which(colnames(rf_train_data) == "label")]
+y <- rf_train_data$label
+
+# RF model
+start_time_rf <- Sys.time()
+
+rf.rna_features_ranger <- ranger::ranger(x = x, y = y, mtry = 5000, num.trees = 10000, importance = "impurity") # RF Model
+
+end_time_rf <- Sys.time()
+rf_training_time <- end_time_rf - start_time_rf
+cat("Random Forest model (ranger) training time:", rf_training_time, "\n")
+
+rf_importance_ranger_vars <- sum(abs(rf.rna_features_ranger$variable.importance) > 0) 
+cat("Number of features utilized in Random Forest model (randomForest):", rf_importance_ranger_vars, "\n") # This model has 23,063 "important" variables when utlizing the ranger library
+
+```
+
+We run into memory issues when trying to run randomForest::randomForest on the entirety of the task 2 training data (with 29788 features). As such, we proceed with only running the random forest on the subset of the top 1000 features that are most highly correlated with the label. After researching, found that conducting a random forest with ranger::ranger is much more computationally efficient (https://www.css.cornell.edu/faculty/dgr2/_static/files/R_html/CompareRandomForestPackages.html#4_Conclusion). When we use ranger:ranger we are able to build our randomForest on the entirity of the training data!
+
+```{r rf_Prediction}
+# Predictions
+start_time_rf_pred <- Sys.time()
+yhat.rf <- predict(rf.rna_features_rf, newdata=rf_test_data_top_subset)
+
+end_time_rf_pred <- Sys.time()
+rf_prediction_time <- end_time_rf_pred - start_time_rf_pred
+cat("Random Forest (randomForest) prediction time:", rf_prediction_time, "\n")
+
+start_time_rf_pred <- Sys.time()
+yhat.rf_ranger <- predict(rf.rna_features_ranger, data=rf_test_data)
+
+end_time_rf_pred <- Sys.time()
+rf_prediction_time <- end_time_rf_pred - start_time_rf_pred
+cat("Random Forest (ranger) prediction time:", rf_prediction_time, "\n")
+
+```
+
+```{r rf_confusion}
+
+rf_confusion_matrix <- table(Predicted = yhat.rf, Actual = rf_test_data_top_subset$label)
+print(rf_confusion_matrix)
+rf_balanced_accuracy <- fun_calc_balanced_accuracy(rf_confusion_matrix,
+                                                   pos_label = "1",
+                                                   neg_label = "-1")
+
+cat("The balanced accuracy (randomForest) is", rf_balanced_accuracy, "\n") # 0.7590267
+
+
+predicted_values <- yhat.rf_ranger$predictions
+
+rf_confusion_matrix_ranger <- table(Predicted = yhat.rf_ranger$predictions, Actual = rf_test_data$label)
+print(rf_confusion_matrix_ranger)
+rf_balanced_accuracy_ranger <- fun_calc_balanced_accuracy(rf_confusion_matrix_ranger,
+                                                   pos_label = "1",
+                                                   neg_label = "-1")
+
+cat("The balanced accuracy (ranger) is", rf_balanced_accuracy_ranger, "\n") # 0.7590267
+```
+
+We notice that both the random forest built on only the subset of top 1000 features (randomForest), as well as the random forest built on the entire training data (ranger) have very similar results. This provides us with confidence in our approach of utilizing the subset of the training data for the FSS model. Moving forward for the random forest, we will utilize the ranger:ranger random forest built on the entire training data as it performs slightly better in terms of balanced accuracy.  
+
+(or should we use the randomForest::randomForest because it is almost the same balanced accuracy yet only uses 755 instead of 23,063 features???)
+
+```{r rf_misclass}
+rf_misclassification_rate <- mean(yhat.rf_ranger$predictions != rf_test_data$label)
+cat("Random Forest Misclassification Rate:", rf_misclassification_rate, "\n") # 0.05626
+```
+
+```{r rf_accuracy}
+rf_accuracy <- mean(yhat.rf_ranger$predictions == rf_test_data$label)
+cat("Random Forest Accuracy:", rf_accuracy, "\n") # 0.94375
+```
+
+```{r rf_roc_auc}
+roc_rf <- roc(rf_test_data$label, as.numeric(yhat.rf_ranger$prediction))
+cat("Random Forest AUC:", auc(roc_rf), "\n")
+plot(roc_rf, main = "Random Forest ROC Curve") # 0.794
+```
+
+```{r rf_f1_score}
+rf_f1_score <- F1_Score(y_pred = yhat.rf_ranger$prediction, y_true = rf_test_data$label)
+# rf_f1_score <- F1_Score(y_pred = yhat.rf_ranger$prediction, y_true = rf_test_data$label, positive = "-1")
+# rf_f1_score <- F1_Score(y_pred = yhat.rf_ranger$prediction, y_true = rf_test_data$label, positive = "1")
+cat("F1 Score:", rf_f1_score, "\n") # 0.969
+```
+
 
 ## T2.3: additional feature selection methods
 
@@ -419,7 +532,7 @@ Train and evaluate up to three additional feature selection methods, other than 
 
 For T2.2 and T2.3, your evaluation results should include the balanced accuracy and the number of selected features achieved by each method for various numbers of selected features. You may also compare the balanced accuracy achieved by different methods for a similar number of selected features.
 
-### Other method? Elastic net?
+### Elastic net
 
 ```{r}
 # Define a range of alpha values to loop over

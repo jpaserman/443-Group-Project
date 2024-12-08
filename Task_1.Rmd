@@ -1520,7 +1520,7 @@ ggplot(scree_data, aes(x = Component, y = Variance)) +
 ```{r}
 logreg_start_time <- Sys.time()
 
-# Prepare the input data (removing the target column from the predictor variables)
+# Prepare the input data
 x_train_log_regularized <- as.matrix(train_data[, setdiff(names(train_data), "label")])
 y_train_log_regularized <- train_data$label_as_numeric
 
@@ -1538,23 +1538,67 @@ logreg_pred_ridge <- ifelse(logreg_probs_regularized > 0.5, 'TREG', 'CD4+T')
 ```
 
 ```{r}
-log_confusion_ridge <- table(prediction = logreg_pred_ridge, truth = test_data$label)
-log_confusion_ridge
+log_ridge_confusion <- table(prediction = logreg_pred_ridge, truth = test_data$label)
+log_ridge_confusion
 ```
 
 ```{r log_pca_f1_score}
-log_pca_f1_score <- F1_Score(y_true = pca_test_data$label, y_pred = log_pca_pred)
-cat("F1 Score of Logistic Regression with PCA:", log_pca_f1_score, "\n")
+log_ridge_f1_score <- F1_Score(y_true = test_data$label, y_pred = logreg_pred_ridge)
+cat("F1 Score of Logistic Regression with Ridge Regularization:", log_ridge_f1_score, "\n")
 ```
 
 graph for f1 score with changing the s parameter = regularization parameter
 
-#### Random Forest (It's already bagged, use cross-validation) (Imar)
+#### Random Forest with CV (Imar)
 
 Hyperparameter tuning (cross-validation): Number of trees (n_estimators): Increasing the number of trees generally improves accuracy, but can slow down the model. Maximum tree depth (max_depth): Controls how deep each tree can grow, preventing overfitting with a smaller depth. Minimum samples per leaf (min_samples_leaf): Sets the minimum number of samples required to split a node, preventing overfitting. Number of features considered at each split (max_features): Controls the randomness in the feature selection process.
 
 ```{r}
+# Define a custom grid of hyperparameters for tuning
+rf_cv_grid <- expand.grid(
+  mtry = c(30, 50, 64, 80), # Number of features considered at each split
+  splitrule = c("gini", "extratrees"), # Criterion for splitting nodes
+  min.node.size = c(1, 5, 10),         # Minimum number of samples per leaf
+  ntree = c(100, 500, 1000)            # Number of trees in the forest
+)
 
+# Set up 5-fold cross-validation
+rf_cv_ctrl <- trainControl(
+  method = "cv",                      # Cross-validation method
+  number = 5,                         # Number of folds
+  summaryFunction = twoClassSummary,  # Use F1 score, ROC, etc.
+  classProbs = TRUE,                  # To compute probabilities
+  savePredictions = "final"           # Save the final predictions
+)
+
+# Train the Random Forest model using cross-validation
+start_time_rf_cv <- Sys.time()
+rf_cv_model <- randomForest(label ~ . - label_as_numeric, data = train_data, method = "rf", trControl = rf_cv_ctrl, tuneGrid = rf_cv_grid, metric = "F1", importance = TRUE)
+end_time_rf_cv <- Sys.time()
+rf_cv_training_time <- end_time_rf_cv - start_time_rf_cv
+cat("Random Forest model training time:", rf_cv_training_time, "\n")
+
+# trControl = rf_cv_ctrl # Cross-validation control
+# tuneGrid = rf_cv_grid # Hyperparameter grid
+# metric = "F1" # Optimize for F1 score
+# importance = TRUE # To calculate feature importance
+
+# Predictions on the test set
+start_time_rf_cv_pred <- Sys.time()
+rf_cv_pred <- predict(rf_cv_model, newdata = test_data)
+end_time_rf_cv_pred <- Sys.time()
+rf_cv_prediction_time <- end_time_rf_cv_pred - start_time_rf_cv_pred
+cat("Random Forest prediction time:", rf_cv_prediction_time, "\n")
+```
+
+```{r}
+# Check the performance on the test data
+confusionMatrix(rf_cv_pred, test_data$label)
+```
+
+```{r}
+rf_cv_f1_score <- F1_Score(y_true = test_data$label, y_pred = rf_cv_pred)
+cat("F1 Score of Random Forest with CV:", rf_cv_f1_score, "\n")
 ```
 
 ## T1.4: Implement predictor (???)
