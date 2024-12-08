@@ -303,6 +303,91 @@ lasso_f1_score <- F1_Score(y_pred = pred.test_binary, y_true = lasso_test_data$l
 cat("F1 Score:", lasso_f1_score, "\n") 
 ```
 
+#### Linear lasso
+```{r lin_lasso_model}
+# Rename datasets for linear lasso regression
+linear_lasso_test_data <- test_data_2
+linear_lasso_train_data <- train_data_2
+
+# Prepare the data
+linear_lasso_test_data_clean_matrix <- as.matrix(linear_lasso_test_data[, -1])
+linear_lasso_train_data_matrix <- as.matrix(linear_lasso_train_data[, -1])
+linear_lasso_train_labels <- linear_lasso_train_data$label
+linear_lasso_test_labels <- linear_lasso_test_data$label
+
+# Lambda grid that will loop over 100 different values of lambda
+linear_lasso_grid <- 10^seq(1, -4, length = 100)
+
+# Function to calculate balanced accuracy
+linear_lasso_calculate_balanced_accuracy <- function(confusion) {
+  if (all(dim(confusion) == c(2, 2))) {
+    balanced_acc <- (1/2) * (confusion[2, 2] / (confusion[2, 2] + confusion[1, 2])) + 
+                    (1/2) * (confusion[1, 1] / (confusion[1, 1] + confusion[2, 1]))
+  } else {
+    balanced_acc <- NA
+  }
+  return(balanced_acc)
+}
+
+# Adding weights because of the imbalanced data
+linear_lasso_class_weights <- ifelse(linear_lasso_train_labels == 1, 1, 
+                                     sum(linear_lasso_train_labels == 1) / sum(linear_lasso_train_labels == -1))
+
+# Performing cross-validation with a sequence of lambda values
+linear_lasso_start_time <- Sys.time()
+linear_lasso_cv_fit <- cv.glmnet(linear_lasso_train_data_matrix, linear_lasso_train_labels, 
+                                 alpha = 1, lambda = linear_lasso_grid, nfolds = 5, 
+                                 weights = linear_lasso_class_weights)
+linear_lasso_end_time <- Sys.time()
+linear_lasso_total_time <- linear_lasso_end_time - linear_lasso_start_time
+print(linear_lasso_total_time)
+
+# Extract the lambda values and their corresponding balanced accuracies
+linear_lasso_lambdas <- linear_lasso_cv_fit$lambda
+linear_lasso_cv_results <- sapply(linear_lasso_lambdas, function(lambda) {
+  pred.cv <- predict(linear_lasso_cv_fit, newx = linear_lasso_train_data_matrix, s = lambda) # Linear regression predictions
+  pred.cv_binary <- ifelse(pred.cv > 0, 1, -1) # Classification threshold for linear predictions
+  confusion <- table(Predicted = pred.cv_binary, Actual = linear_lasso_train_labels)
+  balanced_acc <- linear_lasso_calculate_balanced_accuracy(confusion)
+  num_predictors <- sum(coef(linear_lasso_cv_fit, s = lambda) != 0) - 1 # Number of coefficients
+  custom_scores <- balanced_acc - (0.001 * num_predictors)
+  return(c(balanced_acc, num_predictors, custom_scores))
+})
+
+# Saving the balanced accuracies, number of predictors, and custom scores
+linear_lasso_balanced_accuracies <- linear_lasso_cv_results[1, ]
+linear_lasso_num_predictors <- linear_lasso_cv_results[2, ]
+linear_lasso_custom_scores <- linear_lasso_cv_results[3, ]
+
+# Find the lambda with the highest custom score
+linear_lasso_best_lambda_index <- which.max(linear_lasso_custom_scores)
+linear_lasso_best_lambda <- linear_lasso_lambdas[linear_lasso_best_lambda_index]
+linear_lasso_best_balanced_accuracy <- linear_lasso_balanced_accuracies[linear_lasso_best_lambda_index]
+linear_lasso_best_num_predictors <- linear_lasso_num_predictors[linear_lasso_best_lambda_index]
+
+# Fit the final model using the best lambda
+linear_lasso_final_model <- glmnet(linear_lasso_train_data_matrix, linear_lasso_train_labels, 
+                                   alpha = 1, lambda = linear_lasso_best_lambda, 
+                                   weights = linear_lasso_class_weights)
+
+# Predictions for test data
+linear_lasso_pred_test <- predict(linear_lasso_final_model, 
+                                  newx = linear_lasso_test_data_clean_matrix) # Linear regression predictions
+linear_lasso_pred_test_binary <- ifelse(linear_lasso_pred_test > 0, 1, -1) # Classification threshold
+linear_lasso_confusion_test <- table(Predicted = linear_lasso_pred_test_binary, 
+                                     Actual = linear_lasso_test_labels)
+linear_lasso_test_balanced_accuracy <- linear_lasso_calculate_balanced_accuracy(linear_lasso_confusion_test)
+
+# Output the results
+cat("Linear Lasso Best Lambda:", linear_lasso_best_lambda, "\n")
+cat("Linear Lasso Highest Balanced Accuracy on CV:", linear_lasso_best_balanced_accuracy, "\n")
+cat("Linear Lasso Number of Predictors for Best Lambda:", linear_lasso_best_num_predictors, "\n")
+cat("Linear Lasso Balanced Accuracy on Test Data:", linear_lasso_test_balanced_accuracy, "\n")
+
+```
+
+
+
 ### Forward stepwise selection (FSS) (Peter)
 
 ```{r fss_Training, results='hold'}
@@ -535,6 +620,19 @@ For T2.2 and T2.3, your evaluation results should include the balanced accuracy 
 ### Elastic net
 
 ```{r}
+elastic_net_train_data <- train_data_2
+elastic_net_test_data <- test_data_2
+
+# Replace -1 with 0 for compatibility with logistic regression
+elastic_net_train_data$label[elastic_net_train_data$label == -1] <- 0
+elastic_net_test_data$label[elastic_net_test_data$label == -1] <- 0
+
+# Prepare matrices and labels
+elastic_net_train_data_matrix <- as.matrix(elastic_net_train_data[, -1])  # Exclude label column
+elastic_net_test_data_clean_matrix <- as.matrix(elastic_net_test_data[, -1])  # Exclude label column
+train_labels <- elastic_net_train_data$label
+test_labels <- elastic_net_test_data$label
+
 # Define a range of alpha values to loop over
 alpha_values <- seq(0.4, 0.8, by = 0.03)
 
@@ -623,6 +721,105 @@ plot(elastic_roc, main = "Elastic net ROC Curve") # Make the limits of the axes 
 elastic_f1_score <- F1_Score(y_pred = elastic_pred.test_binary, y_true = elastic_net_test_data$label, positive = "1")
 cat("F1 Score:", elastic_f1_score, "\n") 
 ```
+
+#### Linear Elastic Net
+```{r lin_elastic_net model} 
+# Rename datasets for linear elastic net regression
+linear_elastic_net_train_data <- train_data_2
+linear_elastic_net_test_data <- test_data_2
+
+# Prepare the data
+linear_elastic_net_train_data_matrix <- as.matrix(linear_elastic_net_train_data[, -1])  # Exclude label column
+linear_elastic_net_test_data_clean_matrix <- as.matrix(linear_elastic_net_test_data[, -1])  # Exclude label column
+linear_train_labels <- linear_elastic_net_train_data$label
+linear_test_labels <- linear_elastic_net_test_data$label
+
+# Define a range of alpha values to loop over
+linear_alpha_values <- seq(0.4, 0.8, by = 0.03)
+
+# Initialize a list to store results for each alpha
+linear_results <- list()
+
+# Loop over alpha values
+for (alpha in linear_alpha_values) {
+  cat("Testing alpha =", alpha, "\n")
+  
+  # Perform cross-validation for the current alpha
+  linear_elastic_cv_fit <- cv.glmnet(linear_elastic_net_train_data_matrix, linear_train_labels, 
+                                     alpha = alpha, lambda = grid, nfolds = 5, 
+                                     weights = class_weights)
+  
+  # Extract the lambda values and their corresponding balanced accuracies
+  linear_elastic_lambdas <- linear_elastic_cv_fit$lambda
+  linear_elastic_cv_results <- sapply(linear_elastic_lambdas, function(lambda) {
+    pred.cv <- predict(linear_elastic_cv_fit, newx = linear_elastic_net_train_data_matrix, s = lambda)  # Linear predictions
+    pred.cv_binary <- ifelse(pred.cv > 0, 1, -1)  # Classification threshold for linear predictions
+    confusion <- table(Predicted = pred.cv_binary, Actual = linear_train_labels)
+    balanced_acc <- linear_lasso_calculate_balanced_accuracy(confusion)  # Calculate balanced accuracy
+    num_predictors <- sum(coef(linear_elastic_cv_fit, s = lambda) != 0) - 1  # Number of coefficients
+    custom_score <- balanced_acc - (0.001 * num_predictors)
+    return(c(balanced_acc, num_predictors, custom_score))
+  })
+  
+  linear_elastic_balanced_accuracies <- linear_elastic_cv_results[1, ]
+  linear_elastic_num_predictors <- linear_elastic_cv_results[2, ]
+  linear_custom_scores <- linear_elastic_cv_results[3, ]
+  
+  # Find the lambda with the highest balanced accuracy for this alpha
+  linear_elastic_best_lambda_index <- which.max(linear_custom_scores)
+  linear_elastic_best_lambda <- linear_elastic_lambdas[linear_elastic_best_lambda_index]
+  linear_elastic_best_balanced_accuracy <- linear_elastic_balanced_accuracies[linear_elastic_best_lambda_index]
+  linear_elastic_best_num_predictors <- linear_elastic_num_predictors[linear_elastic_best_lambda_index]
+  linear_elastic_best_custom_score <- linear_custom_scores[linear_elastic_best_lambda_index]
+  
+  # Store results for this alpha
+  linear_results[[as.character(alpha)]] <- list(
+    alpha = alpha,
+    best_lambda = linear_elastic_best_lambda,
+    best_balanced_accuracy = linear_elastic_best_balanced_accuracy,
+    num_predictors = linear_elastic_best_num_predictors,
+    custom_score = linear_elastic_best_custom_score
+  )
+}
+
+# Find the overall best combination of alpha and lambda
+linear_best_result <- NULL
+for (alpha in names(linear_results)) {
+  if (is.null(linear_best_result) || linear_results[[alpha]]$best_balanced_accuracy > linear_best_result$best_balanced_accuracy) {
+    linear_best_result <- linear_results[[alpha]]
+  }
+}
+
+cat("Overall Best Alpha:", linear_best_result$alpha, "\n")
+cat("Best Lambda for Best Alpha:", linear_best_result$best_lambda, "\n")
+cat("Highest Balanced Accuracy:", linear_best_result$best_balanced_accuracy, "\n")
+cat("Number of Predictors for Best Combination:", linear_best_result$num_predictors, "\n")
+cat("Custom Score for Best Combination:", linear_best_result$custom_score, "\n")
+
+# Train the final model using the best alpha and lambda
+linear_elastic_final_model <- glmnet(linear_elastic_net_train_data_matrix, linear_train_labels, 
+                                     alpha = linear_best_result$alpha, 
+                                     lambda = linear_best_result$best_lambda, 
+                                     weights = class_weights)
+
+# Predictions for test data
+linear_elastic_pred_test <- predict(linear_elastic_final_model, newx = linear_elastic_net_test_data_clean_matrix)  # Linear predictions
+linear_elastic_pred_test_binary <- ifelse(linear_elastic_pred_test > 0, 1, -1)  # Classification threshold
+
+# Confusion matrix and balanced accuracy for test data
+linear_elastic_confusion_test <- table(Predicted = linear_elastic_pred_test_binary, 
+                                       Actual = linear_test_labels)
+linear_elastic_test_balanced_accuracy <- linear_lasso_calculate_balanced_accuracy(linear_elastic_confusion_test)
+
+# Output the results
+cat("Linear Elastic Net Best Lambda:", linear_elastic_best_lambda, "\n")
+cat("Linear Elastic Net Highest Balanced Accuracy on CV:", linear_elastic_best_balanced_accuracy, "\n")
+cat("Linear Elastic Net Number of Predictors for Best Lambda:", linear_elastic_best_num_predictors, "\n")
+cat("Linear Elastic Net Balanced Accuracy on Test Data:", linear_elastic_test_balanced_accuracy, "\n")
+
+
+```
+
 
 
 
