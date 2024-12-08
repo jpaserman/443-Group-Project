@@ -270,7 +270,7 @@ roc_curve_log <- roc(test_data$label, logreg_probs, levels=c("TREG", "CD4+T"), d
 
 plot(roc_curve_log, col="blue", main="ROC Curve for Logistic Regression")
 
-log_auc <- auc(roc_curve_log)
+log_auc <- as.numeric(auc(roc_curve_log))
 cat("The AUC of the ROC of Logistic Regression:", log_auc, "\n")
 ```
 
@@ -611,8 +611,8 @@ cat("The balanced accuracy is", rf_balanced_accuracy, "\n")
 ```
 
 ```{r rf_misclass}
-rf_misclassification_rate <- mean(yhat.rf != test_data$label)
-cat("Random Forest Misclassification Rate:", rf_misclassification_rate, "\n")
+rf_misclas <- mean(yhat.rf != test_data$label)
+cat("Random Forest Misclassification Rate:", rf_misclas, "\n")
 ```
 
 ```{r rf_accuracy}
@@ -622,7 +622,8 @@ cat("Random Forest Accuracy:", rf_accuracy, "\n")
 
 ```{r rf_roc_auc}
 roc_rf <- roc(test_data$label, as.numeric(yhat.rf))
-cat("Random Forest AUC:", auc(roc_rf), "\n")
+rf_auc <- auc(roc_rf)
+cat("Random Forest AUC:", rf_auc, "\n")
 plot(roc_rf, main = "Random Forest ROC Curve")
 ```
 
@@ -819,13 +820,13 @@ summary_without_PCA <- list(
     accuracy = c(lda_accuracy, log_accuracy, qda_accuracy, knn_accuracy, gbm_accuracy, rf_accuracy, svm_accuracy),
     balanced_accuracy = c(lda_balanced_accuracy, log_balanced_accuracy, qda_balanced_accuracy, knn_balanced_accuracy, gbm_balanced_accuracy, rf_balanced_accuracy, svm_balanced_accuracy),
     f1_score = c(lda_f1_score, log_f1_score, qda_f1_score, knn_f1_score, gbm_f1_score, rf_f1_score, svm_f1_score),
-    auc = c(lda_auc, log_auc, qda_auc, knn_auc, gbm_auc, rf_auc, svm_auc),
-    misclas = c(lda_misclas, log_misclas, qda_misclas, knn_mislas, gbm_misclas, rf_misclas, svm_misclas),
+    auc = c(lda_auc, log_auc, qda_auc, knn_auc$AUC[1], gbm_auc, rf_auc, svm_auc),
+    misclas = c(lda_misclas, log_misclas, qda_misclas, knn_misclas[1], gbm_misclas, rf_misclas, svm_misclas),
     model_training_time = c(lda_runtime, logreg_run_time, qda_runtime, knn_train_runtime, gbm_model_training_time, rf_training_time, svm_training_time)
 )
-
+print(summary_without_PCA)
 metrics_df <- data.frame(summary_without_PCA)
-
+metrics_df
 ```
 
 
@@ -866,38 +867,8 @@ test_data_pca$label_as_numeric <- test_data$label_as_numeric
 
 #### Linear Discriminant Analysis (LDA) (Imar)
 
-```{r PCA Data}
-# Step 1: Prepare the training and test data
-set.seed(123)
-lda2_train_data <- train_data
-lda2_train_data <- lda2_train_data[, !(names(lda2_train_data) %in% c("label_as_factor", "label_as_numeric"))]
-lda2_train_data$label <- ifelse(lda2_train_data$label == "TREG", 1, 0)
-
-lda2_test_data <- test_data
-lda2_test_data <- lda2_test_data[, !(names(lda2_test_data) %in% c("label_as_factor", "label_as_numeric"))]
-lda2_test_data$label <- ifelse(lda2_test_data$label == "TREG", 1, 0)
-
-# Step 2: Scale the data (excluding the target variable)
-scaled_train_data <- lda2_train_data[, -which(names(lda2_train_data) == "label")]
-scaled_train_data <- scale(scaled_train_data)
-
-# Step 3: Apply PCA and reduce to 10 components (train data)
-pca_model <- prcomp(scaled_train_data, center = TRUE, scale. = TRUE)
-pca_train_data <- data.frame(pca_model$x[, 1:10]) 
-pca_train_data$label <- lda2_train_data$label
-
-# Step 4: Apply the same PCA transformation to the test data
-scaled_test_data <- lda2_test_data[, -which(names(lda2_test_data) == "label")]  
-scaled_test_data <- scale(scaled_test_data, center = pca_model$center, scale = pca_model$scale) 
-pca_test_data <- data.frame(predict(pca_model, newdata = scaled_test_data)[, 1:10])
-pca_test_data$label <- lda2_test_data$label
-
-lda_pca_accuracy <- mean(lda_pca_predictions_class == lda_test_data_labels)
-print(paste("LDA PCA Accuracy:", lda_pca_accuracy))
-```
-
 ```{r LDA_with_PCA}
-lda_pca_model <- lda(label ~ ., data = train_data_pca)
+lda_pca_model <- lda(label ~ .-label_as_numeric, data = train_data_pca)
 lda_pca_pred <- predict(lda_pca_model, test_data_pca)
 lda_test_data_labels <- as.factor(pca_test_data$label)
 ```
@@ -925,7 +896,7 @@ cat("F1 Score of LDA with PCA:", lda_pca_f1_score, "\n")
 ```
 
 ```{r lda_pca_roc_auc}
-roc_curve_lda_pca <- roc(test_data_pca$label, lda_pca_pred$posterior[,2], levels = c(1, 0), direction = ">")
+roc_curve_lda_pca <- roc(test_data_pca$label_as_numeric, lda_pca_pred$posterior[,2], levels = c(1, 0), direction = ">")
 plot(roc_curve_lda_pca, col="blue", main="ROC Curve for LDA with PCA")
 lda_pca_auc <- auc(roc_curve_lda_pca)
 cat("AUC of LDA with PCA:", lda_pca_auc, "\n")
@@ -947,9 +918,9 @@ print(lda_pca_metrics_table)
 #### Logistic classifier (Imar)
 
 ```{r log_pca_model}
-log_pca_model <- glm(label ~ ., data=train_data_pca, family=binomial)
+log_pca_model <- glm(label ~ . -label_as_numeric, data=train_data_pca, family=binomial)
 log_pca_probs <- predict(log_pca_model, newdata = test_data_pca, type="response")
-log_pca_pred <- ifelse(log_pca_probs > 0.5, 1, 0)
+log_pca_pred <- ifelse(log_pca_probs > 0.5, "TREG", "CD4+T")
 ```
 
 ```{r log_pca_confusion}
@@ -958,7 +929,7 @@ print(log_pca_confusion)
 ```
 
 ```{r log_pca_accuracy}
-log_pca_accuracy <- mean(log_pca_pred == test_data_pca$label)
+log_pca_accuracy <- mean(log_pca_pred == test_data_pca$label_as_numeric)
 cat("Accuracy of Logistic Regression with PCA:", log_pca_accuracy, "\n")
 ```
 
@@ -1437,7 +1408,7 @@ logreg_run_time <- Sys.time() - logreg_start_time
 x_test_log_regularized <- as.matrix(test_data[, setdiff(names(test_data), "label")])
 logreg_probs_regularized <- predict(logreg_fit_regularized, newx = x_test_log_regularized, type = "response", s = 0.1)  # s = 0.1 is the regularization parameter
 
-logreg_pred_regularized <- ifelse(logreg_probs_regularized > 0.5, 'TREG', 'CD4+T')
+logreg_pred_ridge <- ifelse(logreg_probs_regularized > 0.5, 'TREG', 'CD4+T')
 ```
 
 ```{r}
@@ -1445,43 +1416,12 @@ log_confusion_ridge <- table(prediction = logreg_pred_ridge, truth = test_data$l
 log_confusion_ridge
 ```
 
-```{r log_pca_accuracy}
-log_ridge_accuracy <- mean(log_pca_pred == pca_test_data$label)
-cat("Accuracy of Logistic Regression with Ridge:", log_ridge_accuracy, "\n")
-```
-
-```{r log_pca_balanced_accuracy}
-log_ridge_balanced_accuracy <- fun_calc_balanced_accuracy(log_confusion_ridge,
-                                                        pos_label = "TREG",
-                                                        neg_label = "CD4+T")
-cat("Balanced Accuracy of Logistic Regression with PCA:", log_pca_balanced_accuracy, "\n")
-```
-
 ```{r log_pca_f1_score}
 log_pca_f1_score <- F1_Score(y_true = pca_test_data$label, y_pred = log_pca_pred)
 cat("F1 Score of Logistic Regression with PCA:", log_pca_f1_score, "\n")
 ```
 
-```{r log_pca_roc_auc}
-roc_curve_log_pca <- roc(pca_test_data$label, log_pca_pred, levels = c(1, 0), direction = ">")
-log_pca_auc <- auc(roc_curve_log)
-plot(roc_curve_log_pca, col="blue", main="ROC Curve for Logistic Regression with PCA")
-cat("AUC of Logistic Regression with PCA:", log_pca_auc, "\n")
-```
-
-```{r log_pca_misclas}
-log_pca_misclas <- mean(log_pca_pred != pca_test_data$label)
-cat("Misclassification rate of Logistic Regression with PCA:", log_pca_misclas, "\n")
-```
-
-```{r Log_PCA_evaluation}
-# Create a table of the evaluation metrics
-log_pca_metrics_table <- data.frame(
-  Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
-  Value = c(log_pca_accuracy, log_pca_balanced_accuracy, log_pca_f1_score, log_pca_auc, log_pca_misclas)
-)
-print(log_pca_metrics_table)
-```
+graph for f1 score with changing the s parameter = regularization parameter
 
 #### Random Forest (It's already bagged, use cross-validation) (Imar)
 
