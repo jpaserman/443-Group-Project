@@ -911,24 +911,33 @@ metrics_df
 
 ### With PCA
 
-```{r pc_decomp}
-# Standardize the data (important for PCA)
-task_one_df_scaled <- task_one_df %>%
+```{r pc_decomp, eval = FALSE}
+# Perform PCA to get first 10 principal components
+pca_start <- Sys.time()
+
+task_one_df_pca <- task_one_df %>% 
   
   dplyr::select(-label, - label_as_numeric) %>% 
   
-  scale()
-  
-# Perform PCA to get first 10 principal components
-pca_start <- Sys.time()
-task_one_df_pca <- task_one_df_scaled %>% 
-  
-  prcomp(center = FALSE, scale. = FALSE, rank. = 25)
+  prcomp(center = TRUE, scale. = TRUE)
 
 pca_end <- Sys.time()
 
-pca_runtime <- pca_end - pca_start # Time difference of 3.813981 mins
+pca_runtime <- pca_end - pca_start # Time difference of 4.244169 mins
+```
 
+```{r pca_save, eval = FALSE}
+write.csv(task_one_df_pca$x, file = "predictions_1.2/task_one_df_pca.csv", row.names = TRUE)
+```
+
+
+```{r logreg_load, include = FALSE}
+task_one_df_pca <- read.csv("predictions_1.2/task_one_df_pca.csv") %>% 
+  
+  dplyr::select(-X)
+```
+
+```{r pca_split}
 # Split into training and test data
 train_data_pca <- as.data.frame(task_one_df_pca$x[train_indices,])
 
