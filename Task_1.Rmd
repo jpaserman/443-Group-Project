@@ -42,6 +42,9 @@ lambda_grid <- c(0.001, 0.01,0.03,0.05)
 ## Initialize a vector to store test errors for each lambda
 test_errors <- numeric(length(lambda_grid))
 
+## Number of Principal Components to train with
+prin_comps <- c(5:20)
+
 ```
 
 ```{r, include=FALSE}
@@ -183,6 +186,19 @@ lda_runtime <- lda_end_time - lda_start_time # Time difference of 4.937018 mins
 lda_pred <- predict(lda_fit, test_data)$class
 ```
 
+```{r lda_save, include = FALSE}
+write.csv(lda_pred, file = "predictions_1.2/lda_predictions.csv", row.names = TRUE)
+```
+
+
+```{r lda_load, include = FALSE}
+lda_pred <- read.csv("predictions_1.2/lda_predictions.csv") %>% 
+  
+  dplyr::select(x)
+
+lda_pred <- lda_pred[,'x']
+```
+
 ```{r lda_confusion}
 lda_confusion <- table(predicted_label = lda_pred, true_label = test_data$label)
 lda_confusion
@@ -190,6 +206,7 @@ lda_confusion
 
 ```{r lda_accuracy}
 lda_accuracy <- mean(lda_pred == test_data$label)
+
 cat("Accuracy of LDA:", lda_accuracy, "\n")
 ```
 
@@ -240,6 +257,19 @@ logreg_run_time <- Sys.time() - logreg_start_time # Time difference of 17.64516 
 
 logreg_probs <- predict(logreg_fit, newdata = test_data, type = "response")
 logreg_pred <- ifelse(logreg_probs > 0.5, 'TREG', 'CD4+T')
+```
+
+```{r logreg_save, include = FALSE}
+write.csv(logreg_pred, file = "predictions_1.2/logreg_predictions.csv", row.names = TRUE)
+```
+
+
+```{r logreg_load, include = FALSE}
+logreg_pred <- read.csv("predictions_1.2/logreg_predictions.csv") %>% 
+  
+  dplyr::select(x)
+
+logreg_pred <- logreg_pred[,'x']
 ```
 
 ```{r logreg_confusion}
@@ -361,9 +391,12 @@ print(knn_train_runtime) #50 mins for k=1 to k=10
 rm(knn_train_X, knn_train_Y, knn_test_X)
 ```
 
-```{r kNN_save_load, include = FALSE}
+```{r kNN_save, include = FALSE}
 write.csv(knn_pred, file = "knn_predictions.csv", row.names = TRUE)
+```
 
+
+```{r kNN_load, include = FALSE}
 knn_pred <- read.csv("knn_predictions.csv") %>% 
   dplyr::select(-X)
 
@@ -375,7 +408,8 @@ colnames(knn_pred) <- paste0("k=", 1:10)
 ```{r kNN_Confusion}
 for (i in kk_vector){
   print(paste("k =", i))
-  print(table(predicted = knn_pred[,i], observed = test_data$label))
+  print(table(predicted = knn_pred[,i], 
+              observed = test_data$label))
 }
 ```
 
@@ -541,6 +575,21 @@ gbm_prediction_time <- gbm_end_time_pred - gbm_start_time_pred
 cat("Prediction time:", gbm_prediction_time, "\n")
 ```
 
+```{r gbm_save, include = FALSE}
+write.csv(gbm_pred_classes, 
+          file = "predictions_1.2/gbm_predictions.csv",
+          row.names = TRUE)
+```
+
+
+```{r gbm_load, include = FALSE}
+gbm_pred_classes <- read.csv("predictions_1.2/gbm_predictions.csv") %>% 
+  
+  dplyr::select(x)
+
+gbm_pred_classes <- gbm_pred_classes[,'x']
+```
+
 ```{r gbm_Confusion}
 gbm_confusion_matrix <- table(Predicted = gbm_pred_classes, Actual = test_data_cleaned_gbm$label_as_numeric)
 print(gbm_confusion_matrix)
@@ -598,6 +647,21 @@ end_time_rf_pred <- Sys.time()
 rf_prediction_time <- end_time_rf_pred - start_time_rf_pred
 cat("Random Forest prediction time:", rf_prediction_time, "\n")
 
+```
+
+```{r rf_save, include = FALSE}
+write.csv(yhat.rf, 
+          file = "predictions_1.2/rf_predictions.csv",
+          row.names = TRUE)
+```
+
+
+```{r rf_load, include = FALSE}
+yhat.rf <- read.csv("predictions_1.2/rf_predictions.csv") %>% 
+  
+  dplyr::select(x)
+
+yhat.rf <- yhat.rf[,'x']
 ```
 
 ```{r rf_confusion}
@@ -666,6 +730,21 @@ yhat.svm = predict(bestmod, test_data)
 end_time_svm_pred <- Sys.time()
 svm_prediction_time <- end_time_svm_pred - start_time_svm_pred
 cat("SVM prediction time:", svm_prediction_time, "\n")
+```
+
+```{r svm_save, include = FALSE}
+write.csv(yhat.svm, 
+          file = "predictions_1.2/svm_predictions.csv",
+          row.names = TRUE)
+```
+
+
+```{r svm_load, include = FALSE}
+yhat.svm <- read.csv("predictions_1.2/svm_predictions.csv") %>% 
+  
+  dplyr::select(x)
+
+yhat.svm <- yhat.svm[,'x']
 ```
 
 ```{r svm_Confusion}
@@ -832,7 +911,7 @@ metrics_df
 
 ### With PCA
 
-```{r}
+```{r pc_decomp}
 # Standardize the data (important for PCA)
 task_one_df_scaled <- task_one_df %>%
   
@@ -844,7 +923,7 @@ task_one_df_scaled <- task_one_df %>%
 pca_start <- Sys.time()
 task_one_df_pca <- task_one_df_scaled %>% 
   
-  prcomp(center = FALSE, scale. = FALSE, rank. = 10)
+  prcomp(center = FALSE, scale. = FALSE, rank. = 25)
 
 pca_end <- Sys.time()
 
@@ -870,7 +949,7 @@ test_data_pca$label_as_numeric <- test_data$label_as_numeric
 ```{r LDA_with_PCA}
 lda_pca_model <- lda(label ~ .-label_as_numeric, data = train_data_pca)
 lda_pca_pred <- predict(lda_pca_model, test_data_pca)
-lda_test_data_labels <- as.factor(pca_test_data$label)
+lda_test_data_labels <- as.factor(test_data_pca$label)
 ```
 
 ```{r lda_pca_confusion}
@@ -891,7 +970,8 @@ cat("Balanced Accuracy of LDA with PCA:", lda_pca_balanced_accuracy, "\n")
 ```
 
 ```{r lda_pca_f1_score}
-lda_pca_f1_score <- F1_Score(y_true = test_data_pca$label, y_pred = lda_pca_pred$class)
+lda_pca_f1_score <- F1_Score(y_true = test_data_pca$label, 
+                             y_pred = lda_pca_pred$class)
 cat("F1 Score of LDA with PCA:", lda_pca_f1_score, "\n")
 ```
 
@@ -977,16 +1057,35 @@ qda_runtime <- Sys.time() - qda_start_time # Time difference of 0.01315498 secs
 ```{r qda_pca_confusion}
 qda_pca_pred <- predict(qda_pca_fit, test_data_pca)$class
 
-table(predicted = qda_pca_pred, observed = test_data$label)
+qda_pca_confusion <- table(predicted = qda_pca_pred,
+                           observed = test_data$label)
+
+print(qda_pca_confusion)
 ```
 
-```{r qda_pca_misclass}
-qda_pca_misclass_rate = mean(qda_pca_pred != test_data$label)
+```{r qda_pca_accuracy}
+qda_pca_accuracy <- mean(qda_pca_pred == test_data_pca$label)
 
-cat("Misclassification rate:", qda_pca_misclass_rate*100, "%")
+cat("Accuracy of QDA with PCA:", log_pca_accuracy, "\n")
 ```
 
-```{r qda_ROC}
+```{r qda_pca_balanced_accuracy}
+qda_pca_balanced_accuracy <- fun_calc_balanced_accuracy(qda_pca_confusion,
+                                                        pos_label = 'TREG',
+                                                        neg_label = 'CD4+T')
+
+cat("Balanced Accuracy of QDA with PCA:", log_pca_balanced_accuracy, "\n")
+```
+
+```{r qda_pca_f1_score}
+qda_pca_f1_score <- F1_Score(y_true = test_data_pca$label, 
+                             y_pred = qda_pca_pred,
+                             positive = "TREG")
+
+cat("F1 Score of QDA with PCA:", qda_pca_f1_score, "\n")
+```
+
+```{r qda_pca_roc_auc}
 qda_pca_pred_numeric <- ifelse(qda_pca_pred == "TREG", 1, 0)
   
 qda_pca_roc_curve <- roc(
@@ -1000,6 +1099,22 @@ plot(qda_pca_roc_curve, col = "red", main = "ROC Curve for QDA")
 
 qda_pca_auc <- auc(qda_pca_roc_curve)
 qda_pca_auc
+```
+
+```{r qda_pca_misclas}
+qda_pca_misclas <- mean(qda_pca_pred != test_data_pca$label)
+
+cat("Misclassification rate of QDA with PCA:", qda_pca_misclas, "\n")
+```
+
+```{r qda_PCA_evaluation}
+# Create a table of the evaluation metrics
+qda_pca_metrics_table <- data.frame(
+  Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
+  Value = c(qda_pca_accuracy, qda_pca_balanced_accuracy, qda_pca_f1_score, qda_pca_auc, qda_pca_misclas)
+)
+
+print(qda_pca_metrics_table)
 ```
 
 #### Nearest Neighbor Classifier (k-NN) (Chi)
@@ -1242,7 +1357,7 @@ cat("F1 Score with PCA:", rf_f1_score_pca, "\n")
 ##### Linear SVM Model
 ```{r svm_linear_model_pca}
 ## Clean the test data for the SVM task
-test_data_cleaned_for_svm <- test_data[, !colnames(test_data) %in% c("label_as_numeric", "label")]
+test_data_cleaned_for_svm <- test_data_pca[, !colnames(test_data_pca) %in% c("label_as_numeric", "label")]
 
 ## K-fold CV for hyperparameter tuning of 'cost' for the training data with a linear kernel
 start_time_svm <- Sys.time()
@@ -1300,14 +1415,19 @@ cat("SVM Accuracy:", svm_accuracy, "\n") # 0.9479
 ```
 
 ```{r svm_ROC_AUC}
-svm_roc <- roc(test_data$label, as.numeric(svm_pca_pred))
+svm_roc <- roc(test_data$label_as_numeric,
+               as.numeric(svm_pca_pred), 
+               levels = c(0,1),
+               direction = "<")
 svm_auc <- auc(svm_roc)
-cat("SVM AUC:", svm_auc, "\n")
+svm_auc
 plot(svm_roc, main = "SVM ROC Curve") # Make the limits of the axes 0-1
 ```
 
 ```{r rf_f1_score}
-svm_f1_score <- F1_Score(y_pred = svm_pca_pred, y_true = test_data$label)
+svm_f1_score <- F1_Score(y_pred = svm_pca_pred, 
+                         y_true = test_data$label,
+                         positive = "TREG")
 cat("F1 Score:", svm_f1_score, "\n") # 0.9645
 ```
 
@@ -1375,18 +1495,99 @@ plot(roc_svm, main = "SVM ROC Curve") # Make the limits of the axes 0-1
 ```
 
 ```{r rf_f1_score}
-svm_f1_score <- F1_Score(y_pred = yhat.svm_rad, y_true = test_data$label)
+svm_f1_score <- F1_Score(y_pred = yhat.svm_rad, 
+                         y_true = test_data$label)
 cat("F1 Score:", svm_f1_score, "\n") # 0.9645
+```
+
+#### Summary with PCA
+
+insert data frame with all the metrics of the classifiers
+```{r train_pca_summary}
+# lda_accuracy
+# lda_balanced_accuracy
+# lda_f1_score
+# lda_auc
+# lda_misclas
+# lda_runtime
+# 
+# log_accuracy
+# log_balanced_accuracy
+# log_f1_score
+# log_auc
+# log_misclas
+# logreg_run_time
+# 
+# # n/a qda_accuracy
+# # n/a qda_balanced_accuracy
+# # n/a qda_f1_score
+# qda_auc
+# qda_misclas
+# # n/a qda_runtime
+# 
+# # n/a knn_accuracy
+# # n/a knn_balanced_accuracy
+# # n/a knn_f1_score
+# knn_auc
+# knn_mislas
+# knn_train_runtime
+# 
+# gbm_accuracy
+# gbm_balanced_accuracy
+# gbm_f1_score
+# gbm_auc
+# gbm_misclas
+# gbm_model_training_time
+# 
+# svm_accuracy
+# svm_balanced_accuracy
+# svm_f1_score
+# svm_auc
+# svm_misclas
+# svm_training_time
+
+
+summary_with_PCA <- data.frame(
+    Model = c("LDA", "Logistic Regression", "QDA", "KNN", "GBM", "RF", "SVM"),
+    
+    accuracy = c(lda_pca_accuracy, log_pca_accuracy, qda_pca_accuracy, knn_pca_accuracy, gbm_pca_accuracy, rf_pca_accuracy, svm_pca_accuracy),
+    
+    balanced_accuracy = c(lda_pca_balanced_accuracy, log_pca_balanced_accuracy, qda_pca_balanced_accuracy, knn_pca_balanced_accuracy, gbm_pca_balanced_accuracy, rf_pca_balanced_accuracy, svm_pca_balanced_accuracy),
+    
+    f1_score = c(lda_pca_f1_score),
+    
+    auc = c(lda_pca_auc, log_pca_auc, qda_pca_auc, knn_pca_auc$AUC[1], gbm_pca_auc, rf_pca_auc, svm_pca_auc),
+    
+    misclas = c(lda_pca_misclas, log_pca_misclas, qda_pca_misclas, knn_pca_misclas[1], gbm_pca_misclas, rf_pca_misclas, svm_pca_misclas),
+    
+    model_training_time = c(lda_runtime, logreg_run_time, qda_runtime, knn_train_runtime, gbm_model_training_time, rf_training_time, svm_training_time)
+
+    )
+
+display(summary_with_PCA)
 ```
 
 ## T1.3: Improving F1 Score (???)
 
 Train and evaluating three classifiers of our choice with the goal of improving the F1 score (can use methods like bagging, boosting, and regularization (cross-fold validation, ridge/lasso)).
 
-#### QDA? - confirm theory to identify techniques of improvement (Chi)
+#### LDA/QDA? - improve through PCA and CV (Chi)
 
-```{r}
+```{r scree_plot}
+variance_explained <- (task_one_df_pca$sdev)^2 / sum((task_one_df_pca$sdev)^2)
 
+scree_data <- data.frame(
+  Component = c(1:30),
+  Variance = variance_explained[1:30]
+)
+
+ggplot(scree_data, aes(x = Component, y = Variance)) + 
+  geom_point(size = 3) + 
+  geom_line() +
+  labs(title= 'Scree Plot', 
+       x = 'Principal Component',
+       y = 'Proportion of Variance Explained') +
+  scale_x_continuous(limits = c(0, 30))
 ```
 
 #### Logistic Regression with Ridge Regression (Regularisation)
@@ -1394,7 +1595,7 @@ Train and evaluating three classifiers of our choice with the goal of improving 
 ```{r}
 logreg_start_time <- Sys.time()
 
-# Prepare the input data (removing the target column from the predictor variables)
+# Prepare the input data
 x_train_log_regularized <- as.matrix(train_data[, setdiff(names(train_data), "label")])
 y_train_log_regularized <- train_data$label_as_numeric
 
@@ -1412,23 +1613,67 @@ logreg_pred_ridge <- ifelse(logreg_probs_regularized > 0.5, 'TREG', 'CD4+T')
 ```
 
 ```{r}
-log_confusion_ridge <- table(prediction = logreg_pred_ridge, truth = test_data$label)
-log_confusion_ridge
+log_ridge_confusion <- table(prediction = logreg_pred_ridge, truth = test_data$label)
+log_ridge_confusion
 ```
 
 ```{r log_pca_f1_score}
-log_pca_f1_score <- F1_Score(y_true = pca_test_data$label, y_pred = log_pca_pred)
-cat("F1 Score of Logistic Regression with PCA:", log_pca_f1_score, "\n")
+log_ridge_f1_score <- F1_Score(y_true = test_data$label, y_pred = logreg_pred_ridge)
+cat("F1 Score of Logistic Regression with Ridge Regularization:", log_ridge_f1_score, "\n")
 ```
 
 graph for f1 score with changing the s parameter = regularization parameter
 
-#### Random Forest (It's already bagged, use cross-validation) (Imar)
+#### Random Forest with CV (Imar)
 
 Hyperparameter tuning (cross-validation): Number of trees (n_estimators): Increasing the number of trees generally improves accuracy, but can slow down the model. Maximum tree depth (max_depth): Controls how deep each tree can grow, preventing overfitting with a smaller depth. Minimum samples per leaf (min_samples_leaf): Sets the minimum number of samples required to split a node, preventing overfitting. Number of features considered at each split (max_features): Controls the randomness in the feature selection process.
 
 ```{r}
+# Define a custom grid of hyperparameters for tuning
+rf_cv_grid <- expand.grid(
+  mtry = c(30, 50, 64, 80), # Number of features considered at each split
+  splitrule = c("gini", "extratrees"), # Criterion for splitting nodes
+  min.node.size = c(1, 5, 10),         # Minimum number of samples per leaf
+  ntree = c(100, 500, 1000)            # Number of trees in the forest
+)
 
+# Set up 5-fold cross-validation
+rf_cv_ctrl <- trainControl(
+  method = "cv",                      # Cross-validation method
+  number = 5,                         # Number of folds
+  summaryFunction = twoClassSummary,  # Use F1 score, ROC, etc.
+  classProbs = TRUE,                  # To compute probabilities
+  savePredictions = "final"           # Save the final predictions
+)
+
+# Train the Random Forest model using cross-validation
+start_time_rf_cv <- Sys.time()
+rf_cv_model <- randomForest(label ~ . - label_as_numeric, data = train_data, method = "rf", trControl = rf_cv_ctrl, tuneGrid = rf_cv_grid, metric = "F1", importance = TRUE)
+end_time_rf_cv <- Sys.time()
+rf_cv_training_time <- end_time_rf_cv - start_time_rf_cv
+cat("Random Forest model training time:", rf_cv_training_time, "\n")
+
+# trControl = rf_cv_ctrl # Cross-validation control
+# tuneGrid = rf_cv_grid # Hyperparameter grid
+# metric = "F1" # Optimize for F1 score
+# importance = TRUE # To calculate feature importance
+
+# Predictions on the test set
+start_time_rf_cv_pred <- Sys.time()
+rf_cv_pred <- predict(rf_cv_model, newdata = test_data)
+end_time_rf_cv_pred <- Sys.time()
+rf_cv_prediction_time <- end_time_rf_cv_pred - start_time_rf_cv_pred
+cat("Random Forest prediction time:", rf_cv_prediction_time, "\n")
+```
+
+```{r}
+# Check the performance on the test data
+confusionMatrix(rf_cv_pred, test_data$label)
+```
+
+```{r}
+rf_cv_f1_score <- F1_Score(y_true = test_data$label, y_pred = rf_cv_pred)
+cat("F1 Score of Random Forest with CV:", rf_cv_f1_score, "\n")
 ```
 
 ## T1.4: Implement predictor (???)
