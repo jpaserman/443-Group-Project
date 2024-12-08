@@ -42,6 +42,9 @@ lambda_grid <- c(0.001, 0.01,0.03,0.05)
 ## Initialize a vector to store test errors for each lambda
 test_errors <- numeric(length(lambda_grid))
 
+## Number of Principal Components to train with
+prin_comps <- c(5:20)
+
 ```
 
 ```{r, include=FALSE}
@@ -183,6 +186,19 @@ lda_runtime <- lda_end_time - lda_start_time # Time difference of 4.937018 mins
 lda_pred <- predict(lda_fit, test_data)$class
 ```
 
+```{r lda_save, include = FALSE}
+write.csv(lda_pred, file = "lda_predictions.csv", row.names = TRUE)
+```
+
+
+```{r lda_load, include = FALSE}
+lda_pred <- read.csv("lda_predictions.csv") %>% 
+  
+  dplyr::select(x)
+
+lda_pred <- lda_pred[,'x']
+```
+
 ```{r lda_confusion}
 lda_confusion <- table(predicted_label = lda_pred, true_label = test_data$label)
 lda_confusion
@@ -190,6 +206,7 @@ lda_confusion
 
 ```{r lda_accuracy}
 lda_accuracy <- mean(lda_pred == test_data$label)
+
 cat("Accuracy of LDA:", lda_accuracy, "\n")
 ```
 
@@ -240,6 +257,19 @@ logreg_run_time <- Sys.time() - logreg_start_time # Time difference of 17.64516 
 
 logreg_probs <- predict(logreg_fit, newdata = test_data, type = "response")
 logreg_pred <- ifelse(logreg_probs > 0.5, 'TREG', 'CD4+T')
+```
+
+```{r logreg_save, include = FALSE}
+write.csv(logreg_pred, file = "logreg_predictions.csv", row.names = TRUE)
+```
+
+
+```{r logreg_load, include = FALSE}
+logreg_pred <- read.csv("logreg_predictions.csv") %>% 
+  
+  dplyr::select(x)
+
+logreg_pred <- logreg_pred[,'x']
 ```
 
 ```{r logreg_confusion}
