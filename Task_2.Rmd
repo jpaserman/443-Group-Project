@@ -501,7 +501,7 @@ rf_test_data_top_subset$label <- as.factor(rf_test_data_top_subset$label)
 # RF model
 start_time_rf <- Sys.time()
 
-rf.rna_features_rf <- randomForest(label ~ ., data = rf_train_data_top_subset, mtry = 100, num.trees = 20, importance = TRUE) # RF Model
+rf.rna_features_rf <- randomForest(label ~ ., data = rf_train_data_top_subset, mtry = 100, num.trees = 5, importance = TRUE) # RF Model
 
 end_time_rf <- Sys.time()
 rf_training_time <- end_time_rf - start_time_rf
@@ -528,14 +528,14 @@ y <- rf_train_data$label
 # RF model
 start_time_rf <- Sys.time()
 
-rf.rna_features_ranger <- ranger::ranger(x = x, y = y, mtry = 5000, num.trees = 20, importance = "impurity") # RF Model
+rf.rna_features_ranger <- ranger::ranger(x = x, y = y, mtry = 5000, num.trees = 5, importance = "impurity") # RF Model
 
 end_time_rf <- Sys.time()
 rf_training_time <- end_time_rf - start_time_rf
 cat("Random Forest model (ranger) training time:", rf_training_time, "\n")
 
 rf_importance_ranger_vars <- sum(abs(rf.rna_features_ranger$variable.importance) > 0) 
-cat("Number of features utilized in Random Forest model (randomForest):", rf_importance_ranger_vars, "\n") # This model has 368 "important" variables when utilizing the ranger library
+cat("Number of features utilized in Random Forest model (randomForest):", rf_importance_ranger_vars, "\n") # This model has 100 "important" variables when utilizing the ranger library
 
 ```
 
@@ -578,30 +578,30 @@ rf_balanced_accuracy_ranger <- fun_calc_balanced_accuracy(rf_confusion_matrix_ra
                                                    pos_label = "1",
                                                    neg_label = "-1")
 
-cat("The balanced accuracy (ranger) is", rf_balanced_accuracy_ranger, "\n") # 0.8642072 
+cat("The balanced accuracy (ranger) is", rf_balanced_accuracy_ranger, "\n") # 0.8223443 
 ```
 
 We notice that both the random forest built on only the subset of top 1000 features (randomForest), as well as the random forest built on the entire training data (ranger) have moderately successful results. This provides us with confidence in our approach of utilizing the subset of the top 1000 features within training data for the FSS model. Moving forward for the random forest, we will utilize the ranger:ranger random forest built on the entire training data as it performs better in terms of balanced accuracy as well as having less than half the number of features (368 as opposed to 785).  
 
 ```{r rf_misclass}
 rf_misclassification_rate <- mean(yhat.rf_ranger$predictions != rf_test_data$label)
-cat("Random Forest Misclassification Rate:", rf_misclassification_rate, "\n") # 0.05625 
+cat("Random Forest Misclassification Rate:", rf_misclassification_rate, "\n") # 0.06875 
 ```
 
 ```{r rf_accuracy}
 rf_accuracy <- mean(yhat.rf_ranger$predictions == rf_test_data$label)
-cat("Random Forest Accuracy:", rf_accuracy, "\n") # 0.94375 
+cat("Random Forest Accuracy:", rf_accuracy, "\n") # 0.93125 
 ```
 
 ```{r rf_roc_auc}
 roc_rf <- roc(rf_test_data$label, as.numeric(yhat.rf_ranger$prediction))
 cat("Random Forest AUC:", auc(roc_rf), "\n")
-plot(roc_rf, main = "Random Forest ROC Curve") # 0.8642072 
+plot(roc_rf, main = "Random Forest ROC Curve") # 0.8223443 
 ```
 
 ```{r rf_f1_score}
 rf_f1_score <- F1_Score(y_pred = yhat.rf_ranger$prediction, y_true = rf_test_data$label, positive = "1")
-cat("F1 Score:", rf_f1_score, "\n") # 0.6896552
+cat("F1 Score:", rf_f1_score, "\n") # 0.6206897
 ```
 
 
