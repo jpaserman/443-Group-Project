@@ -939,9 +939,16 @@ task_one_df_pca <- read.csv("predictions_1.2/task_one_df_pca.csv") %>%
 
 ```{r pca_split}
 # Split into training and test data
-train_data_pca <- as.data.frame(task_one_df_pca$x[train_indices,])
 
-test_data_pca <- as.data.frame(task_one_df_pca$x[-train_indices,])
+if(is.data.frame(task_one_df_pca$x)){
+  train_data_pca <- as.data.frame(task_one_df_pca$x[train_indices, 1:10])
+
+  test_data_pca <- as.data.frame(task_one_df_pca$x[-train_indices, 1:10])
+} else {
+  train_data_pca <- as.data.frame(task_one_df_pca[train_indices, 1:10])
+
+  test_data_pca <- as.data.frame(task_one_df_pca[-train_indices, 1:10])
+}
 
 train_data_pca$label <- train_data$label
 
@@ -1018,7 +1025,7 @@ print(log_pca_confusion)
 ```
 
 ```{r log_pca_accuracy}
-log_pca_accuracy <- mean(log_pca_pred == test_data_pca$label_as_numeric)
+log_pca_accuracy <- mean(log_pca_pred == test_data_pca$label)
 cat("Accuracy of Logistic Regression with PCA:", log_pca_accuracy, "\n")
 ```
 
@@ -1035,8 +1042,13 @@ cat("F1 Score of Logistic Regression with PCA:", log_pca_f1_score, "\n")
 ```
 
 ```{r log_pca_roc_auc}
-roc_curve_log_pca <- roc(test_data_pca$label, log_pca_pred, levels = c(1, 0), direction = ">")
-log_pca_auc <- auc(roc_curve_log)
+log_pca_pred_num <- ifelse(log_pca_pred == 'TREG', 1, 0)
+
+roc_curve_log_pca <- roc(test_data_pca$label_as_numeric,
+                         log_pca_pred_num, 
+                         levels = c(1, 0),
+                         direction = ">")
+log_pca_auc <- auc(roc_curve_log_pca)
 plot(roc_curve_log_pca, col="blue", main="ROC Curve for Logistic Regression with PCA")
 cat("AUC of Logistic Regression with PCA:", log_pca_auc, "\n")
 ```
