@@ -187,12 +187,12 @@ lda_pred <- predict(lda_fit, test_data)$class
 ```
 
 ```{r lda_save, include = FALSE}
-write.csv(lda_pred, file = "lda_predictions.csv", row.names = TRUE)
+write.csv(lda_pred, file = "predictions_1.2/lda_predictions.csv", row.names = TRUE)
 ```
 
 
 ```{r lda_load, include = FALSE}
-lda_pred <- read.csv("lda_predictions.csv") %>% 
+lda_pred <- read.csv("predictions_1.2/lda_predictions.csv") %>% 
   
   dplyr::select(x)
 
