@@ -1,0 +1,13 @@
+---
+title: "report"
+output:
+  pdf_document: default
+  html_document: default
+date: "2024-12-09"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Merge of both tasks' reports 

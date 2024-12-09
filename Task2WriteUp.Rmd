@@ -1,0 +1,34 @@
+---
+title: "Task2WriteUp"
+output:
+  pdf_document: default
+  html_document: default
+date: "2024-12-09"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# Task 2: Feature Selection
+
+## Abstract Task 2
+The focus of the following analysis is to attempt to achieve high classification accuracy, while using a minimal number of features on very highly dimensional data. We will use a combination of six different feature selection and classification techniques to accomplish the goal. The models and methods used are a combination of methods taught in our ST443 Machine Learning and Data Mining Course taught at the London School of Economics and Political Sciences, and other techniques used from personal research. 
+
+## Data Description
+We were given one dataset that contains binary features that describe the three-dimensional properties of a molecule in a compound or a random probe across different compounds. The data contains 800 observations, which represent 800 compounds, and 100,000 columns (50,000 real variables and 50,000 random probes). The first column named $label$ represents whether a compound bound to a target site on thrombin^[1].
+
+
+
+
+
+
+
+
+[1] Thrombin is an enzyme that plays a key role in blood clotting and other biological processes. 
+
+## Refrences
+Guyon, I., Gunn, S., Ben-Hur, A. and Dror, G. (2004) Result Analysis of the NIPS 2003
+Feature Selection Challenge. In Advances in Neural Information Processing Systems (Saul,
+L., Weiss, Y. and Bottou, L., eds.), vol. 17, MIT Press.
+
+Shlobin NA, Har-Even M, Itsekson-Hayosh Z, Harnof S, Pick CG. Role of Thrombin in Central Nervous System Injury and Disease. Biomolecules. 2021 Apr 12;11(4):562. doi: 10.3390/biom11040562. PMID: 33921354; PMCID: PMC8070021.
