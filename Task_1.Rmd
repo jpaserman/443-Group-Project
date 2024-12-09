@@ -1182,7 +1182,7 @@ knn_pca_confusion <- table(predicted = knn_pca_pred,
 
 knn_pca_confusion
 ```
-```{r qda_pca_diagnostics}
+```{r knn_pca_diagnostics}
 knn_pred_numeric <- ifelse(knn_pca_pred == "TREG", 1, 0)
 
 knn_pca_misclass = mean(knn_pca_pred != test_data$label)
@@ -1365,7 +1365,7 @@ rf_f1_score_pca <- F1_Score(y_pred = rf_pca_pred, y_true = test_data_pca$label)
 cat("F1 Score with PCA:", rf_f1_score_pca, "\n")
 ```
 
-#### Support Vector Machine (SVM) (Peter)
+#### Support Vector Machine (SVM) (Chi)
 
 ##### Linear SVM Model
 ```{r svm_linear_model_pca}
@@ -1401,44 +1401,43 @@ svm_prediction_time <- end_time_svm_pred - start_time_svm_pred
 ```
 
 ```{r svm_pca_confusion}
-svm_pca_confusion_matrix <- table(predict = svm_pca_pred, truth = test_data_pca$label)
+svm_pca_confusion_matrix <- table(predict = svm_pca_pred,
+                                  truth = test_data_pca$label)
 print(svm_pca_confusion_matrix)
 ```
 
-```{r svm_pca_balanced_accuracy}
+```{r svm_pca_diagnostics}
 svm_pca_balanced_accuracy <- fun_calc_balanced_accuracy(svm_pca_confusion_matrix,
                                                     pos_label = "TREG",
                                                     neg_label = "CD4+T")
 
-cat("The balanced accuracy is", svm_pca_balanced_accuracy, "\n") # 0.9418
-```
+svm_pca_misclass <- mean(svm_pca_pred != test_data$label)
 
+svm_pca_accuracy <- mean(svm_pca_pred == test_data$label)
 
-```{r svm_pca_misclass}
-svm_misclas <- mean(svm_pca_pred != test_data$label)
-cat("SVM Misclassification Rate:", svm_misclas, "\n") # 0.0521
-```
-
-```{r svm_Accuracy}
-svm_accuracy <- mean(svm_pca_pred == test_data$label)
-cat("SVM Accuracy:", svm_accuracy, "\n") # 0.9479
-```
-
-```{r svm_ROC_AUC}
-svm_roc <- roc(test_data$label_as_numeric,
+svm_pca_roc <- roc(test_data$label_as_numeric,
                as.numeric(svm_pca_pred), 
                levels = c(0,1),
                direction = "<")
-svm_auc <- auc(svm_roc)
-svm_auc
-plot(svm_roc, main = "SVM ROC Curve") # Make the limits of the axes 0-1
+
+svm_pca_auc <- auc(svm_roc)
+
+plot(svm_pca_roc, main = "SVM ROC Curve") # Make the limits of the axes 0-1
+
+svm_pca_f1_score <- F1_Score(y_pred = svm_pca_pred, 
+                             y_true = test_data$label,
+                             positive = "TREG")
+
 ```
 
-```{r svm_pca_f1_score}
-svm_pca_f1_score <- F1_Score(y_pred = svm_pca_pred, 
-                         y_true = test_data$label,
-                         positive = "TREG")
-cat("F1 Score:", svm_f1_score, "\n") # 0.9310345
+```{r svm_pca_evaluation}
+# Create a table of the evaluation metrics
+svm_pca_metrics_table <- data.frame(
+  Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
+  SVM_Linear = c(svm_pca_accuracy, svm_pca_balanced_accuracy, svm_pca_f1_score, svm_pca_auc, svm_pca_misclass)
+)
+
+print(svm_pca_metrics_table)
 ```
 
 ##### Radial SVM Model
@@ -1476,7 +1475,8 @@ svm_prediction_time <- end_time_svm_pred - start_time_svm_pred #Time difference 
 ```
 
 ```{r svm_radial_pca_confusion}
-svm_rad_pca_confusion_matrix <- table(predict = svm_rad_pca_pred, truth = test_data_pca$label)
+svm_rad_pca_confusion_matrix <- table(predict = svm_rad_pca_pred,
+                                      truth = test_data_pca$label)
 print(svm_rad_pca_confusion_matrix)
 ```
 
@@ -1485,88 +1485,39 @@ svm_rad_pca_balanced_accuracy <- fun_calc_balanced_accuracy(svm_rad_pca_confusio
                                                     pos_label = "TREG",
                                                     neg_label = "CD4+T")
 
-cat("The balanced accuracy is", svm_rad_pca_balanced_accuracy, "\n") # 0.9411
-```
+svm_rad_pca_misclass <- mean(svm_rad_pca_pred != test_data$label)
 
-```{r svm_radial_pca_misclass}
-svm_misclassification_rate <- mean(svm_rad_pca_pred != test_data$label)
-cat("SVM Misclassification Rate:", svm_misclassification_rate, "\n") # 0.0447
-```
+svm_rad_pca_accuracy <- mean(svm_rad_pca_pred == test_data$label)
 
-```{r svm_radial_pca_accuracy}
-svm_radial_pca_accuracy <- mean(svm_rad_pca_pred == test_data$label)
-cat("SVM Accuracy:", svm_radial_pca_accuracy, "\n") # 0.9553
-```
+svm_rad_pca_roc <- roc(test_data$label, 
+                       as.numeric(svm_rad_pca_pred),
+                       levels = c("CD4+T", 'TREG'),
+                       direction = "<")
 
-```{r svm_radial_pca_roc}
-roc_svm <- roc(test_data$label, as.numeric(svm_rad_pca_pred))
-auc(roc_svm)
-plot(roc_svm, main = "SVM ROC Curve") # Make the limits of the axes 0-1
-```
+svm_rad_pca_auc <- auc(svm_rad_pca_roc)
 
-```{r svm_radial_pca_f1_score}
+plot(svm_rad_pca_roc, main = "SVM ROC Curve") # Make the limits of the axes 0-1
+
 svm_rad_pca_f1_score <- F1_Score(y_pred = svm_rad_pca_pred, 
-                         y_true = test_data$label,
-                         positive = 'TREG')
-cat("F1 Score:", svm_rad_pca_f1_score, "\n") # 0.9645
+                                 y_true = test_data$label,
+                                 positive = 'TREG')
+
 ```
 
-```{r Log_PCA_evaluation}
+```{r svm_rad_pca_evaluation}
 # Create a table of the evaluation metrics
-log_pca_metrics_table <- data.frame(
+svm_rad_pca_metrics_table <- data.frame(
   Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
-  Value = c(svm_radial_pca_accuracy, log_pca_balanced_accuracy, log_pca_f1_score, log_pca_auc, log_pca_misclas)
+  SVM_Radial = c(svm_rad_pca_accuracy, svm_rad_pca_balanced_accuracy, svm_rad_pca_f1_score, svm_rad_pca_auc, svm_rad_pca_misclass)
 )
-print(log_pca_metrics_table)
+
+print(svm_rad_pca_metrics_table)
 ```
 
 #### Summary with PCA
 
 insert data frame with all the metrics of the classifiers
 ```{r train_pca_summary}
-# lda_accuracy
-# lda_balanced_accuracy
-# lda_f1_score
-# lda_auc
-# lda_misclas
-# lda_runtime
-# 
-# log_accuracy
-# log_balanced_accuracy
-# log_f1_score
-# log_auc
-# log_misclas
-# logreg_run_time
-# 
-# # n/a qda_accuracy
-# # n/a qda_balanced_accuracy
-# # n/a qda_f1_score
-# qda_auc
-# qda_misclas
-# # n/a qda_runtime
-# 
-# # n/a knn_accuracy
-# # n/a knn_balanced_accuracy
-# # n/a knn_f1_score
-# knn_auc
-# knn_mislas
-# knn_train_runtime
-# 
-# gbm_accuracy
-# gbm_balanced_accuracy
-# gbm_f1_score
-# gbm_auc
-# gbm_misclas
-# gbm_model_training_time
-# 
-# svm_accuracy
-# svm_balanced_accuracy
-# svm_f1_score
-# svm_auc
-# svm_misclas
-# svm_training_time
-
-
 summary_with_PCA <- data.frame(
     Model = c("LDA", "Logistic Regression", "QDA", "KNN", "GBM", "RF", "SVM"),
     
