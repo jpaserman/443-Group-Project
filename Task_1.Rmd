@@ -1127,29 +1127,19 @@ print(qda_pca_metrics_table)
 #### Nearest Neighbor Classifier (k-NN) (Chi)
 
 ```{r kNN_train, eval = FALSE}
-# knn_train_X <- train_data_pca %>% 
-#   dplyr::select(-label, -label_as_numeric)
-# 
-# knn_train_Y <- train_data_pca$label
-# 
-# knn_test_X <- test_data_pca %>% 
-#   dplyr::select(-label, -label_as_numeric)
+knn_train_X <- train_data_pca %>%
+  dplyr::select(-label, -label_as_numeric)
 
-knn_train_X <- task_one_df_pca[train_indices,1:45] 
+knn_train_Y <- train_data_pca$label
 
-knn_train_Y <- task_one_df$label[train_indices]
-
-knn_test_X <- task_one_df_pca[-train_indices,1:45] 
+knn_test_X <- test_data_pca %>%
+  dplyr::select(-label, -label_as_numeric)
 
 knn_start_time <- Sys.time()
-knn_pca_pred <- sapply(c(20:35),
-                       function(kk){
-                       knn(train = knn_train_X, 
-                           test = knn_test_X, 
-                           cl = knn_train_Y, 
-                           #k = 5
-                           k = kk
-                           )})
+knn_pca_pred <- knn(train = knn_train_X, 
+                    test = knn_test_X, 
+                    cl = knn_train_Y, 
+                    k = 8)
 
 knn_end_time <- Sys.time()
 
@@ -1158,47 +1148,34 @@ knn_train_runtime <- knn_end_time - knn_start_time # Time difference of 0.352587
 rm(knn_train_X, knn_train_Y, knn_test_X)
 ```
 
-```{r kNN_ROC}
-f1 <- c()
-for (i in 1:length(c(20:35))){
-  
-  score <- F1_Score(y_true = test_data$label,
-                    y_pred = knn_pca_pred[, i],
-                    positive = 'TREG')
-  
-  f1 <- c(f1, score)
-}
-```
-
-```{r kNN_Confusion}
-knn_pca_confusion <- table(predicted = knn_pca_pred,
+```{r knn_pca_confusion}
+knn_confusion <- table(predicted = knn_pca_pred,
                            observed = test_data$label)
 
-knn_pca_confusion
+print(knn_pca_confusion)
 ```
 
 ```{r knn_pca_diagnostics}
-knn_pred_numeric <- ifelse(knn_pca_pred == "TREG", 1, 0)
-
-knn_pca_misclass = mean(knn_pca_pred != test_data$label)
-
-knn_pca_accuracy <- mean(knn_pca_pred == test_data$label)
-
-knn_pca_roc_curve <- roc(response = test_data$label_as_numeric, 
-                 predictor = knn_pred_numeric,
-                 levels = c(1, 0),
-                 direction = ">"
-                 )
-
-knn_pca_auc = knn_pca_roc_curve$auc
+knn_pca_accuracy <- mean(knn_pca_pred == test_data_pca$label)
 
 knn_pca_balanced_accuracy <- fun_calc_balanced_accuracy(knn_pca_confusion,
                                                         pos_label = 'TREG',
                                                         neg_label = 'CD4+T')
 
-knn_pca_f1_score <- F1_Score(y_true = test_data$label, 
+knn_pca_f1_score <- F1_Score(y_true = test_data_pca$label, 
                              y_pred = knn_pca_pred,
                              positive = "TREG")
+
+knn_pca_roc_curve <- roc(
+  response = test_data_pca$label,
+  predictor = as.numeric(knn_pca_pred), 
+  levels = c('CD4+T','TREG'),
+  direction = "<"
+  )
+
+knn_pca_auc <- auc(knn_pca_roc_curve)
+
+knn_pca_misclas <- mean(knn_pca_pred != test_data_pca$label)
 
 plot(knn_pca_roc_curve, col = "red", main = "ROC Curve for QDA")
 ```
@@ -1207,12 +1184,10 @@ plot(knn_pca_roc_curve, col = "red", main = "ROC Curve for QDA")
 # Create a table of the evaluation metrics
 knn_pca_metrics_table <- data.frame(
   Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
-  kNN = c(knn_pca_accuracy, knn_pca_balanced_accuracy, knn_pca_f1_score, knn_pca_auc, knn_pca_misclass)
+  kNN = c(knn_pca_accuracy, knn_pca_balanced_accuracy, knn_pca_f1_score, knn_pca_auc, knn_pca_misclas)
 )
 
 print(knn_pca_metrics_table)
-
-print(left_join(knn_pca_metrics_table, qda_pca_metrics_table, by = "Metric"))
 ```
 
 #### Gradient Boosting Decision Trees (GBDT) (Imar)
