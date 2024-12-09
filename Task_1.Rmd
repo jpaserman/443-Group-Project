@@ -394,6 +394,8 @@ The current dimensionality of the data is too high for a QDA classifier. During 
 #### Nearest Neighbor Classifier (k-NN) (Chi)
 
 ```{r kNN_train, eval = FALSE}
+set.seed(seed)
+
 knn_train_X <- train_data %>% 
   dplyr::select(-label, -label_as_numeric)
 
@@ -424,9 +426,7 @@ write.csv(knn_pred, file = "knn_predictions.csv", row.names = TRUE)
 knn_pred <- read.csv("knn_predictions.csv") %>% 
   dplyr::select(-X)
 
-## CAUTION: currently hard-coded numbers here. To be changed (Chi)
-colnames(knn_pred) <- paste0("k=", 1:10)
-## CAUTION: currently hard-coded numbers here. To be changed (Chi)
+colnames(knn_pred) <- paste0("k=", kk_vector)
 ```
 
 ```{r kNN_Confusion}
@@ -741,8 +741,7 @@ tune.out = tune(svm,
 summary(tune.out)
 
 end_time_svm <- Sys.time()
-svm_training_time <- end_time_svm - start_time_svm
-cat("SVM model training time:", svm_training_time, "\n") # 1.18 hrs (~ 1hr & 10 min)
+svm_training_time <- end_time_svm - start_time_svm # 1.18 hrs (~ 1hr & 10 min)
 ```
 
 ```{r svm_linear_tuned_model}
