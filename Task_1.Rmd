@@ -1766,7 +1766,6 @@ cat("AdaBoost with Random Forest prediction time:", rf_ab_prediction_time, "\n")
 # Evaluate F1 Score and other metrics
 cm_rf_ab <- confusionMatrix(yhat.rf_ab, test_data$label)
 cat("F1 Score on Test Set (AdaBoost with Random Forest): ", cm_rf_ab$byClass["F1"], "\n")
-
 ```
 
 
@@ -1776,7 +1775,7 @@ confusionMatrix(rf_cv_pred, test_data$label)
 ```
 
 ```{r}
-rf_cv_f1_score <- F1_Score(y_true = test_data$label, y_pred = rf_cv_pred)
+rf_cv_f1_score <- F1_Score(y_true = test_data$label, y_pred = rf_ab_pred)
 cat("F1 Score of Random Forest with CV:", rf_cv_f1_score, "\n")
 ```
 
