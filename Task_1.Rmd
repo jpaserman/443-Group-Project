@@ -1164,10 +1164,11 @@ knn_test_X <- test_data_pca %>%
   dplyr::select(-label, -label_as_numeric)
 
 knn_start_time <- Sys.time()
-knn_pca_pred <- sapply(kk_vector,
-                   function(k)
-                     {knn(train = knn_train_X, test = knn_test_X, cl = knn_train_Y, k = k)}
-                   )
+knn_pca_pred <- knn(train = knn_train_X, 
+                    test = knn_test_X, 
+                    cl = knn_train_Y, 
+                    k = 5)
+
 knn_end_time <- Sys.time()
 
 knn_train_runtime <- knn_end_time - knn_start_time # Time difference of 0.3525879 secs
