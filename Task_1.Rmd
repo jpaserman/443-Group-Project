@@ -1573,7 +1573,7 @@ for (prin_comps in no_prin_comps) {
   
   set.seed(seed)
   
-  X_pca <- task_one_df_pca[, 1:prin_comps]  # Use the first n_components
+  X_pca <- train_data_pca[, 1:prin_comps]  # Use the first n_components
   
   # Combine PCA-transformed data with the target
   data_pca <- data.frame(X_pca, label = task_one_df$label)
@@ -1607,7 +1607,6 @@ ggplot(lda_cv_scores, aes(x = no_pc, y = f1)) +
   geom_line() +
   geom_point()
 ```
-```
 
 
 #### Logistic Regression 
@@ -1626,7 +1625,7 @@ for (prin_comps in no_prin_comps) {
   
   set.seed(seed)
   
-  X_pca <- task_one_df_pca[, 1:prin_comps]  # Use the first n_components
+  X_pca <- train_data_pca[, 1:prin_comps]  # Use the first n_components
   
   # Combine PCA-transformed data with the target
   data_pca <- data.frame(X_pca, label = task_one_df$label)
@@ -1730,9 +1729,6 @@ cat("F1 Score of Logistic Regression with Ridge Regularization:", log_ridge_f1_s
 ```
 
 graph for f1 score with changing the s parameter = regularization parameter
-
-##### with Boosting??
-
 
 #### Random Forest with CV (Imar)
 
