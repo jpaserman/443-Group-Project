@@ -1177,70 +1177,47 @@ rm(knn_train_X, knn_train_Y, knn_test_X)
 ```
 
 ```{r kNN_Confusion}
-for (i in kk_vector){
-  print(paste("k =", i))
-  print(table(predicted = knn_pca_pred[,i], observed = test_data$label))
-}
+knn_pca_confusion <- table(predicted = knn_pca_pred,
+                           observed = test_data$label)
+
+knn_pca_confusion
 ```
-
-```{r kNN_Misclass}
-knn_misclass = c(rep(0,length(kk_vector)))
-
-for (i in kk_vector){
-  knn_misclass[i] = mean(knn_pca_pred[,i] != test_data$label)
-}
-plot(knn_misclass, type = "l")
-```
-
-```{r kNN_ROC}
+```{r qda_pca_diagnostics}
 knn_pred_numeric <- ifelse(knn_pca_pred == "TREG", 1, 0)
 
-knn_roc_curves <- data.frame()
+knn_pca_misclass = mean(knn_pca_pred != test_data$label)
 
-knn_auc <- data.frame()
+knn_pca_accuracy <- mean(knn_pca_pred == test_data$label)
 
-for (kk in 1:ncol(knn_pred_numeric)) {
-  roc_curve <- roc(
-    response = test_data$label_as_numeric, 
-    predictor = knn_pred_numeric[,kk],
-    levels = c(1, 0),
-    direction = ">"
-    )
-  
-  roc_curve_data <- data.frame(
-    k = kk,
-    FPR = 1 - roc_curve$specificities,
-    TPR = roc_curve$sensitivities
-    )
-  
-  auc_data <- data.frame(
-    k = kk,
-    AUC = roc_curve$auc
-    )
-  
-  knn_roc_curves <- rbind(knn_roc_curves, roc_curve_data)
-  
-  knn_auc <- rbind(knn_auc, auc_data)
-}
+knn_pca_roc_curve <- roc(response = test_data$label_as_numeric, 
+                 predictor = knn_pred_numeric,
+                 levels = c(1, 0),
+                 direction = ">"
+                 )
 
-knn_roc_curves$k <- as.factor(knn_roc_curves$k)
+knn_pca_auc = knn_pca_roc_curve$auc
 
-ggplot(knn_roc_curves, aes(x = FPR, y = TPR, colour = k)) + 
-  geom_line(linewidth = 1) +
-  labs(
-    title = "ROC Curves for k-NN (k = 1 to 10)",
-    x = "False Positive Rate (FPR)",
-    y = "True Positive Rate (TPR)",
-    color = "k"
-  )
+knn_pca_balanced_accuracy <- fun_calc_balanced_accuracy(knn_pca_confusion,
+                                                        pos_label = 'TREG',
+                                                        neg_label = 'CD4+T')
 
-ggplot(knn_auc, aes(x = k, y = AUC)) + 
-  geom_line(linewidth = 1) +
-  labs(
-    title = "ROC AUCs for k-NN (k = 1 to 10)",
-    x = "k",
-    y = "ROC AUC"
-  )
+knn_pca_f1_score <- F1_Score(y_true = test_data$label, 
+                             y_pred = knn_pca_pred,
+                             positive = "TREG")
+
+plot(knn_pca_roc_curve, col = "red", main = "ROC Curve for QDA")
+```
+
+```{r knn_pca_evaluation}
+# Create a table of the evaluation metrics
+knn_pca_metrics_table <- data.frame(
+  Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
+  kNN = c(knn_pca_accuracy, knn_pca_balanced_accuracy, knn_pca_f1_score, knn_pca_auc, knn_pca_misclass)
+)
+
+print(knn_pca_metrics_table)
+
+print(left_join(knn_pca_metrics_table, qda_pca_metrics_table, by = "Metric"))
 ```
 
 #### Gradient Boosting Decision Trees (GBDT) (Imar)
