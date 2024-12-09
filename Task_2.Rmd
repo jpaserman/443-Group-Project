@@ -24,7 +24,8 @@ packages = list("caret",
                 "pROC",
                 "MLmetrics",
                 "ranger",
-                "kernlab"
+                "kernlab",
+                "ggplot"
                 )
 
 ```
@@ -300,7 +301,7 @@ plot(lasso_roc, main = "Lasso ROC Curve") # Make the limits of the axes 0-1
 ```
 
 ```{r lasso_f1_score}
-lasso_f1_score <- F1_Score(y_pred = pred.test_binary, y_true = lasso_test_data$label, positive = )
+lasso_f1_score <- F1_Score(y_pred = pred.test_binary, y_true = lasso_test_data$label, positive = "1")
 cat("F1 Score:", lasso_f1_score, "\n") 
 ```
 
@@ -385,6 +386,23 @@ cat("Linear Lasso Highest Balanced Accuracy on CV:", linear_lasso_best_balanced_
 cat("Linear Lasso Number of Predictors for Best Lambda:", linear_lasso_best_num_predictors, "\n")
 cat("Linear Lasso Balanced Accuracy on Test Data:", linear_lasso_test_balanced_accuracy, "\n")
 
+```
+
+```{r lin_lasso_Accuracy}
+linear_lasso_accuracy <- mean(linear_lasso_pred_test_binary == linear_lasso_test_data$label)
+cat("Lasso Accuracy:", linear_lasso_accuracy, "\n") # 0.925
+```
+
+```{r lin_lasso_ROC_AUC}
+linear_lasso_roc <- roc(linear_lasso_test_data$label, linear_lasso_pred_test_binary)
+linear_lasso_auc <- auc(linear_lasso_roc)
+cat("Lasso AUC:", linear_lasso_auc, "\n") # 
+plot(linear_lasso_roc, main = "Lasso ROC Curve") # Make the limits of the axes 0-1
+```
+
+```{r lin_lasso_f1_score}
+linear_lasso_f1_score <- F1_Score(y_pred = linear_lasso_pred_test_binary, y_true = linear_lasso_test_data$label, positive = "1")
+cat("F1 Score:", linear_lasso_f1_score, "\n") 
 ```
 
 
@@ -820,7 +838,23 @@ cat("Linear Elastic Net Highest Balanced Accuracy on CV:", linear_elastic_best_b
 cat("Linear Elastic Net Number of Predictors for Best Lambda:", linear_elastic_best_num_predictors, "\n")
 cat("Linear Elastic Net Balanced Accuracy on Test Data:", linear_elastic_test_balanced_accuracy, "\n")
 
+```
 
+```{r linear_elastic_Accuracy}
+lin_elastic_accuracy <- mean(linear_elastic_pred_test_binary == linear_elastic_net_test_data$label)
+cat("Elastic Net Accuracy:", lin_elastic_accuracy, "\n") 
+```
+
+```{r linear_elastic_ROC_AUC}
+lin_elastic_roc <- roc(linear_elastic_net_test_data$label, linear_elastic_pred_test_binary)
+lin_elastic_auc <- auc(lin_elastic_roc)
+cat("Elastic net AUC:", lin_elastic_auc, "\n") #
+plot(lin_elastic_roc, main = "Elastic net ROC Curve") # Make the limits of the axes 0-1
+```
+
+```{r linear_elastic_f1_score}
+lin_elastic_f1_score <- F1_Score(y_pred = linear_elastic_pred_test_binary, y_true = linear_elastic_net_test_data$label, positive = "1")
+cat("F1 Score:", lin_elastic_f1_score, "\n") 
 ```
 
 
@@ -932,7 +966,7 @@ xgb_model_total_time <- xgb_model_end - xgb_model_start
 cat("Time taken for xgb model training and selection:", xgb_model_total_time, "\n")
 
 # Plot Feature Importance
-xgb.plot.importance(importance_matrix)
+xgb.plot.importance(importance_matrix) 
 
 ```
 
