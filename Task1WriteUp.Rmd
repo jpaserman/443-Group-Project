@@ -1,0 +1,74 @@
+---
+title: "Task 1 Write Up"
+author: "Imar Colic"
+date: "2024-12-08"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Task 1: Binary Classification
+
+## Abstract Task 1
+
+-   abstract/overview of task
+
+## Task 1.1 Data Description
+
+-   summary statistics
+-   plots
+
+## Task 1.2 Summary Table without PCA
+
+-   short intro (1-2 sentences what every classifier does)
+-   after showing summary table, add explanation to specific occurances like the QDA or kNN or SVM
+
+| w/o PCA  | Accuracy | Bal. Accuracy | AUC | F1  |
+|----------|----------|---------------|-----|-----|
+| LDA      |          |               |     |     |
+| Logistic |          |               |     |     |
+| QDA      |          |               |     |     |
+| k-NN     |          |               |     |     |
+| GDBT     |          |               |     |     |
+| RF       |          |               |     |     |
+| SVM      |          |               |     |     |
+
+## Task 1.2 Summary Table with PCA
+
+-   explanation of what PCA does and how it is essentially applied for all classifiers
+
+| with PCA | Accuracy | Bal. Accuracy | AUC | F1  |
+|----------|----------|---------------|-----|-----|
+| LDA      |          |               |     |     |
+| Logistic |          |               |     |     |
+| QDA      |          |               |     |     |
+| k-NN     |          |               |     |     |
+| GDBT     |          |               |     |     |
+| RF       |          |               |     |     |
+| SVM      |          |               |     |     |
+
+## Task 1.3 Improved Classifiers
+
+-   Summary Table: of F1 before and F1 after improvement
+
+|                       | F1 Score before | F1 Score after |
+|-----------------------|-----------------|----------------|
+| QDA/LDA??             |                 |                |
+| Logistic (with Ridge) |                 |                |
+| RF (with AdaBoost)    |                 |                |
+
+-   explanation how each classifier was improved and why this improvement method was chosen
+
+## Task 1.4 Final predict function
+
+-   summary and discussion of the results
+
+|             | Accuracy | Bal. Accuracy | AUC | F1 Score |
+|-------------|----------|---------------|-----|----------|
+| mypredict() |          |               |     |          |
+
+-   present in one row all performance metrics of chosen prediction function
