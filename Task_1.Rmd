@@ -742,37 +742,44 @@ yhat.svm <- read.csv("predictions_1.2/svm_predictions.csv") %>%
 yhat.svm <- yhat.svm[,'x']
 ```
 
-```{r svm_Confusion}
-svm_confusion_matrix <- table(predict = yhat.svm, truth = test_data$label)
+```{r svm_confusion}
+svm_confusion_matrix <- table(predict = yhat.svm, 
+                              truth = test_data$label)
 print(svm_confusion_matrix)
-print(svm_confusion_matrix[2,2])
+```
+
+```{r svm_diagnostics}
 svm_balanced_accuracy <- fun_calc_balanced_accuracy(svm_confusion_matrix,
                                                     pos_label = "TREG",
                                                     neg_label = "CD4+T")
 
-cat("The balanced accuracy is", svm_balanced_accuracy, "\n") # 0.9479
-```
-
-```{r svm_Misclass}
 svm_misclass <- mean(yhat.svm != test_data$label)
-cat("SVM Misclassification Rate:", svm_misclass, "\n") # 0.0447
-```
 
-```{r svm_Accuracy}
 svm_accuracy <- mean(yhat.svm == test_data$label)
-cat("SVM Accuracy:", svm_accuracy, "\n") # 0.9553
-```
 
-```{r svm_ROC_AUC}
-svm_roc <- roc(test_data$label, as.numeric(yhat.svm))
+svm_roc <- roc(test_data$label, 
+               as.numeric(yhat.svm),
+               levels = c("CD4+T", "TREG"),
+               direction = "<")
+
 svm_auc <- auc(svm_roc)
-cat("SVM AUC:", svm_auc, "\n")
+
 plot(svm_roc, main = "SVM ROC Curve") # Make the limits of the axes 0-1
+
+svm_f1_score <- F1_Score(y_pred = yhat.svm, 
+                         y_true = test_data$label,
+                         positive = 'TREG')
+
 ```
 
-```{r svm_f1_score}
-svm_f1_score <- F1_Score(y_pred = yhat.svm, y_true = test_data$label)
-cat("F1 Score:", svm_f1_score, "\n") # 0.9645
+```{r svm_evaluation}
+# Create a table of the evaluation metrics
+svm_metrics_table <- data.frame(
+  Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
+  SVM_Linear = c(svm_accuracy, svm_balanced_accuracy, svm_f1_score, svm_auc, svm_misclass)
+)
+
+print(svm_metrics_table)
 ```
 
 ##### Radial SVM Model
@@ -924,7 +931,6 @@ pca_runtime <- pca_end - pca_start # Time difference of 4.244169 mins
 ```{r pca_save, eval = FALSE}
 write.csv(task_one_df_pca$x, file = "predictions_1.2/task_one_df_pca.csv", row.names = TRUE)
 ```
-
 
 ```{r logreg_load, include = FALSE}
 task_one_df_pca <- read.csv("predictions_1.2/task_one_df_pca.csv") %>% 
