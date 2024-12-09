@@ -1534,49 +1534,72 @@ ggplot(scree_data, aes(x = Component, y = Variance)) +
 
 LDA outperforms QDA. Does this imply a linear bayes decision boundary?   
 
-##### Cross-validation and picking n PCs
+##### Cross-validation (Finding optimal number of Principal Components and tuning threshold)
 
 ```{r}
 lda_cv_time <- Sys.time()
 lda_cv_scores <- data.frame(no_pc = c(),
-                            accuracy = c(),
+                            threshold = c(),
+                            # accuracy = c(),
                             f1 = c())
+
+thresholds <- seq(0.3, 0.7, 0.05)
 
 for (prin_comps in no_prin_comps) {
   
-  set.seed(seed)
-  
   X_pca <- task_one_df_pca[train_indices, 1:prin_comps]  # Use the first n_components
   
-  # Combine PCA-transformed data with the target
-  data_pca <- data.frame(X_pca, label = train_data_pca$label)
+  test_lda_tuning <- task_one_df_pca[-train_indices, 1:prin_comps]
   
+  set.seed(seed)
+    
+  # Combine PCA-transformed data with the target
+  data_pca <- data.frame(X_pca, label = make.names(train_data_pca$label))
+    
   # Perform LDA with 5-fold cross-validation
   train_control <- trainControl(method = "cv", 
                                 number = no_folds,
-                                summaryFunction = cv_f1_score)
+                                classProbs = TRUE,
+                                summaryFunction = twoClassSummary)
   
-  lda_model <- train(label ~ ., 
+  lda_cv_model <- train(as.factor(label) ~ ., 
                      data = data_pca, 
                      method = "lda", 
-                     trControl = train_control)
+                     trControl = train_control,
+                     metric = "ROC")
   
-  model_result <- lda_model$result
+  lda_cv_probs <- predict(lda_cv_model, test_lda_tuning, type = "prob")
   
-  return_df <- data.frame(no_pc = c(rep(prin_comps, length(model_result$F1))),
-                              accuracy = c(model_result$Accuracy),
-                              f1 = c(model_result$F1)
-                              )
-  
-  # Store the cross-validation accuracy
-  lda_cv_scores <- rbind(lda_cv_scores, return_df)
+  for (threshold in thresholds){
+    lda_cv_preds <- as.factor(ifelse(lda_cv_probs[, "TREG"] > threshold,
+                                     1,
+                                     0))
+    
+    f1 <- F1_Score(y_true = test_data$label_as_numeric,
+                   y_pred = lda_cv_preds,
+                   positive = 1)
+    
+    # model_result <- lda_model$result
+    
+    # return_df <- data.frame(no_pc = c(rep(prin_comps, length(model_result$F1))),
+    #                             accuracy = c(model_result$Accuracy),
+    #                             f1 = c(model_result$F1)
+    #                             )
+    
+    return_df <- data.frame(no_pc = prin_comps,
+                            decision_threshold = threshold,
+                            f1 = f1)
+    
+    # Store the cross-validation accuracy
+    lda_cv_scores <- rbind(lda_cv_scores, return_df)
+  }
 }
 lda_cv_time <- Sys.time() - lda_cv_time # Time difference of 11.68833 secs
 
 lda_improved_models <- lda_cv_scores[order(lda_cv_scores$f1, 
                                                  decreasing = TRUE),]
 
-lda_improved_models
+lda_improved_models %>% filter(no_pc == 15)
 ```
 
 ```{r}
