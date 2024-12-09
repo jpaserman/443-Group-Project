@@ -44,13 +44,16 @@ lambda_grid <- c(0.001, 0.01,0.03,0.05)
 test_errors <- numeric(length(lambda_grid))
 
 ## Number of Principal Components to train with
-no_prin_comps <- c(2:50)
+no_prin_comps <- c(2:30)
 
 ## Number of folds for Cross-Validation 
 no_folds <- 5
+
+## SVM Bootstraps
+no_bootstraps <- c(10, 25, 50)
 ```
 
-```{r, include=FALSE}
+```{r load_packages, include=FALSE}
 for (package in packages){
   if(!require(package, character.only = TRUE)){
     install.packages(package, character.only = TRUE)
@@ -80,6 +83,7 @@ train_data <- task_one_df[train_indices,]
 test_data <- task_one_df[-train_indices,]
 ```
 
+## Functions 
 ```{r functions}
 fun_calc_balanced_accuracy <- function(confusion_matrix, pos_label, neg_label){
   tp <- confusion_matrix[pos_label, pos_label]
@@ -500,7 +504,7 @@ knn_f1_score <- "n/a"
 ```
 
 
-#### Gradient Boosting Decision Trees (GBDT) (Jonathan)
+#### Gradient Boosting Decision Trees (GBDT) (Imar)
 
 ```{r gbmparams}
 #Number of trees
@@ -645,7 +649,7 @@ cat("F1 Score:", gbm_f1_score, "\n")
 
 The accuracy for the gradient descent decision tree model (where the shrinkage term was equal to 0.001) was 0.904. The AUC was equal to 0.972 and the Test mean squared error was equal to 0.109. Misclassification rate was equal to 0.096. And F1 score was equal to 0.928
 
-#### Random Forest (Jonathan)
+#### Random Forest (Imar)
 
 Above we use a tree search to find.... When using the tree search, we get that there are 11 features that are the most important to classifying whether a cell is a TREG cell or a CD4+T cell. However, we can see based on the tree that there are certain features that appear more than once. Based on the tree plot, we can determine that the most important regressor that helps determine if a cell is a TREG cell or a CD4+T cell is the IL7R. From the National Library of medicine ("<https://www.ncbi.nlm.nih.gov/gene/3575>"), IL7R is a protein encoded by a gene that plays a critical role in the development of lymph nodes. Based on the analysis above, we decided to create a Random Forest regression that will have 12 terminal nodes.
 
@@ -718,7 +722,7 @@ cat("F1 Score:", rf_f1_score, "\n")
 
 Using a random forest tree model, we see that the accuracy of the model was 0.936 Which is quite accurate! Misclassification Rate was equal to 0.064. The F1 score was equal to 0.9504
 
-#### Support Vector Machine (SVM) (Peter)
+#### Support Vector Machine (SVM) (Chi)
 
 ##### Linear SVM Model
 ```{r svm_linear_model}
@@ -728,7 +732,12 @@ test_data_cleaned_for_svm <- test_data[, !colnames(test_data) %in% c("label_as_n
 ## K-fold CV for hyperparameter tuning of 'cost' for the training data with a linear kernel
 start_time_svm <- Sys.time()
 
-tune.out = tune(svm, label ~ . -label_as_numeric, data = train_data, kernel = "linear", ranges = list(cost = c(0.01, 0.1, 1, 10)))
+tune.out = tune(svm, 
+                label ~ . -label_as_numeric, 
+                data = train_data, 
+                kernel = "linear", 
+                ranges = list(cost = c(0.01, 0.1, 1, 10)))
+
 summary(tune.out)
 
 end_time_svm <- Sys.time()
@@ -825,7 +834,7 @@ cat("F1 Score:", svm_f1_score, "\n") # 0.9645
 ```{r svm_predictions}
 # Predictions
 start_time_svm_pred <-  Sys.time()
-yhat.svm_rad = predict(bestmod_rad, test_data)
+svm_rad_pca_pred = predict(bestmod_rad, test_data)
 
 end_time_svm_pred <- Sys.time()
 svm_prediction_time <- end_time_svm_pred - start_time_svm_pred
@@ -833,7 +842,7 @@ cat("SVM prediction time:", svm_prediction_time, "\n")
 ```
 
 ```{r svm_confusion}
-svm_confusion_matrix <- table(predict = yhat.svm_rad, truth = test_data$label)
+svm_confusion_matrix <- table(predict = svm_rad_pca_pred, truth = test_data$label)
 print(svm_confusion_matrix)
 print(svm_confusion_matrix[2,2])
 ```
@@ -847,23 +856,23 @@ cat("The balanced accuracy is", svm_balanced_accuracy, "\n") # 0.9479
 ```
 
 ```{r svm_Misclass}
-svm_misclassification_rate <- mean(yhat.svm_rad != test_data$label)
+svm_misclassification_rate <- mean(svm_rad_pca_pred != test_data$label)
 cat("SVM Misclassification Rate:", svm_misclassification_rate, "\n") # 0.0447
 ```
 
 ```{r svm_Accuracy}
-accuracy_svm <- mean(yhat.svm_rad == test_data$label)
+accuracy_svm <- mean(svm_rad_pca_pred == test_data$label)
 cat("SVM Accuracy:", accuracy_svm, "\n") # 0.9553
 ```
 
 ```{r svm_ROC_AUC}
-roc_svm <- roc(test_data$label, as.numeric(yhat.svm_rad))
+roc_svm <- roc(test_data$label, as.numeric(svm_rad_pca_pred))
 cat("SVM AUC:", auc(roc_svm), "\n")
 plot(roc_svm, main = "SVM ROC Curve") # Make the limits of the axes 0-1
 ```
 
 ```{r rf_f1_score}
-svm_f1_score <- F1_Score(y_pred = yhat.svm_rad, y_true = test_data$label)
+svm_f1_score <- F1_Score(y_pred = svm_rad_pca_pred, y_true = test_data$label)
 cat("F1 Score:", svm_f1_score, "\n") # 0.9645
 ```
 
@@ -1248,7 +1257,7 @@ ggplot(knn_auc, aes(x = k, y = AUC)) +
   )
 ```
 
-#### Gradient Boosting Decision Trees (GBDT) (Jonathan)
+#### Gradient Boosting Decision Trees (GBDT) (Imar)
 ```{r gbm_pca_training}
 lambda <- 0.001
 # Measure the time it takes to run 
@@ -1328,7 +1337,7 @@ gbm_f1_score_pca <- F1_Score(y_pred = gbm_pred_classes_pca,
 cat("F1 Score with PCA:", gbm_f1_score_pca, "\n")
 
 ```
-#### Random Forest (Jonathan)
+#### Random Forest (Imar)
 ```{r rf_pca_train}
 # RF model with PCA data
 start_time_rf_pca <- Sys.time()
@@ -1397,9 +1406,6 @@ cat("F1 Score with PCA:", rf_f1_score_pca, "\n")
 
 ##### Linear SVM Model
 ```{r svm_linear_model_pca}
-## Clean the test data for the SVM task
-test_data_cleaned_for_svm <- test_data_pca[, !colnames(test_data_pca) %in% c("label_as_numeric", "label")]
-
 ## K-fold CV for hyperparameter tuning of 'cost' for the training data with a linear kernel
 start_time_svm <- Sys.time()
 
@@ -1465,15 +1471,15 @@ svm_auc
 plot(svm_roc, main = "SVM ROC Curve") # Make the limits of the axes 0-1
 ```
 
-```{r rf_f1_score}
-svm_f1_score <- F1_Score(y_pred = svm_pca_pred, 
+```{r svm_pca_f1_score}
+svm_pca_f1_score <- F1_Score(y_pred = svm_pca_pred, 
                          y_true = test_data$label,
                          positive = "TREG")
-cat("F1 Score:", svm_f1_score, "\n") # 0.9645
+cat("F1 Score:", svm_f1_score, "\n") # 0.9310345
 ```
 
 ##### Radial SVM Model
-```{r svm_radial_model}
+```{r svm_radial_pca_model}
 ## K-fold CV for hyperparameter tuning of 'cost' for the training data with a radial basis function (RBF) kernel
 start_time_svm_rad <- Sys.time()
 
@@ -1498,7 +1504,7 @@ bestmod_rad <-  tune.out_rad$best.model
 summary(bestmod_rad)
 ```
 
-```{r svm_predictions}
+```{r svm_radial_pca_predictions}
 start_time_svm_pred <-  Sys.time()
 svm_rad_pca_pred = predict(bestmod_rad, test_data_pca)
 
@@ -1506,39 +1512,49 @@ end_time_svm_pred <- Sys.time()
 svm_prediction_time <- end_time_svm_pred - start_time_svm_pred #Time difference of 0.01661301 secs
 ```
 
-```{r svm_confusion}
+```{r svm_radial_pca_confusion}
 svm_rad_pca_confusion_matrix <- table(predict = svm_rad_pca_pred, truth = test_data_pca$label)
-print(svm_confusion_matrix)
+print(svm_rad_pca_confusion_matrix)
 ```
 
-```{r svm_balanced_accuracy}
+```{r svm_radial_pca_balanced_accuracy}
 svm_rad_pca_balanced_accuracy <- fun_calc_balanced_accuracy(svm_rad_pca_confusion_matrix, 
                                                     pos_label = "TREG",
                                                     neg_label = "CD4+T")
 
-cat("The balanced accuracy is", svm_balanced_accuracy, "\n") # 0.9411
+cat("The balanced accuracy is", svm_rad_pca_balanced_accuracy, "\n") # 0.9411
 ```
 
-```{r svm_Misclass}
-svm_misclassification_rate <- mean(yhat.svm_rad != test_data$label)
+```{r svm_radial_pca_misclass}
+svm_misclassification_rate <- mean(svm_rad_pca_pred != test_data$label)
 cat("SVM Misclassification Rate:", svm_misclassification_rate, "\n") # 0.0447
 ```
 
-```{r svm_Accuracy}
-accuracy_svm <- mean(yhat.svm_rad == test_data$label)
-cat("SVM Accuracy:", accuracy_svm, "\n") # 0.9553
+```{r svm_radial_pca_accuracy}
+svm_radial_pca_accuracy <- mean(svm_rad_pca_pred == test_data$label)
+cat("SVM Accuracy:", svm_radial_pca_accuracy, "\n") # 0.9553
 ```
 
-```{r svm_ROC_AUC}
-roc_svm <- roc(test_data$label, as.numeric(yhat.svm_rad))
-cat("SVM AUC:", auc(roc_svm), "\n")
+```{r svm_radial_pca_roc}
+roc_svm <- roc(test_data$label, as.numeric(svm_rad_pca_pred))
+auc(roc_svm)
 plot(roc_svm, main = "SVM ROC Curve") # Make the limits of the axes 0-1
 ```
 
-```{r rf_f1_score}
-svm_f1_score <- F1_Score(y_pred = yhat.svm_rad, 
-                         y_true = test_data$label)
-cat("F1 Score:", svm_f1_score, "\n") # 0.9645
+```{r svm_radial_pca_f1_score}
+svm_rad_pca_f1_score <- F1_Score(y_pred = svm_rad_pca_pred, 
+                         y_true = test_data$label,
+                         positive = 'TREG')
+cat("F1 Score:", svm_rad_pca_f1_score, "\n") # 0.9645
+```
+
+```{r Log_PCA_evaluation}
+# Create a table of the evaluation metrics
+log_pca_metrics_table <- data.frame(
+  Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
+  Value = c(svm_radial_pca_accuracy, log_pca_balanced_accuracy, log_pca_f1_score, log_pca_auc, log_pca_misclas)
+)
+print(log_pca_metrics_table)
 ```
 
 #### Summary with PCA
@@ -1612,7 +1628,7 @@ display(summary_with_PCA)
 
 Train and evaluating three classifiers of our choice with the goal of improving the F1 score (can use methods like bagging, boosting, and regularization (cross-fold validation, ridge/lasso)).
 
-### Identifying the number of Principle Components to use 
+#### Identifying the number of Principle Components to use 
 ```{r scree_plot}
 variance_explained <- (task_one_df_pca$sdev)^2 / sum((task_one_df_pca$sdev)^2)
 
@@ -1632,29 +1648,13 @@ ggplot(scree_data, aes(x = Component, y = Variance)) +
 
 #### LDA/QDA? - improve through PCA and CV (Chi)
 
-```{r}
-cv_f1_score <- function(data, lev = NULL, model = NULL) {
-  # Calculate confusion matrix
-  cm <- table(data$pred, data$obs)
-  
-  tp <- cm["TREG", "TREG"]
-  fp <- cm["TREG", "CD4+T"]
-  fn <- cm["CD4+T", "TREG"]
-  
-  precision <- tp / (tp + fp)
-  
-  recall <- tp / (tp + fn)
-  
-  # Extract precision, recall, and F1-score
-  f1 <- 2 * (precision * recall) / (precision + recall)
-  
-  accuracy <- mean(data$pred == data$obs)
-  
-  # Return a named vector
-  c(Accuracy = accuracy, F1 = f1)
-}
+LDA outperforms QDA. Does this imply a linear bayes decision boundary?   
 
-cv_scores <- c()
+```{r}
+lda_cv_time <- Sys.time()
+lda_cv_scores <- data.frame(no_pc = c(),
+                   accuracy = c(),
+                   f1 = c())
 
 for (prin_comps in no_prin_comps) {
   
@@ -1675,9 +1675,25 @@ for (prin_comps in no_prin_comps) {
                      method = "lda", 
                      trControl = train_control)
   
+  model_result <- lda_model$result
+  
+  return_df <- data.frame(no_pc = c(rep(prin_comps, length(model_result$F1))),
+                              accuracy = c(model_result$Accuracy),
+                              f1 = c(model_result$F1)
+                              )
+  
   # Store the cross-validation accuracy
-  cv_scores <- c(cv_scores, lda_model$results$F1)
+  lda_cv_scores <- rbind(lda_cv_scores, return_df)
 }
+lda_cv_time <- Sys.time() - lda_cv_time # Time difference of 11.68833 secs
+lda_cv_scores
+```
+
+```{r}
+ggplot(lda_cv_scores, aes(x = no_pc, y = f1)) +
+  geom_line() +
+  geom_point()
+```
 ```
 
 
