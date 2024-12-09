@@ -27,7 +27,8 @@ packages = list("class",
                 "MLmetrics",
                 "caret",
                 "e1071",
-                "glmnet"
+                "glmnet",
+                "adabag"
 )
 
 # For knn-training
@@ -1768,42 +1769,35 @@ graph for f1 score with changing the s parameter = regularization parameter
 Hyperparameter tuning (cross-validation): Number of trees (n_estimators): Increasing the number of trees generally improves accuracy, but can slow down the model. Maximum tree depth (max_depth): Controls how deep each tree can grow, preventing overfitting with a smaller depth. Minimum samples per leaf (min_samples_leaf): Sets the minimum number of samples required to split a node, preventing overfitting. Number of features considered at each split (max_features): Controls the randomness in the feature selection process.
 
 ```{r}
-# Define a custom grid of hyperparameters for tuning
-rf_cv_grid <- expand.grid(
-  mtry = c(30, 50, 64, 80), # Number of features considered at each split
-  splitrule = c("gini", "extratrees"), # Criterion for splitting nodes
-  min.node.size = c(1, 5, 10),         # Minimum number of samples per leaf
-  ntree = c(100, 500, 1000)            # Number of trees in the forest
+# Train the AdaBoost model with Random Forest as the base learner
+start_time_rf_ab <- Sys.time()
+
+# Train AdaBoost using Random Forest as the base model
+rf_ab_model <- boosting(
+  label ~ . - label_as_numeric,       # Formula excluding label_as_numeric
+  data = train_data,                  # Training data
+  boos = TRUE,                        # Enable boosting
+  mfinal = 50,                        # Number of boosting iterations (trees)
+  baselearner = randomForest          # Use Random Forest as the base model
 )
 
-# Set up 5-fold cross-validation
-rf_cv_ctrl <- trainControl(
-  method = "cv",                      # Cross-validation method
-  number = 5,                         # Number of folds
-  summaryFunction = twoClassSummary,  # Use F1 score, ROC, etc.
-  classProbs = TRUE,                  # To compute probabilities
-  savePredictions = "final"           # Save the final predictions
-)
+end_time_rf_ab <- Sys.time()
+rf_ab_training_time <- end_time_rf_ab - start_time_rf_ab
+cat("AdaBoost with Random Forest training time:", rf_ab_training_time, "\n")
 
-# Train the Random Forest model using cross-validation
-start_time_rf_cv <- Sys.time()
-rf_cv_model <- randomForest(label ~ . - label_as_numeric, data = train_data, method = "rf", trControl = rf_cv_ctrl, tuneGrid = rf_cv_grid, metric = "F1", importance = TRUE)
-end_time_rf_cv <- Sys.time()
-rf_cv_training_time <- end_time_rf_cv - start_time_rf_cv
-cat("Random Forest model training time:", rf_cv_training_time, "\n")
+# Predictions
+start_time_rf_ab_pred <- Sys.time()
+yhat.rf_ab <- predict(rf_ab_model, newdata = test_data)$class  # Predictions using the AdaBoost model
+end_time_rf_ab_pred <- Sys.time()
+rf_ab_prediction_time <- end_time_rf_ab_pred - start_time_rf_ab_pred
+cat("AdaBoost with Random Forest prediction time:", rf_ab_prediction_time, "\n")
 
-# trControl = rf_cv_ctrl # Cross-validation control
-# tuneGrid = rf_cv_grid # Hyperparameter grid
-# metric = "F1" # Optimize for F1 score
-# importance = TRUE # To calculate feature importance
+# Evaluate F1 Score and other metrics
+cm_rf_ab <- confusionMatrix(yhat.rf_ab, test_data$label)
+cat("F1 Score on Test Set (AdaBoost with Random Forest): ", cm_rf_ab$byClass["F1"], "\n")
 
-# Predictions on the test set
-start_time_rf_cv_pred <- Sys.time()
-rf_cv_pred <- predict(rf_cv_model, newdata = test_data)
-end_time_rf_cv_pred <- Sys.time()
-rf_cv_prediction_time <- end_time_rf_cv_pred - start_time_rf_cv_pred
-cat("Random Forest prediction time:", rf_cv_prediction_time, "\n")
 ```
+
 
 ```{r}
 # Check the performance on the test data
