@@ -1100,12 +1100,14 @@ print(log_pca_metrics_table)
 
 ```{r qda_pca_train}
 qda_start_time <- Sys.time()
-qda_pca_fit <- qda(label ~ . - label_as_numeric, data = train_data_pca)
+qda_pca_fit <- qda(label ~ . - label_as_numeric, 
+                   data = train_data_pca)
 qda_runtime <- Sys.time() - qda_start_time # Time difference of 0.01315498 secs
 ```
 
 ```{r qda_pca_confusion}
-qda_pca_pred <- predict(qda_pca_fit, test_data_pca)$class
+qda_pca_pred <- predict(qda_pca_fit,
+                        test_data_pca)$class
 
 qda_pca_confusion <- table(predicted = qda_pca_pred,
                            observed = test_data$label)
@@ -1113,55 +1115,38 @@ qda_pca_confusion <- table(predicted = qda_pca_pred,
 print(qda_pca_confusion)
 ```
 
-```{r qda_pca_accuracy}
+```{r qda_pca_diagnostics}
+qda_pca_probs <- predict(qda_pca_fit, newdata = test_data_pca, type = "prob")
+
 qda_pca_accuracy <- mean(qda_pca_pred == test_data_pca$label)
 
-cat("Accuracy of QDA with PCA:", log_pca_accuracy, "\n")
-```
-
-```{r qda_pca_balanced_accuracy}
 qda_pca_balanced_accuracy <- fun_calc_balanced_accuracy(qda_pca_confusion,
                                                         pos_label = 'TREG',
                                                         neg_label = 'CD4+T')
 
-cat("Balanced Accuracy of QDA with PCA:", log_pca_balanced_accuracy, "\n")
-```
-
-```{r qda_pca_f1_score}
 qda_pca_f1_score <- F1_Score(y_true = test_data_pca$label, 
                              y_pred = qda_pca_pred,
                              positive = "TREG")
 
-cat("F1 Score of QDA with PCA:", qda_pca_f1_score, "\n")
-```
-
-```{r qda_pca_roc_auc}
-qda_pca_pred_numeric <- ifelse(qda_pca_pred == "TREG", 1, 0)
-  
 qda_pca_roc_curve <- roc(
-  response = test_data_pca$label_as_numeric,
-  predictor = qda_pca_pred_numeric, 
-  levels = c(0,1),
+  response = test_data_pca$label,
+  predictor = qda_pca_probs$posterior[,'TREG'], 
+  levels = c('CD4+T','TREG'),
   direction = "<"
   )
 
-plot(qda_pca_roc_curve, col = "red", main = "ROC Curve for QDA")
-
 qda_pca_auc <- auc(qda_pca_roc_curve)
-qda_pca_auc
-```
 
-```{r qda_pca_misclas}
 qda_pca_misclas <- mean(qda_pca_pred != test_data_pca$label)
 
-cat("Misclassification rate of QDA with PCA:", qda_pca_misclas, "\n")
+plot(qda_pca_roc_curve, col = "red", main = "ROC Curve for QDA")
 ```
 
 ```{r qda_PCA_evaluation}
 # Create a table of the evaluation metrics
 qda_pca_metrics_table <- data.frame(
   Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
-  Value = c(qda_pca_accuracy, qda_pca_balanced_accuracy, qda_pca_f1_score, qda_pca_auc, qda_pca_misclas)
+  QDA = c(qda_pca_accuracy, qda_pca_balanced_accuracy, qda_pca_f1_score, qda_pca_auc, qda_pca_misclas)
 )
 
 print(qda_pca_metrics_table)
