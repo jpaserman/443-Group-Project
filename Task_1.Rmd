@@ -6,6 +6,8 @@ output:
 date: "2024-11-12"
 ---
 
+## T1: Setup
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 options(warn=-1)
@@ -63,7 +65,7 @@ for (package in packages){
 }
 ```
 
-# T1: Binary classification
+## T1: Binary classification
 
 ```{r train_test_split}
 set.seed(seed)
@@ -84,6 +86,7 @@ test_data <- task_one_df[-train_indices,]
 ```
 
 ## T1: Functions 
+
 ```{r functions}
 fun_calc_balanced_accuracy <- function(confusion_matrix, pos_label, neg_label){
   tp <- confusion_matrix[pos_label, pos_label]
@@ -217,7 +220,6 @@ lda_pred <- predict(lda_fit, test_data)$class
 write.csv(lda_pred, file = "predictions_1.2/lda_predictions.csv", row.names = TRUE)
 ```
 
-
 ```{r lda_load, include = FALSE}
 lda_pred <- read.csv("predictions_1.2/lda_predictions.csv") %>% 
   
@@ -287,9 +289,9 @@ logreg_pred <- ifelse(logreg_probs > 0.5, 'TREG', 'CD4+T')
 ```
 
 ```{r logreg_save, include = FALSE}
+write.csv(logreg_probs, file = "predictions_1.2/logreg_probabilities.csv", row.names = TRUE)
 write.csv(logreg_pred, file = "predictions_1.2/logreg_predictions.csv", row.names = TRUE)
 ```
-
 
 ```{r logreg_load, include = FALSE}
 logreg_pred <- read.csv("predictions_1.2/logreg_predictions.csv") %>% 
@@ -297,6 +299,12 @@ logreg_pred <- read.csv("predictions_1.2/logreg_predictions.csv") %>%
   dplyr::select(x)
 
 logreg_pred <- logreg_pred[,'x']
+
+logreg_probs <- read.csv("predictions_1.2/logreg_probabilities.csv") %>% 
+  
+  dplyr::select(x)
+
+logreg_probs <- logreg_probs[,'x']
 ```
 
 ```{r logreg_confusion}
@@ -567,11 +575,8 @@ cat("Prediction time:", gbm_prediction_time, "\n")
 ```
 
 ```{r gbm_save, include = FALSE}
-write.csv(gbm_pred_classes, 
-          file = "predictions_1.2/gbm_predictions.csv",
-          row.names = TRUE)
+write.csv(gbm_pred_classes, file = "predictions_1.2/gbm_predictions.csv", row.names = TRUE)
 ```
-
 
 ```{r gbm_load, include = FALSE}
 gbm_pred_classes <- read.csv("predictions_1.2/gbm_predictions.csv") %>% 
@@ -641,11 +646,8 @@ cat("Random Forest prediction time:", rf_prediction_time, "\n")
 ```
 
 ```{r rf_save, include = FALSE}
-write.csv(yhat.rf, 
-          file = "predictions_1.2/rf_predictions.csv",
-          row.names = TRUE)
+write.csv(yhat.rf, file = "predictions_1.2/rf_predictions.csv", row.names = TRUE)
 ```
-
 
 ```{r rf_load, include = FALSE}
 yhat.rf <- read.csv("predictions_1.2/rf_predictions.csv") %>% 
@@ -676,7 +678,8 @@ cat("Random Forest Accuracy:", rf_accuracy, "\n")
 ```
 
 ```{r rf_roc_auc}
-roc_rf <- roc(test_data$label, as.numeric(yhat.rf))
+yhat.rf_numeric <- ifelse(yhat.rf == "CD4+T", 0, ifelse(yhat.rf == "TREG", 1, NA))
+roc_rf <- roc(test_data$label, yhat.rf_numeric)
 rf_auc <- auc(roc_rf)
 cat("Random Forest AUC:", rf_auc, "\n")
 plot(roc_rf, main = "Random Forest ROC Curve")
@@ -1252,7 +1255,7 @@ cat("Misclassification Rate with PCA:", gbm_misclassification_rate_pca, "\n")
 
 ```{r gbm_pca_accuracy}
 # Accuracy
-gbm_accuracy_pca <- mean(gbm_pred_classes_pca == gbm_test_data_pca$label_as_numeric)
+gbm_accuracy_pca <- mean(gbm_pred_classes_pca == test_data_pca$label_as_numeric)
 cat("Accuracy with PCA:", gbm_accuracy_pca, "\n")
 ```
 
@@ -1734,7 +1737,7 @@ lda_boosted_pred <- sapply(c(1:3),
 ```
 
 
-#### Logistic Regression 
+#### Logistic Regression (Chi - only using graphs, can be deleted??)
 
 ```{r}
 logreg_cv_time <- Sys.time()
@@ -1791,7 +1794,6 @@ logreg_improved_models <- logreg_cv_scores[order(logreg_cv_scores$f1,
 logreg_improved_models
 ```
 
-
 ```{r}
 graph_cv <- logreg_cv_scores %>% filter(no_pc == 37)
 
@@ -1819,7 +1821,7 @@ ggplot(graph_cv, aes(x = lambda, y = f1, colour = as.factor(no_pc))) +
 ```
 
 
-#### Logistic Regression with Ridge Regression (Regularisation)
+#### Logistic Regression with Ridge Regularisation (Imar)
 
 ```{r}
 logreg_start_time <- Sys.time()
@@ -1841,6 +1843,18 @@ logreg_probs_regularized <- predict(logreg_fit_regularized, newx = x_test_log_re
 logreg_pred_ridge <- ifelse(logreg_probs_regularized > 0.5, 'TREG', 'CD4+T')
 ```
 
+```{r logreg_ridge_save, include = FALSE}
+write.csv(logreg_pred_ridge, file = "predictions_1.3/logreg_ridge.csv", row.names = TRUE)
+```
+
+```{r log_ridge_load, include = FALSE}
+logreg_pred_ridge <- read.csv("predictions_1.3/logreg_ridge.csv") %>% 
+  
+  dplyr::select(s1)
+
+logreg_pred_ridge <- logreg_pred_ridge[,'s1']
+```
+
 ```{r}
 log_ridge_confusion <- table(prediction = logreg_pred_ridge, truth = test_data$label)
 log_ridge_confusion
@@ -1852,8 +1866,6 @@ cat("F1 Score of Logistic Regression with Ridge Regularization:", log_ridge_f1_s
 ```
 
 #### Random Forest with AdaBoost (Imar)
-
-Hyperparameter tuning (cross-validation): Number of trees (n_estimators): Increasing the number of trees generally improves accuracy, but can slow down the model. Maximum tree depth (max_depth): Controls how deep each tree can grow, preventing overfitting with a smaller depth. Minimum samples per leaf (min_samples_leaf): Sets the minimum number of samples required to split a node, preventing overfitting. Number of features considered at each split (max_features): Controls the randomness in the feature selection process.
 
 ```{r}
 # Train the AdaBoost model with Random Forest as the base learner
@@ -1878,15 +1890,30 @@ yhat.rf_ab <- predict(rf_ab_model, newdata = test_data)$class  # Predictions usi
 end_time_rf_ab_pred <- Sys.time()
 rf_ab_prediction_time <- end_time_rf_ab_pred - start_time_rf_ab_pred
 cat("AdaBoost with Random Forest prediction time:", rf_ab_prediction_time, "\n")
+```
 
-# Evaluate F1 Score and other metrics
-cm_rf_ab <- confusionMatrix(yhat.rf_ab, test_data$label)
-cat("F1 Score on Test Set (AdaBoost with Random Forest): ", cm_rf_ab$byClass["F1"], "\n")
+```{r rf_ab_save, include = FALSE}
+write.csv(yhat.rf_ab, file = "predictions_1.3/rf_ab.csv", row.names = TRUE)
+```
+
+```{r logreg_load, include = FALSE}
+yhat.rf_ab <- read.csv("predictions_1.3/rf_ab.csv") %>% 
+  
+  dplyr::select(x)
+
+yhat.rf_ab <- yhat.rf_ab[,'x']
 ```
 
 ```{r}
+# Evaluate F1 Score and other metrics
+cm_rf_ab <- table(prediction = yhat.rf_ab, truth = test_data$label)
+cm_rf_ab
+```
+
+
+```{r}
 rf_cv_f1_score <- F1_Score(y_true = test_data$label, y_pred = yhat.rf_ab)
-cat("F1 Score of Random Forest with CV:", rf_cv_f1_score, "\n")
+cat("F1 Score of Random Forest with AdaBoost:", rf_cv_f1_score, "\n")
 ```
 
 ## T1.4: Implement predictor (???)
