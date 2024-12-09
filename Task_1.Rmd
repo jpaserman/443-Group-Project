@@ -92,6 +92,26 @@ fun_calc_balanced_accuracy <- function(confusion_matrix, pos_label, neg_label){
   return(balanced_accuracy)
 }
 
+cv_f1_score <- function(data, lev = NULL, model = NULL) {
+  # Calculate confusion matrix
+  cm <- table(data$pred, data$obs)
+  
+  tp <- cm["TREG", "TREG"]
+  fp <- cm["TREG", "CD4+T"]
+  fn <- cm["CD4+T", "TREG"]
+  
+  precision <- tp / (tp + fp)
+  
+  recall <- tp / (tp + fn)
+  
+  # Extract precision, recall, and F1-score
+  f1 <- 2 * (precision * recall) / (precision + recall)
+  
+  accuracy <- mean(data$pred == data$obs)
+  
+  # Return a named vector
+  c(Accuracy = accuracy, F1 = f1)
+}
 ```
 
 
