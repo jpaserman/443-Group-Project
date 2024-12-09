@@ -63,7 +63,7 @@ for (package in packages){
 }
 ```
 
-# Task 1: binary classification
+# T1: Binary classification
 
 ```{r train_test_split}
 set.seed(seed)
@@ -83,7 +83,7 @@ train_data <- task_one_df[train_indices,]
 test_data <- task_one_df[-train_indices,]
 ```
 
-## Functions 
+## T1: Functions 
 ```{r functions}
 fun_calc_balanced_accuracy <- function(confusion_matrix, pos_label, neg_label){
   tp <- confusion_matrix[pos_label, pos_label]
@@ -119,7 +119,7 @@ cv_f1_score <- function(data, lev = NULL, model = NULL) {
 ```
 
 
-## T1.1: exploratory data analysis and summary statistics (Peter?)
+## T1.1: Exploratory data analysis and summary statistics (Peter?)
 
 ```{r EDA}
 dim(task_one_df)  # The data has 5471 observations and 4125 variables-- 4124 originally, 1 added (label)
@@ -198,7 +198,7 @@ for (var in top_3_abs_diff$genes) {
 
 ```
 
-## T1.2: training and evaluating on various classifiers
+## T1.2: Training and evaluating various classifiers
 
 ### Without PCA
 
@@ -1738,8 +1738,6 @@ lda_boosted_pred <- sapply(c(1:3),
 
 #### Logistic Regression 
 
-##### with Ridge Regression (Regularisation)
-
 ```{r}
 logreg_cv_time <- Sys.time()
 logreg_cv_scores <- data.frame(no_pc = c(),
@@ -1855,9 +1853,7 @@ log_ridge_f1_score <- F1_Score(y_true = test_data$label, y_pred = logreg_pred_ri
 cat("F1 Score of Logistic Regression with Ridge Regularization:", log_ridge_f1_score, "\n")
 ```
 
-graph for f1 score with changing the s parameter = regularization parameter
-
-#### Random Forest with CV (Imar)
+#### Random Forest with AdaBoost (Imar)
 
 Hyperparameter tuning (cross-validation): Number of trees (n_estimators): Increasing the number of trees generally improves accuracy, but can slow down the model. Maximum tree depth (max_depth): Controls how deep each tree can grow, preventing overfitting with a smaller depth. Minimum samples per leaf (min_samples_leaf): Sets the minimum number of samples required to split a node, preventing overfitting. Number of features considered at each split (max_features): Controls the randomness in the feature selection process.
 
@@ -1890,14 +1886,8 @@ cm_rf_ab <- confusionMatrix(yhat.rf_ab, test_data$label)
 cat("F1 Score on Test Set (AdaBoost with Random Forest): ", cm_rf_ab$byClass["F1"], "\n")
 ```
 
-
 ```{r}
-# Check the performance on the test data
-confusionMatrix(rf_cv_pred, test_data$label)
-```
-
-```{r}
-rf_cv_f1_score <- F1_Score(y_true = test_data$label, y_pred = rf_ab_pred)
+rf_cv_f1_score <- F1_Score(y_true = test_data$label, y_pred = yhat.rf_ab)
 cat("F1 Score of Random Forest with CV:", rf_cv_f1_score, "\n")
 ```
 

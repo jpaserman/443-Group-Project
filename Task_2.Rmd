@@ -210,7 +210,7 @@ Our partial EDA is in above chunk of code where we plot histograms of the totals
 
 Train and evaluate feature selection methods with the goal of achieving high balanced accuracy using a minimal number of selected features. Use three different approaches of your choice that were covered in the course.
 
-### Lasso (Jonathan)
+### Lasso
 
 ```{r lasso with balanced accuracy}
 
@@ -389,7 +389,7 @@ cat("Linear Lasso Balanced Accuracy on Test Data:", linear_lasso_test_balanced_a
 
 
 
-### Forward stepwise selection (FSS) (Peter)
+### Forward stepwise selection (FSS)
 
 ```{r fss_Training, results='hold'}
 fss_test_data <- test_data_2_top_subset
@@ -492,7 +492,7 @@ cat("F1 Score:", fss_f1_score, "\n") # 0.5517241
 ```
 
 
-### Random forest (Peter)
+### Random forest
 
 ```{r rf_Training_randomForest}
 set.seed(seed)
@@ -957,7 +957,7 @@ cat("F1 Score:", xgb_f1_score, "\n")
 
 
 
-### Recursive Feature Elimination (RFE) SVM (Peter)
+### Recursive Feature Elimination (RFE) SVM 
 
 
 ```{r sve_rfe_Training}
