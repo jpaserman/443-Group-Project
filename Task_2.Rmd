@@ -23,7 +23,8 @@ packages = list("caret",
                 "dplyr",
                 "pROC",
                 "MLmetrics",
-                "ranger"
+                "ranger",
+                "kernlab"
                 )
 
 ```
@@ -467,11 +468,13 @@ cat("The balanced accuracy is", fss_balanced_accuracy, "\n") # 0.7804
 ```{r fss_Misclass}
 fss_misclass <- mean(fss_test_data$label_pred != fss_test_data$label)
 cat("FSS Misclassification Rate:", fss_misclass, "\n") # 0.08125
+
 ```
 
 ```{r fss_Accuracy}
 fss_accuracy <- mean(fss_test_data$label_pred == fss_test_data$label)
 cat("fss Accuracy:", fss_accuracy, "\n") # 0.91875
+
 ```
 
 ```{r fss_ROC_AUC}
@@ -479,11 +482,13 @@ fss_roc <- roc(fss_test_data$label, fss_test_data$label_pred)
 fss_auc <- auc(fss_roc)
 cat("fss AUC:", fss_auc, "\n") # 0.7804
 plot(fss_roc, main = "fss ROC Curve") # Make the limits of the axes 0-1
+
 ```
 
 ```{r fss_f1_score}
 fss_f1_score <- F1_Score(y_pred = fss_test_data$label_pred, y_true = fss_test_data$label, positive = "1")
 cat("F1 Score:", fss_f1_score, "\n") # 0.5517241
+
 ```
 
 
@@ -560,14 +565,13 @@ cat("Random Forest (ranger) prediction time:", rf_prediction_time, "\n")
 ```
 
 ```{r rf_confusion}
-
 rf_confusion_matrix <- table(Predicted = yhat.rf, Actual = rf_test_data_top_subset$label)
 print(rf_confusion_matrix)
 rf_balanced_accuracy <- fun_calc_balanced_accuracy(rf_confusion_matrix,
                                                    pos_label = "1",
                                                    neg_label = "-1")
 
-cat("The balanced accuracy (randomForest) is", rf_balanced_accuracy, "\n") # 0.7974882
+cat("The balanced accuracy (randomForest) is:", rf_balanced_accuracy, "\n") # 0.7974882
 
 
 predicted_values <- yhat.rf_ranger$predictions
@@ -578,7 +582,8 @@ rf_balanced_accuracy_ranger <- fun_calc_balanced_accuracy(rf_confusion_matrix_ra
                                                    pos_label = "1",
                                                    neg_label = "-1")
 
-cat("The balanced accuracy (ranger) is", rf_balanced_accuracy_ranger, "\n") # 0.8223443 
+cat("The balanced accuracy (ranger) is:", rf_balanced_accuracy_ranger, "\n") # 0.8223443 
+
 ```
 
 We notice that both the random forest built on only the subset of top 1000 features (randomForest), as well as the random forest built on the entire training data (ranger) have moderately successful results. This provides us with confidence in our approach of utilizing the subset of the top 1000 features within training data for the FSS model. Moving forward for the random forest, we will utilize the ranger:ranger random forest built on the entire training data as it performs better in terms of balanced accuracy as well as having less than half the number of features (368 as opposed to 785).  
@@ -586,22 +591,26 @@ We notice that both the random forest built on only the subset of top 1000 featu
 ```{r rf_misclass}
 rf_misclassification_rate <- mean(yhat.rf_ranger$predictions != rf_test_data$label)
 cat("Random Forest Misclassification Rate:", rf_misclassification_rate, "\n") # 0.06875 
+
 ```
 
 ```{r rf_accuracy}
 rf_accuracy <- mean(yhat.rf_ranger$predictions == rf_test_data$label)
 cat("Random Forest Accuracy:", rf_accuracy, "\n") # 0.93125 
+
 ```
 
 ```{r rf_roc_auc}
 roc_rf <- roc(rf_test_data$label, as.numeric(yhat.rf_ranger$prediction))
 cat("Random Forest AUC:", auc(roc_rf), "\n")
 plot(roc_rf, main = "Random Forest ROC Curve") # 0.8223443 
+
 ```
 
 ```{r rf_f1_score}
 rf_f1_score <- F1_Score(y_pred = yhat.rf_ranger$prediction, y_true = rf_test_data$label, positive = "1")
 cat("F1 Score:", rf_f1_score, "\n") # 0.6206897
+
 ```
 
 
@@ -948,10 +957,113 @@ cat("F1 Score:", xgb_f1_score, "\n")
 
 
 
-### (Sparse?) SVM (???)
+### Recursive Feature Elimination (RFE) SVM (Peter)
 
-Is the non-sparse SVM a feature-selection method?
 
-```{r}
+```{r sve_rfe_Training}
+set.seed(seed)
+
+svm_rfe_test_data <- test_data_2
+svm_rfe_train_data <- train_data_2
+
+# Give factors values that are valid for column names
+y_train <- as.character(svm_rfe_train_data$label)
+y_train[y_train == "-1"] <- "no_bind"
+y_train[y_train == "1"] <- "bind"
+y_train <- as.factor(y_train)
+
+# Separate out the explanatory variables
+x_train <- svm_rfe_train_data[, -which(colnames(svm_rfe_train_data) == "label")]
+x_train <- as.data.frame(x_train)
+dim(x_train)
+
+# Remove variables in the training data that have constant values to allow for future scaling
+nzv <- nearZeroVar(x_train)
+if (length(nzv) > 0) {
+  x_train <- x_train[, -nzv]
+}
+# x_train <- x_train[, apply(x, 2, function(column) length(unique(column)) > 1)]
+dim(x_train)
+
+# SVM RFE model
+start_time_sve_rfe <- Sys.time()
+
+# Preprocess the data: centering and scaling the predictors
+preProc <- preProcess(x_train, method = c("center", "scale"))
+x_train <- predict(preProc, x_train)
+
+# Define control setup for RFE, utilize cross-validation with 10-folds
+ctrl <- rfeControl(functions = caretFuncs, method = "cv", number = 10)
+
+# RFE with linear kernel SVM
+svm_rfe <- rfe(x = x_train, y = y_train, sizes = c(1:10), rfeControl = ctrl, method = "svmLinear")
+
+
+end_time_svm_rfe <- Sys.time()
+svm_rfe_training_time <- end_time_svm_rfe - start_time_sve_rfe
+cat("SVM with RFE model training time:", svm_rfe_training_time, "\n")
+
+print(svm_rfe)
 
 ```
+
+```{r svm_rfe_Prediction}
+# Extract the features identified by the SVM with RFE
+start_time_svm_rfe_pred <- Sys.time()
+svm_rfe_vars <- predictors(svm_rfe)
+
+# Limit the training and test data to solely the identified features 
+x_test <- svm_rfe_test_data[, svm_rfe_vars, drop = FALSE]
+y_test <- as.factor(svm_rfe_test_data$label)
+
+x_train <- svm_rfe_train_data[, svm_rfe_vars, drop = FALSE]
+y_train <- as.factor(svm_rfe_train_data$label)
+
+# Train the SVM on solely the identified features
+final_svm <- train(x_train, y_train, method = "svmLinear", trControl = trainControl(method = "none"))
+
+# Predictions
+yhat.svm_rfe <- predict(final_svm, newdata = x_test)
+end_time_svm_rfe_pred <- Sys.time()
+svm_rfe_prediction_time <- end_time_svm_rfe_pred - start_time_svm_rfe_pred
+cat("SVM with RFE prediction time:", svm_rfe_prediction_time, "\n")
+
+```
+
+
+```{r svm_rfe_confusion}
+svm_rfe_confusion_matrix <- table(Predicted = yhat.svm_rfe, Actual = y_test)
+print(svm_rfe_confusion_matrix)
+svm_rfe_balanced_accuracy <- fun_calc_balanced_accuracy(svm_rfe_confusion_matrix,
+                                                        pos_label = "1",
+                                                        neg_label = "-1")
+
+cat("The balanced accuracy for SVM with RFE is:", svm_rfe_balanced_accuracy, "\n") # 0.8257457 
+
+```
+
+```{r svm_rfe_misclass}
+svm_rfe_misclassification_rate <- mean(yhat.svm_rfe != y_test)
+cat("SVM with RFE Misclassification Rate:", svm_rfe_misclassification_rate, "\n") # 0.0625 
+
+```
+
+```{r svm_rfe_accuracy}
+svm_rfe_accuracy <- mean(yhat.svm_rfe == y_test)
+cat("SVM with RFE Accuracy:", svm_rfe_accuracy, "\n") # 0.9375
+
+```
+
+```{r svm_rfe_roc_auc}
+roc_svm_rfe <- roc(y_test, as.numeric(yhat.svm_rfe))
+cat("SVM with RFE AUC:", auc(roc_svm_rfe), "\n")
+plot(roc_svm_rfe, main = "SVM with RFE ROC Curve") # 0.8257457 
+
+```
+
+```{r svm_rfe_f1_score}
+svm_rfe_f1_score <- F1_Score(y_pred = yhat.svm_rfe, y_true = y_test, positive = "1")
+cat("F1 Score:", svm_rfe_f1_score, "\n") # 0.6428571 
+
+```
+
