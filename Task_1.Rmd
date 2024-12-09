@@ -314,59 +314,56 @@ cat("The Misclassification rate of Logistic Regression:", log_misclas, "\n")
 
 #### Quadratic Discriminant Analysis (QDA) (Chi)
 
-Estimation of a QDA classifier fails when training on this training data.
+The current dimensionality of the data is too high for a QDA classifier. During training, the covariance matrix estimation for each class, k, fails. This occurs because, when the data is partitioned into k classes, the number of observations, n, is much smaller than the number of features, p (i.e n << p). As a result, the covariance matrix estimate for class k becomes singular or nearly singular. Therefore, without dimension reduction or regularisation, training this classifier is not feasible.
 
-Due to the high-dimensionality of the data relative to number of data points, the covariance matrices for each class k are likely to be estimated as singular or near-singular. This leads to numerical instability and no solution can be found for the inverse of the covariance matrix. 
-
-As a result no classifier can be found without dimension reduction or regularisation.
 ```{r qda_Train}
-## CAUTION: currently hard-coded numbers here. To be changed (Chi)
-options(expressions = 10000)
-qda_covariates = mean_table$genes[1:1100]
-## CAUTION: currently hard-coded numbers here. To be changed (Chi)
-
-qda_formula = as.formula(
-  paste(
-    "label ~",
-    paste(qda_covariates, collapse = " + ")
-    ))
-
-qda_fit <- qda(qda_formula, data = train_data)
+# ## CAUTION: currently hard-coded numbers here. To be changed (Chi)
+# options(expressions = 10000)
+# qda_covariates = mean_table$genes[1:1100]
+# ## CAUTION: currently hard-coded numbers here. To be changed (Chi)
+# 
+# qda_formula = as.formula(
+#   paste(
+#     "label ~",
+#     paste(qda_covariates, collapse = " + ")
+#     ))
+# 
+# qda_fit <- qda(qda_formula, data = train_data)
 ```
 
 ```{r qda_Confusion}
-qda_pred <- predict(qda_fit, test_data)$class
-
-table(predicted = qda_pred, observed = test_data$label)
+# qda_pred <- predict(qda_fit, test_data)$class
+# 
+# table(predicted = qda_pred, observed = test_data$label)
 ```
 
 ```{r qda_Misclass}
-qda_misclas = mean(qda_pred != test_data$label)
-
-cat("Misclassification rate:", qda_misclas*100, "%")
+# qda_misclas = mean(qda_pred != test_data$label)
+# 
+# cat("Misclassification rate:", qda_misclas*100, "%")
 ```
 
 ```{r qda_ROC}
-qda_pred_numeric <- ifelse(qda_pred == "TREG", 1, 0)
-  
-qda_roc_curve <- roc(
-  response = test_data$label_as_numeric,
-  predictor = qda_pred_numeric, 
-  levels = c(0,1),
-  direction = "<"
-  )
-
-plot(qda_roc_curve, col = "red", main = "ROC Curve for QDA")
-
-qda_auc <- auc(qda_roc_curve)
-qda_auc
+# qda_pred_numeric <- ifelse(qda_pred == "TREG", 1, 0)
+#   
+# qda_roc_curve <- roc(
+#   response = test_data$label_as_numeric,
+#   predictor = qda_pred_numeric, 
+#   levels = c(0,1),
+#   direction = "<"
+#   )
+# 
+# plot(qda_roc_curve, col = "red", main = "ROC Curve for QDA")
+# 
+# qda_auc <- auc(qda_roc_curve)
+# qda_auc
 ```
 
 ```{r QDA_TBD}
-qda_accuracy <- "n/a"
-qda_balanced_accuracy <- "n/a"
-qda_f1_score <- "n/a"
-qda_runtime <- "n/a"
+# qda_accuracy <- "n/a"
+# qda_balanced_accuracy <- "n/a"
+# qda_f1_score <- "n/a"
+# qda_runtime <- "n/a"
 ```
 
 
