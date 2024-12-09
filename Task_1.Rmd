@@ -1734,13 +1734,13 @@ for (prin_comps in no_prin_comps) {
                                                   0.05, 0.1)
                                      ))
   
-  result <- logistic_regression_model$results
+  model_result <- logistic_regression_model$results
     
-  scores <- data.frame(no_pc = c(rep(prin_comps, length(result$alpha))),
-                       alpha = c(result$alpha),
-                       lambda = c(result$lambda),
-                       accuracy = c(result$Accuracy),
-                       f1 = c(result$F1))  
+  return_df <- data.frame(no_pc = c(rep(prin_comps, length(model_result$alpha))),
+                       alpha = c(model_result$alpha),
+                       lambda = c(model_result$lambda),
+                       accuracy = c(model_result$Accuracy),
+                       f1 = c(model_result$F1))  
   
   # Store the cross-validation accuracy
   logreg_cv_scores <- rbind(logreg_cv_scores, scores)
