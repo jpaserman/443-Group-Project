@@ -51,8 +51,13 @@ no_prin_comps <- c(2:30)
 ## Number of folds for Cross-Validation 
 no_folds <- 5
 
-## SVM Bootstraps
-no_bootstraps <- c(10, 25, 50)
+## Threshold tuning
+thresholds <- seq(0.1, 0.9, 0.1)
+
+## Logistic Ridge/Lasso Tuning
+lambda_tuning = c(10^seq(-4, 1, 1))
+
+
 ```
 
 ```{r load_packages, include=FALSE}
@@ -1534,18 +1539,18 @@ LDA outperforms QDA. Does this imply a linear bayes decision boundary?
 
 ##### Cross-validation (Finding optimal number of Principal Components and tuning threshold)
 
-```{r}
+```{r lda_cv_train}
 lda_cv_time <- Sys.time()
 lda_cv_scores <- data.frame(no_pc = c(),
                             threshold = c(),
                             balanced_accuracy = c(),
                             f1 = c())
 
-thresholds <- seq(0, 0.9, 0.1)
+thresholds <- seq(0.1, 0.9, 0.1)
 
 set.seed(seed)
 
-fold_indices <- createFolds(train_data$label, k = no_folds, returnTrain = TRUE)
+fold_indices <- createFolds(train_data$label, k = 10, returnTrain = TRUE)
 
 for (prin_comps in no_prin_comps) {
   
@@ -1570,7 +1575,9 @@ for (prin_comps in no_prin_comps) {
       
       cm <- table(lda_cv_preds, lda_train$label[-fold])
       
-      balanced_accuracy <- fun_calc_balanced_accuracy(cm, "TREG", "CD4+T")
+      balanced_accuracy <- fun_calc_balanced_accuracy(cm, 
+                                                      pos_label = "TREG", 
+                                                      neg_label = "CD4+T")
       
       f1 <- F1_Score(y_true = lda_train[-fold,]$label,
                      y_pred = lda_cv_preds,
@@ -1588,11 +1595,15 @@ for (prin_comps in no_prin_comps) {
 }
 lda_cv_time <- Sys.time() - lda_cv_time # Time difference of 11.68833 secs
 
-lda_cv_scores <- lda_cv_scores %>%
+lda_avg_scores <- lda_cv_scores %>%
   
   group_by(no_pc, threshold) %>%
   
-  summarise(F1 = mean(f1), F1_sd = sd(f1), .groups = "keep")
+  summarise(Balanced_Accuracy = mean(balanced_accuracy),
+            Balanced_Accuracy_sd = sd(balanced_accuracy),
+            F1 = mean(f1), 
+            F1_sd = sd(f1),
+            .groups = "keep")
 
 lda_improved_models <- lda_cv_scores[order(lda_cv_scores$F1,
                                                  decreasing = TRUE),]
@@ -1601,75 +1612,74 @@ lda_improved_models
 ```
 
 ```{r}
-ggplot(lda_cv_scores, aes(x = no_pc, y = f1)) +
+ggplot(lda_avg_scores, aes(x = threshold, y = F1, color = as.factor(no_pc))) +
   geom_line() +
   geom_point()
 ```
 
 ```{r}
-lda_best_no_pc <- lda_improved_models[1, 'no_pc']
+lda_improved_models <- lda_avg_scores[order(lda_avg_scores$F1,
+                                                 decreasing = TRUE),]
 
-X_pca <- task_one_df_pca[train_indices, 1:lda_best_no_pc]
 
-test_lda_improved <- task_one_df_pca[-train_indices, 1:lda_best_no_pc]
+lda_tuned_training <- task_one_df_pca[train_indices, 1:lda_best_no_pc] %>%
+  
+  data.frame(., label = train_data$label)
+
+test_lda_tuned <- task_one_df_pca[-train_indices, 1:lda_best_no_pc]
 
 data_pca <- data.frame(X_pca, label = train_data_pca$label)
 
-train_control <- trainControl(method = "cv", 
-                              number = no_folds,How 
-                              summaryFunction = cv_f1_score)
-  
-lda_improved_model <- train(label ~ ., 
-                   data = data_pca, 
-                   method = "lda", 
-                   trControl = train_control,
-                   metric = "F1")
+lda_tuned_model <- lda(label ~ ., 
+                          lda_tuned_training)
 
-lda_improved_pred <- predict(lda_improved_model, newdata = test_lda_improved)
+lda_tuned_prob <- predict(lda_tuned_model, newdata = test_lda_tuned)$posterior[, "TREG"]
+
+lda_tuned_pred <- ifelse(lda_tuned_prob > 0.2, "TREG", "CD4+T")
 ```
 
-```{r lda_improved_confusion}
-lda_improved_confusion <- table(predicted = lda_improved_pred,
+```{r lda_tuned_confusion}
+lda_tuned_confusion <- table(predicted = lda_tuned_pred,
                            observed = test_data$label)
 
-print(lda_improved_confusion)
+print(lda_tuned_confusion)
 ```
 
-```{r lda_improved_diagnostics}
-lda_improved_probs <- predict(lda_improved_model, newdata = test_lda_improved, type = "prob")
+```{r lda_tuned_diagnostics}
+lda_tuned_probs <- predict(lda_tuned_model, newdata = test_lda_tuned, type = "prob")
 
-lda_improved_accuracy <- mean(lda_improved_pred == test_data_pca$label)
+lda_tuned_accuracy <- mean(lda_tuned_pred == test_data_pca$label)
 
-lda_improved_balanced_accuracy <- fun_calc_balanced_accuracy(lda_improved_confusion,
+lda_tuned_balanced_accuracy <- fun_calc_balanced_accuracy(lda_tuned_confusion,
                                                         pos_label = 'TREG',
                                                         neg_label = 'CD4+T')
 
-lda_improved_f1_score <- F1_Score(y_true = test_data_pca$label, 
-                             y_pred = lda_improved_pred,
+lda_tuned_f1_score <- F1_Score(y_true = test_data_pca$label, 
+                             y_pred = lda_tuned_pred,
                              positive = "TREG")
 
-lda_improved_roc_curve <- roc(
+lda_tuned_roc_curve <- roc(
   response = test_data_pca$label,
-  predictor = lda_improved_probs[,'TREG'], 
+  predictor = lda_tuned_prob, 
   levels = c('CD4+T','TREG'),
   direction = "<"
   )
 
-lda_improved_auc <- auc(lda_improved_roc_curve)
+lda_tuned_auc <- auc(lda_tuned_roc_curve)
 
-lda_improved_misclas <- mean(lda_improved_pred != test_data_pca$label)
+lda_tuned_misclas <- mean(lda_tuned_pred != test_data_pca$label)
 
-plot(lda_improved_roc_curve, col = "red", main = "ROC Curve for QDA")
+plot(lda_tuned_roc_curve, col = "red", main = "ROC Curve for QDA")
 ```
 
-```{r lda_improved_evaluation}
+```{r lda_tuned_evaluation}
 # Create a table of the evaluation metrics
-lda_improved_metrics_table <- data.frame(
+lda_tuned_metrics_table <- data.frame(
   Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
-  LDA_Improved = c(lda_improved_accuracy, lda_improved_balanced_accuracy, lda_improved_f1_score, lda_improved_auc, lda_improved_misclas)
+  LDA_tuned = c(lda_tuned_accuracy, lda_tuned_balanced_accuracy, lda_tuned_f1_score, lda_tuned_auc, lda_tuned_misclas)
 )
 
-print(lda_improved_metrics_table)
+print(lda_tuned_metrics_table)
 ```
 ##### Boosting an LDA 
 
