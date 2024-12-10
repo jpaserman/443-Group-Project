@@ -1533,7 +1533,19 @@ fun_lda_cvc <- function(no_prin_comps = c(2:25),
 lda_cv_time <- Sys.time()
 lda_cv_scores <- fun_lda_cvc(no_prin_comps = c(10:30))
 lda_cv_time <- Sys.time() - lda_cv_time # Time difference of 14.50283 mins
+```
 
+```{r}
+write.csv(lda_cv_scores, file = "predictions_1.3/lda_cv_scores.csv")
+```
+
+```{r}
+lda_cv_scores <- dplyr::select(read.csv(file = "predictions_1.3/lda_cv_scores.csv"),
+                               -X)
+```
+
+
+```{r}
 lda_avg_scores <- lda_cv_scores %>%
   
   group_by(no_pc, threshold) %>%
@@ -1543,10 +1555,7 @@ lda_avg_scores <- lda_cv_scores %>%
             F1 = mean(f1), 
             F1_sd = sd(f1),
             .groups = "keep")
-```
 
-
-```{r}
 ggplot(filter(lda_avg_scores, no_pc >= 15), aes(x = threshold, y = F1, color = as.factor(no_pc))) +
   geom_line() +
   geom_point()
@@ -1620,6 +1629,8 @@ lda_tuned_metrics_table <- data.frame(
 
 print(lda_tuned_metrics_table)
 ```
+
+
 ##### Boosting an LDA 
 
 Not successful, the results of an LDA are too stable and the base classifier is too strong to have an effective improvement from boosting.
