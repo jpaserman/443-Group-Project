@@ -288,6 +288,48 @@ cat("Number of Predictors for Best Lambda:", best_num_predictors, "\n")
 cat("Balanced Accuracy on Test Data:", test_balanced_accuracy, "\n")
 ```
 
+```{r lowest_score_model}
+# Find the lambda with the highest balanced accuracy
+worst_lambda_index <- which.min(custom_scores) #Max balanaced accuracy for the predictions. 
+worst_lambda <- lambdas[worst_lambda_index] # Extracting the best lambda
+worst_balanced_accuracy <- balanced_accuracies[worst_lambda_index] # Taking the best balanced accuracy 
+worst_num_predictors <- num_predictors[worst_lambda_index] # Taking the best number of predictors for the given lambda 
+
+# Fit the final model using the best lambda, in terms of lambda that returned highest bal. accuracy 
+worst_final_model <- glmnet(train_data_matrix, train_labels, alpha = 1, lambda = lambdas[worst_lambda_index], family = "binomial", weights = class_weights) # Lasso on train, with best balanced accuracy
+worst_pred.test <- predict(worst_final_model, newx = test_data_clean_matrix, family ="binomial", type = "response") # Predictions for test data
+worst_pred.test_binary <- ifelse(pred.test > 0.5, 1, 0) # Classification for probabilities, > 0.5 will be 1, and less will be classified as 0 (which is actually-1). 
+worst_confusion_test <- table(Predicted = worst_pred.test_binary, Actual = test_labels) # Confusion matrix 
+worst_test_balanced_accuracy <- calculate_balanced_accuracy(worst_confusion_test) # Balanced accuracy on test data
+
+cat("Worst score Lambda:", worst_lambda, "\n")
+cat("lowest Balanced Accuracy on CV:", worst_balanced_accuracy, "\n")
+cat("Number of Predictors for worst score:", worst_num_predictors, "\n")
+cat("Balanced Accuracy on Test Data:", worst_test_balanced_accuracy, "\n")
+
+```
+```{r worst_lambda_bal_acc}
+# Find the lambda with the highest balanced accuracy
+worst_lambda_index <- which.min(balanced_accuracies) #Max balanaced accuracy for the predictions. 
+worst_lambda <- lambdas[worst_lambda_index] # Extracting the best lambda
+worst_balanced_accuracy <- balanced_accuracies[worst_lambda_index] # Taking the best balanced accuracy 
+worst_num_predictors <- num_predictors[worst_lambda_index] # Taking the best number of predictors for the given lambda 
+
+# Fit the final model using the best lambda, in terms of lambda that returned highest bal. accuracy 
+worst_final_model <- glmnet(train_data_matrix, train_labels, alpha = 1, lambda = lambdas[worst_lambda_index], family = "binomial", weights = class_weights) # Lasso on train, with best balanced accuracy
+worst_pred.test <- predict(worst_final_model, newx = test_data_clean_matrix, family ="binomial", type = "response") # Predictions for test data
+worst_pred.test_binary <- ifelse(pred.test > 0.5, 1, 0) # Classification for probabilities, > 0.5 will be 1, and less will be classified as 0 (which is actually-1). 
+worst_confusion_test <- table(Predicted = worst_pred.test_binary, Actual = test_labels) # Confusion matrix 
+worst_test_balanced_accuracy <- calculate_balanced_accuracy(worst_confusion_test) # Balanced accuracy on test data
+
+cat("Worst score Lambda:", worst_lambda, "\n")
+cat("lowest Balanced Accuracy on CV:", worst_balanced_accuracy, "\n")
+cat("Number of Predictors for worst score:", worst_num_predictors, "\n")
+cat("Balanced Accuracy on Test Data:", worst_test_balanced_accuracy, "\n")
+```
+
+
+
 ```{r lasso_Accuracy}
 lasso_accuracy <- mean(pred.test_binary == lasso_test_data$label)
 cat("Lasso Accuracy:", lasso_accuracy, "\n") # .93125
@@ -743,6 +785,62 @@ elastic_f1_score <- F1_Score(y_pred = elastic_pred.test_binary, y_true = elastic
 cat("F1 Score:", elastic_f1_score, "\n") 
 ```
 
+```{r elastic worst_score}
+# Extract the combination of alpha and lambda that gives the worst score
+worst_score_result <- NULL
+for (alpha in names(results)) {
+  if (is.null(worst_score_result) || results[[alpha]]$custom_score < worst_score_result$custom_score) {
+    worst_score_result <- results[[alpha]]
+  }
+}
+
+cat("Worst Score Alpha:", worst_score_result$alpha, "\n")
+cat("Worst Lambda for Worst Score:", worst_score_result$best_lambda, "\n")
+cat("Balanced Accuracy for Worst Score:", worst_score_result$best_balanced_accuracy, "\n")
+cat("Number of Predictors for Worst Score:", worst_score_result$num_predictors, "\n")
+cat("Custom Score for Worst Score:", worst_score_result$custom_score, "\n")
+
+# Train the final model using the worst alpha and lambda
+elastic_worst_model <- glmnet(elastic_net_train_data_matrix, train_labels, alpha = worst_score_result$alpha, 
+                              lambda = worst_score_result$best_lambda, family = "binomial", weights = class_weights)
+elastic_worst_pred_test <- predict(elastic_worst_model, newx = elastic_net_test_data_clean_matrix, 
+                                   family = "binomial", type = "response")
+elastic_worst_pred_test_binary <- ifelse(elastic_worst_pred_test > 0.5, 1, 0)
+elastic_worst_confusion_test <- table(Predicted = elastic_worst_pred_test_binary, Actual = test_labels)
+elastic_worst_test_balanced_accuracy <- calculate_balanced_accuracy(elastic_worst_confusion_test)
+
+cat("Balanced Accuracy on Test Data with Worst Alpha and Lambda:", elastic_worst_test_balanced_accuracy, "\n")
+```
+```{r elastic worst balanced acc}
+# Extract the combination of alpha and lambda that gave the worst balanced accuracy on the CV
+worst_balanced_accuracy_result <- NULL
+for (alpha in names(results)) {
+  if (is.null(worst_balanced_accuracy_result) || results[[alpha]]$best_balanced_accuracy < worst_balanced_accuracy_result$best_balanced_accuracy) {
+    worst_balanced_accuracy_result <- results[[alpha]]
+  }
+}
+
+cat("Worst Balanced Accuracy Alpha:", worst_balanced_accuracy_result$alpha, "\n")
+cat("Worst Lambda for Worst Balanced Accuracy:", worst_balanced_accuracy_result$best_lambda, "\n")
+cat("Worst Balanced Accuracy on CV:", worst_balanced_accuracy_result$best_balanced_accuracy, "\n")
+cat("Number of Predictors for Worst Balanced Accuracy:", worst_balanced_accuracy_result$num_predictors, "\n")
+cat("Custom Score for Worst Balanced Accuracy:", worst_balanced_accuracy_result$custom_score, "\n")
+
+# Train the final model using the worst balanced accuracy alpha and lambda
+elastic_worst_bal_acc_model <- glmnet(elastic_net_train_data_matrix, train_labels, alpha = worst_balanced_accuracy_result$alpha, 
+                                      lambda = worst_balanced_accuracy_result$best_lambda, family = "binomial", weights = class_weights)
+elastic_worst_bal_acc_pred_test <- predict(elastic_worst_bal_acc_model, newx = elastic_net_test_data_clean_matrix, 
+                                           family = "binomial", type = "response")
+elastic_worst_bal_acc_pred_test_binary <- ifelse(elastic_worst_bal_acc_pred_test > 0.5, 1, 0)
+elastic_worst_bal_acc_confusion_test <- table(Predicted = elastic_worst_bal_acc_pred_test_binary, Actual = test_labels)
+elastic_worst_bal_acc_test_balanced_accuracy <- calculate_balanced_accuracy(elastic_worst_bal_acc_confusion_test)
+
+cat("Balanced Accuracy on Test Data with Worst Balanced Accuracy Alpha and Lambda:", elastic_worst_bal_acc_test_balanced_accuracy, "\n")
+
+
+```
+
+
 #### Linear Elastic Net
 ```{r lin_elastic_net model} 
 # Rename datasets for linear elastic net regression
@@ -839,6 +937,124 @@ cat("Linear Elastic Net Number of Predictors for Best Lambda:", linear_elastic_b
 cat("Linear Elastic Net Balanced Accuracy on Test Data:", linear_elastic_test_balanced_accuracy, "\n")
 
 ```
+
+```{r elastic worst score ba}
+
+```
+```{r elastic_Accuracy}
+elastic_accuracy <- mean(elastic_pred.test_binary == elastic_net_test_data$label)
+cat("Elastic Net Accuracy:", elastic_accuracy, "\n") 
+```
+
+```{r elastic_ROC_AUC}
+elastic_roc <- roc(elastic_net_test_data$label, elastic_pred.test_binary)
+elastic_auc <- auc(elastic_roc)
+cat("Elastic net AUC:", elastic_auc, "\n") #
+plot(elastic_roc, main = "Elastic net ROC Curve") # Make the limits of the axes 0-1
+```
+
+```{r elastic_f1_score}
+elastic_f1_score <- F1_Score(y_pred = elastic_pred.test_binary, y_true = elastic_net_test_data$label, positive = "1")
+cat("F1 Score:", elastic_f1_score, "\n") 
+```
+
+#### Linear Elastic Net
+```{r lin_elastic_net model} 
+# Rename datasets for linear elastic net regression
+linear_elastic_net_train_data <- train_data_2
+linear_elastic_net_test_data <- test_data_2
+
+# Prepare the data
+linear_elastic_net_train_data_matrix <- as.matrix(linear_elastic_net_train_data[, -1])  # Exclude label column
+linear_elastic_net_test_data_clean_matrix <- as.matrix(linear_elastic_net_test_data[, -1])  # Exclude label column
+linear_train_labels <- linear_elastic_net_train_data$label
+linear_test_labels <- linear_elastic_net_test_data$label
+
+# Define a range of alpha values to loop over
+linear_alpha_values <- seq(0.4, 0.8, by = 0.03)
+
+# Initialize a list to store results for each alpha
+linear_results <- list()
+
+# Loop over alpha values
+for (alpha in linear_alpha_values) {
+  cat("Testing alpha =", alpha, "\n")
+  
+  # Perform cross-validation for the current alpha
+  linear_elastic_cv_fit <- cv.glmnet(linear_elastic_net_train_data_matrix, linear_train_labels, 
+                                     alpha = alpha, lambda = grid, nfolds = 5, 
+                                     weights = class_weights)
+  
+  # Extract the lambda values and their corresponding balanced accuracies
+  linear_elastic_lambdas <- linear_elastic_cv_fit$lambda
+  linear_elastic_cv_results <- sapply(linear_elastic_lambdas, function(lambda) {
+    pred.cv <- predict(linear_elastic_cv_fit, newx = linear_elastic_net_train_data_matrix, s = lambda)  # Linear predictions
+    pred.cv_binary <- ifelse(pred.cv > 0, 1, -1)  # Classification threshold for linear predictions
+    confusion <- table(Predicted = pred.cv_binary, Actual = linear_train_labels)
+    balanced_acc <- linear_lasso_calculate_balanced_accuracy(confusion)  # Calculate balanced accuracy
+    num_predictors <- sum(coef(linear_elastic_cv_fit, s = lambda) != 0) - 1  # Number of coefficients
+    custom_score <- balanced_acc - (0.001 * num_predictors)
+    return(c(balanced_acc, num_predictors, custom_score))
+  })
+  
+  linear_elastic_balanced_accuracies <- linear_elastic_cv_results[1, ]
+  linear_elastic_num_predictors <- linear_elastic_cv_results[2, ]
+  linear_custom_scores <- linear_elastic_cv_results[3, ]
+  
+  # Find the lambda with the highest balanced accuracy for this alpha
+  linear_elastic_best_lambda_index <- which.max(linear_custom_scores)
+  linear_elastic_best_lambda <- linear_elastic_lambdas[linear_elastic_best_lambda_index]
+  linear_elastic_best_balanced_accuracy <- linear_elastic_balanced_accuracies[linear_elastic_best_lambda_index]
+  linear_elastic_best_num_predictors <- linear_elastic_num_predictors[linear_elastic_best_lambda_index]
+  linear_elastic_best_custom_score <- linear_custom_scores[linear_elastic_best_lambda_index]
+  
+  # Store results for this alpha
+  linear_results[[as.character(alpha)]] <- list(
+    alpha = alpha,
+    best_lambda = linear_elastic_best_lambda,
+    best_balanced_accuracy = linear_elastic_best_balanced_accuracy,
+    num_predictors = linear_elastic_best_num_predictors,
+    custom_score = linear_elastic_best_custom_score
+  )
+}
+
+# Find the overall best combination of alpha and lambda
+linear_best_result <- NULL
+for (alpha in names(linear_results)) {
+  if (is.null(linear_best_result) || linear_results[[alpha]]$best_balanced_accuracy > linear_best_result$best_balanced_accuracy) {
+    linear_best_result <- linear_results[[alpha]]
+  }
+}
+
+cat("Overall Best Alpha:", linear_best_result$alpha, "\n")
+cat("Best Lambda for Best Alpha:", linear_best_result$best_lambda, "\n")
+cat("Highest Balanced Accuracy:", linear_best_result$best_balanced_accuracy, "\n")
+cat("Number of Predictors for Best Combination:", linear_best_result$num_predictors, "\n")
+cat("Custom Score for Best Combination:", linear_best_result$custom_score, "\n")
+
+# Train the final model using the best alpha and lambda
+linear_elastic_final_model <- glmnet(linear_elastic_net_train_data_matrix, linear_train_labels, 
+                                     alpha = linear_best_result$alpha, 
+                                     lambda = linear_best_result$best_lambda, 
+                                     weights = class_weights)
+
+# Predictions for test data
+linear_elastic_pred_test <- predict(linear_elastic_final_model, newx = linear_elastic_net_test_data_clean_matrix)  # Linear predictions
+linear_elastic_pred_test_binary <- ifelse(linear_elastic_pred_test > 0, 1, -1)  # Classification threshold
+
+# Confusion matrix and balanced accuracy for test data
+linear_elastic_confusion_test <- table(Predicted = linear_elastic_pred_test_binary, 
+                                       Actual = linear_test_labels)
+linear_elastic_test_balanced_accuracy <- linear_lasso_calculate_balanced_accuracy(linear_elastic_confusion_test)
+
+# Output the results
+cat("Linear Elastic Net Best Lambda:", linear_elastic_best_lambda, "\n")
+cat("Linear Elastic Net Highest Balanced Accuracy on CV:", linear_elastic_best_balanced_accuracy, "\n")
+cat("Linear Elastic Net Number of Predictors for Best Lambda:", linear_elastic_best_num_predictors, "\n")
+cat("Linear Elastic Net Balanced Accuracy on Test Data:", linear_elastic_test_balanced_accuracy, "\n")
+
+```
+
 
 ```{r linear_elastic_Accuracy}
 lin_elastic_accuracy <- mean(linear_elastic_pred_test_binary == linear_elastic_net_test_data$label)
