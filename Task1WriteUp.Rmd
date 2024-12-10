@@ -51,49 +51,49 @@ In the following we are evaluating seven different classifiers regarding their c
 
 -   **SVM (Support Vector Machine)**: The SVM works by finding a hyperplane that best separates data into different classes, maximizing the margin between the classes. SVM can also handle non-linear data by using kernel functions to transform the data into higher-dimensional spaces.
 
-| w/o PCA  | Accuracy   | Bal. Accuracy | AUC           | F1         |
-|----------|------------|---------------|---------------|------------|
-| LDA      | 0.94155    | 0.9407        | 0.9407        | **0.9526** |
-| Logistic | 0.6393     | 0.6413        | 0.6596597     | 0.6858     |
-| QDA      | N/A        | N/A           | N/A           | N/A        |
-| k-NN     | 0.7425     | 0.6964        | 0.6963545     | 0.5983     |
-| GBDT     | 0.9068     | 0.8856        | **0.9723815** | 0.9283     |
-| RF       | 0.9352     | 0.9171        | 0.9170923     | 0.9500     |
-| SVM      | **0.9553** | **0.9479**    | 0.9479        | 0.9394     |
+| w/o PCA  | Accuracy   | Bal. Accuracy | AUC        | F1         |
+|----------|------------|---------------|------------|------------|
+| LDA      | 0.9416     | 0.9407        | 0.9407     | **0.9526** |
+| Logistic | 0.6393     | 0.6413        | 0.6597     | 0.6858     |
+| QDA      | N/A        | N/A           | N/A        | N/A        |
+| k-NN     | 0.7425     | 0.6964        | 0.6964     | 0.5983     |
+| GBDT     | 0.9068     | 0.8856        | **0.9724** | 0.9283     |
+| RF       | 0.9352     | 0.9171        | 0.9171     | 0.9500     |
+| SVM      | **0.9553** | **0.9479**    | 0.9479     | 0.9394     |
 
 ## Task 1.2 Summary Table with PCA
 
 In the following we are applying the dimensionality reduction tool PCA (Principal Component Analyis). It transforms data into a new coordinate system, where the axes (principal components) capture the maximum variance in the data. It finds a set of orthogonal directions (principal components) that explain the most variability, with the first component explaining the most, the second the second most, and so on. PCA is often used to reduce the number of features while preserving as much information as possible, simplifying data for analysis or visualization.
 
-| with PCA            | Accuracy       | Bal. Accuracy  | AUC            | F1             |
-|---------------|---------------|---------------|---------------|-------------|
-| LDA                 | 0.93515982     | 0.91756581     | 0.98915349     | 0.90791180     |
-| Logistic            | 0.94885845     | **0.94136394** | **0.99134549** | 0.93086420     |
-| QDA                 | 0.94155251     | 0.92980804     | 0.98758220     | 0.91939547     |
-| k-NN                | 0.91598174     | 0.89409755     | 0.89409755     | 0.87862797     |
-| GDBT                | 0.8666667      | 0.8340888      | 0.9481581      | 0.7988981      |
-| RF                  | 0.93789954     | 0.92545064     | 0.92545064     | 0.91414141     |
-| SVM (Linear Kernel) | 0.94885845     | 0.94089042     | 0.94089042     | 0.93069307     |
-| SVM (Radial Kernel) | **0.94977169** | 0.93973058     | 0.93973058     | **0.93116395** |
+| with PCA            | Accuracy   | Bal. Accuracy | AUC        | F1         |
+|---------------------|------------|---------------|------------|------------|
+| LDA                 | 0.9352     | 0.9176        | 0.9892     | 0.9079     |
+| Logistic            | 0.9489     | **0.9414**    | **0.9913** | 0.9309     |
+| QDA                 | 0.9416     | 0.9298        | 0.9876     | 0.9194     |
+| k-NN                | 0.9160     | 0.8941        | 0.8941     | 0.8786     |
+| GDBT                | 0.8667     | 0.8341        | 0.9482     | 0.7989     |
+| RF                  | 0.9379     | 0.9255        | 0.9255     | 0.9141     |
+| SVM (Linear Kernel) | 0.9489     | 0.9409        | 0.9409     | 0.9307     |
+| SVM (Radial Kernel) | **0.9498** | 0.9397        | 0.9397     | **0.9312** |
 
 ## Task 1.3 Improved Classifiers
 
--   Summary Table: of F1 before and F1 after improvement
+Now we want to focus on improving a selection of classifiers with regards to the F1 score. For this exercise we choose to improve a linear, a logistic and one more complex classifier. Hence, we are improving the LDA, Logistic Regression and Random Forest with given improvement techniques.
 
-|                       | F1 Score before | F1 Score after |
-|-----------------------|-----------------|----------------|
-| QDA/LDA??             |                 |                |
-| Logistic (with Ridge) | 0.6858          |                |
-| RF (with AdaBoost)    | 0.9482          | 0.9629         |
+|                                         | F1 Score before | F1 Score after |
+|-----------------------------------------|-----------------|----------------|
+| LDA (with CV and Hyperparameter tuning) | 0.9079          | 0.9433         |
+| Logistic (with CV and Regularization)   |                 |                |
+| RF (with AdaBoost)                      | 0.9141          | 0.9629         |
 
--   explanation how each classifier was improved and why this improvement method was chosen
+-   **LDA with CV**: We try to improve the LDA with PCA and CV since we have noticed that the accuracy and balanced accuracy and F1 Score of the LDA with PCA dropped compared to only LDA. This seems plausible since we have less components/features which are helping us to linearly separate the data in lower dimensions. That is why we apply Cross Validation to select the best subset to train the data on which helps us to identify the subsets which give us the most information for training the model.
+-   **Logistic CV and Lasso**: Cross-validation involves splitting the data into multiple subsets (folds) and training the model on some subsets while testing it on the remaining subsets. It helps us to assess the performance of logistic regression in a more robust way by reducing overfitting and providing a better estimate of how the model will generalize to the test data as well as unseen data. Additionally, regularization helps us to add a penalty term to the logistic regression's loss function to control the complexity of the model. This discourages overfitting by penalizing large coefficients, leading to simpler models. Lasso regularization can also perform feature selection by driving some coefficients to zero, while Ridge regularization shrinks all coefficients towards zero without eliminating any. Together, both cross-validation and regularization helps to evaluate the model's performance, while regularization improves its generalization ability by preventing overfitting.
+-   **RF with AdaBoost**: We choose to improve the Random Forest with AdaBoost due to the fact that the Random Forest itself is already a bagged classifier, since the Decision Trees are consturcted on bootstrapped (with replacement) data sets and due to majority voting a decision is made which resembles the aggregation part of bagging. Boosting helps here to improve the weak classifiers which in this case are the Random Forests which misclassified the cells. By increasing their weights for the classification problem the classifier is focusing more on improving the flase classifiers, resulting in a better performance of the Random Forest.
 
 ## Task 1.4 Final predict function
 
--   summary and discussion of the results
+Ultimately, after comparing the F1 Scores, we are choosing XXX to implement into our mypredict() function for Task 1.
 
 |             | Accuracy | Bal. Accuracy | AUC | F1 Score |
 |-------------|----------|---------------|-----|----------|
 | mypredict() |          |               |     |          |
-
--   present in one row all performance metrics of chosen prediction function
