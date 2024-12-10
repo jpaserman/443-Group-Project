@@ -46,7 +46,7 @@ lambda_grid <- c(0.001, 0.01,0.03,0.05)
 test_errors <- numeric(length(lambda_grid))
 
 ## Number of Principal Components to train with
-no_prin_comps <- c(2:30)
+no_prin_comps <- c(2:1000)
 
 ## Number of folds for Cross-Validation 
 no_folds <- 5
@@ -960,7 +960,7 @@ test_data_pca <- test_data %>%
 
 test_data_pca <- test_data_pca[,1:10]
 
-test_pca_runtime <- Sys.time() - test_pca_runtime
+test_pca_runtime <- Sys.time() - test_pca_runtime # Time difference of 6.589544 secs
 
 train_data_pca$label <- train_data$label
 
@@ -974,108 +974,109 @@ test_data_pca$label_as_numeric <- test_data$label_as_numeric
 
 #### Linear Discriminant Analysis (LDA) (Imar)
 
-```{r LDA_with_PCA}
-lda_pca_model <- lda(label ~ .-label_as_numeric, data = train_data_pca)
+```{r lda_pca_train}
+lda_pca_fit <- lda(label ~ .-label_as_numeric, data = train_data_pca)
 lda_pca_pred <- predict(lda_pca_model, test_data_pca)
 lda_test_data_labels <- as.factor(test_data_pca$label)
 ```
 
 ```{r lda_pca_confusion}
-lda_pca_confusion <- table(prediction = lda_pca_pred$class, truth = as.factor(test_data_pca$label))
-lda_pca_confusion
+lda_pca_pred <- predict(lda_pca_fit,
+                        test_data_pca)$class
+
+lda_pca_confusion <- table(predicted = lda_pca_pred,
+                           observed = test_data$label)
+
+print(lda_pca_confusion)
 ```
 
-```{r lda_pca_accuracy}
-lda_pca_accuracy <- mean(lda_pca_pred$class == test_data_pca$label)
-cat("Accuracy of LDA with PCA:", lda_pca_accuracy, "\n")
-```
+```{r lda_pca_diagnostics}
+lda_pca_probs <- predict(lda_pca_fit, newdata = test_data_pca, type = "prob")
 
-```{r lda_pca_balanced_accuracy}
+lda_pca_accuracy <- mean(lda_pca_pred == test_data_pca$label)
+
 lda_pca_balanced_accuracy <- fun_calc_balanced_accuracy(lda_pca_confusion,
-                                                        pos_label = "TREG",
-                                                        neg_label = "CD4+T")
-cat("Balanced Accuracy of LDA with PCA:", lda_pca_balanced_accuracy, "\n")
-```
+                                                        pos_label = 'TREG',
+                                                        neg_label = 'CD4+T')
 
-```{r lda_pca_f1_score}
 lda_pca_f1_score <- F1_Score(y_true = test_data_pca$label, 
-                             y_pred = lda_pca_pred$class)
-cat("F1 Score of LDA with PCA:", lda_pca_f1_score, "\n")
+                             y_pred = lda_pca_pred,
+                             positive = "TREG")
+
+lda_pca_roc_curve <- roc(
+  response = test_data_pca$label,
+  predictor = lda_pca_probs$posterior[,'TREG'], 
+  levels = c('CD4+T','TREG'),
+  direction = "<"
+  )
+
+lda_pca_auc <- auc(lda_pca_roc_curve)
+
+lda_pca_misclas <- mean(lda_pca_pred != test_data_pca$label)
+
+plot(lda_pca_roc_curve, col = "red", main = "ROC Curve for lda")
 ```
 
-```{r lda_pca_roc_auc}
-roc_curve_lda_pca <- roc(test_data_pca$label_as_numeric, lda_pca_pred$posterior[,2], levels = c(1, 0), direction = ">")
-plot(roc_curve_lda_pca, col="blue", main="ROC Curve for LDA with PCA")
-lda_pca_auc <- auc(roc_curve_lda_pca)
-cat("AUC of LDA with PCA:", lda_pca_auc, "\n")
-```
-
-```{r lda_pca_misclas}
-lda_pca_misclas <- mean(lda_pca_pred$class != test_data_pca$label)
-cat("Misclassification rate of LDA with PCA:", lda_pca_misclas, "\n")
-```
-
-```{r lda_pca_summary}
+```{r lda_PCA_evaluation}
+# Create a table of the evaluation metrics
 lda_pca_metrics_table <- data.frame(
   Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
-  Value = c(lda_pca_accuracy, lda_pca_balanced_accuracy, lda_pca_f1_score, lda_pca_auc, lda_pca_misclas)
+  lda = c(lda_pca_accuracy, lda_pca_balanced_accuracy, lda_pca_f1_score, lda_pca_auc, lda_pca_misclas)
 )
+
 print(lda_pca_metrics_table)
 ```
 
 #### Logistic classifier (Imar)
 
-```{r log_pca_model}
+```{r log_pca_train}
 log_pca_model <- glm(label ~ . -label_as_numeric, data=train_data_pca, family=binomial)
 log_pca_probs <- predict(log_pca_model, newdata = test_data_pca, type="response")
 log_pca_pred <- ifelse(log_pca_probs > 0.5, "TREG", "CD4+T")
 ```
 
 ```{r log_pca_confusion}
-log_pca_confusion <- table(prediction = log_pca_pred, truth = test_data_pca$label)
+log_pca_confusion <- table(predicted = log_pca_pred,
+                           observed = test_data$label)
+
 print(log_pca_confusion)
 ```
 
-```{r log_pca_accuracy}
+```{r log_pca_diagnostics}
 log_pca_accuracy <- mean(log_pca_pred == test_data_pca$label)
-cat("Accuracy of Logistic Regression with PCA:", log_pca_accuracy, "\n")
-```
 
-```{r log_pca_balanced_accuracy}
 log_pca_balanced_accuracy <- fun_calc_balanced_accuracy(log_pca_confusion,
-                                                        pos_label = "TREG",
-                                                        neg_label = "CD4+T")
-cat("Balanced Accuracy of Logistic Regression with PCA:", log_pca_balanced_accuracy, "\n")
-```
+                                                        pos_label = 'TREG',
+                                                        neg_label = 'CD4+T')
 
-```{r log_pca_f1_score}
-log_pca_f1_score <- F1_Score(y_true = test_data_pca$label, y_pred = log_pca_pred)
-cat("F1 Score of Logistic Regression with PCA:", log_pca_f1_score, "\n")
-```
+log_pca_f1_score <- F1_Score(y_true = test_data_pca$label, 
+                             y_pred = log_pca_pred,
+                             positive = "TREG")
 
-```{r log_pca_roc_auc}
-log_pca_pred_num <- ifelse(log_pca_pred == 'TREG', 1, 0)
+log_pca_roc_curve <- roc(
+  response = test_data_pca$label,
+  predictor = log_pca_probs, 
+  levels = c('CD4+T','TREG'),
+  direction = "<"
+  )
 
 roc_curve_log_pca <- roc(test_data_pca$label_as_numeric,
                          log_pca_pred_num, 
                          levels = c(1, 0),
-                         direction = ">")
-log_pca_auc <- auc(roc_curve_log_pca)
-plot(roc_curve_log_pca, col="blue", main="ROC Curve for Logistic Regression with PCA")
-cat("AUC of Logistic Regression with PCA:", log_pca_auc, "\n")
-```
+log_pca_auc <- auc(log_pca_roc_curve)
 
-```{r log_pca_misclas}
 log_pca_misclas <- mean(log_pca_pred != test_data_pca$label)
-cat("Misclassification rate of Logistic Regression with PCA:", log_pca_misclas, "\n")
+
+plot(log_pca_roc_curve, col = "red", main = "ROC Curve for log")
 ```
 
-```{r Log_PCA_evaluation}
+```{r log_PCA_evaluation}
 # Create a table of the evaluation metrics
 log_pca_metrics_table <- data.frame(
   Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
-  Value = c(log_pca_accuracy, log_pca_balanced_accuracy, log_pca_f1_score, log_pca_auc, log_pca_misclas)
+  log = c(log_pca_accuracy, log_pca_balanced_accuracy, log_pca_f1_score, log_pca_auc, log_pca_misclas)
 )
+
 print(log_pca_metrics_table)
 ```
 
@@ -1160,7 +1161,7 @@ rm(knn_train_X, knn_train_Y, knn_test_X)
 ```
 
 ```{r knn_pca_confusion}
-knn_confusion <- table(predicted = knn_pca_pred,
+knn_pca_confusion <- table(predicted = knn_pca_pred,
                            observed = test_data$label)
 
 print(knn_pca_confusion)
@@ -1222,69 +1223,67 @@ best_trees_pca <- gbm.perf(pca_gbm_model, method = "cv")
 # Measure time after model training
 gbm_end_time <- Sys.time()
 gbm_model_training_time <- gbm_end_time - gbm_start_time #Time difference of 8.224947 secs
-cat("GBM Model training time with PCA:", gbm_model_training_time, "\n")
 
 ```
 
 ```{r gbm_pca_predict}
 # Measure time for predictions
-gbm_start_time_pred <- Sys.time()
+gbm_pred_time <- Sys.time()
 
 # Make predictions on the test set using the best number of trees
-gbm_pred_probs_pca <- predict(pca_gbm_model, newdata = test_data_pca, n.trees = best_trees_pca, type = "response")
-gbm_pred_classes_pca <- ifelse(gbm_pred_probs_pca > 0.5, 1, 0)
+gbm_pca_probs <- predict(pca_gbm_model, newdata = test_data_pca, n.trees = best_trees_pca, type = "response")
+gbm_pca_pred <- ifelse(gbm_pred_probs_pca > 0.5, "TREG", "CD4+T")
 
 # Measure time after predictions
-gbm_end_time_pred <- Sys.time()
-gbm_prediction_time <- gbm_end_time_pred - gbm_start_time_pred
-cat("Prediction time with PCA:", gbm_prediction_time, "\n")
-
+gbm_pred_time <- Sys.time() - gbm_pred_time # Time difference of 0.02414608 secs
 ```
 
 ```{r gbm_pca_confusion}
-# Confusion Matrix
-gbm_confusion_matrix_pca <- table(Predicted = gbm_pred_classes_pca, Actual = test_data_pca$label_as_numeric)
-print(gbm_confusion_matrix_pca)
+gbm_pca_confusion <- table(predicted = gbm_pca_pred,
+                           observed = test_data$label)
+
+print(gbm_pca_confusion)
 ```
 
-```{r gbm_pca_balanced_accuracy}
-# Balanced Accuracy
-gbm_balanced_accuracy_pca <- fun_calc_balanced_accuracy(gbm_confusion_matrix_pca,
-                                                        pos_label = '1',
-                                                        neg_label = '0')
-cat("The balanced accuracy with PCA is", gbm_balanced_accuracy_pca, "\n")
+```{r gbm_pca_diagnostics}
+gbm_pca_accuracy <- mean(gbm_pca_pred == test_data_pca$label)
+
+gbm_pca_balanced_accuracy <- fun_calc_balanced_accuracy(gbm_pca_confusion,
+                                                        pos_label = 'TREG',
+                                                        neg_label = 'CD4+T')
+
+gbm_pca_f1_score <- F1_Score(y_true = test_data_pca$label, 
+                             y_pred = gbm_pca_pred,
+                             positive = "TREG")
+
+gbm_pca_roc_curve <- roc(
+  response = test_data_pca$label,
+  predictor = gbm_pca_probs, 
+  levels = c('CD4+T','TREG'),
+  direction = "<"
+  )
+
+gbm_pca_auc <- auc(gbm_pca_roc_curve)
+
+gbm_pca_misclas <- mean(gbm_pca_pred != test_data_pca$label)
+
+plot(gbm_pca_roc_curve, col = "red", main = "ROC Curve for gbm")
 ```
 
-```{r gbm_pca_misclass}
-# Misclassification Rate
-gbm_misclassification_rate_pca <- mean(gbm_pred_classes_pca != test_data_pca$label_as_numeric)
-cat("Misclassification Rate with PCA:", gbm_misclassification_rate_pca, "\n")
+```{r gbm_PCA_evaluation}
+# Create a table of the evaluation metrics
+gbm_pca_metrics_table <- data.frame(
+  Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
+  gbm = c(gbm_pca_accuracy, gbm_pca_balanced_accuracy, gbm_pca_f1_score, gbm_pca_auc, gbm_pca_misclas)
+)
+
+print(gbm_pca_metrics_table)
 ```
 
-```{r gbm_pca_accuracy}
-# Accuracy
-gbm_accuracy_pca <- mean(gbm_pred_classes_pca == test_data_pca$label_as_numeric)
-cat("Accuracy with PCA:", gbm_accuracy_pca, "\n")
-```
-
-```{r gbm_pca_ROC}
-# ROC and AUC
-gbm_roc_curve_pca <- roc(test_data_pca$label_as_numeric, gbm_pred_probs_pca)
-cat("AUC with PCA:", auc(gbm_roc_curve_pca), "\n")
-plot(gbm_roc_curve_pca, main = "ROC Curve with PCA")
-```
-
-```{r gbm_pca_F1}
-# F1 Score
-gbm_f1_score_pca <- F1_Score(y_pred = gbm_pred_classes_pca,
-                             y_true = test_data_pca$label_as_numeric)
-cat("F1 Score with PCA:", gbm_f1_score_pca, "\n")
-
-```
 #### Random Forest (Imar)
 ```{r rf_pca_train}
 # RF model with PCA data
-start_time_rf_pca <- Sys.time()
+rf_pca_train_time <- Sys.time()
 
 rf_pca_model <- randomForest(label ~ . - label_as_numeric, 
                              data = train_data_pca,
@@ -1292,58 +1291,60 @@ rf_pca_model <- randomForest(label ~ . - label_as_numeric,
                              importance = TRUE, 
                              n.tree = 5000)
 
-end_time_rf_pca <- Sys.time()
-rf_pca_training_time <- end_time_rf_pca - start_time_rf_pca #Time difference of 3.99099 secs
-cat("Random Forest model training time with PCA:", rf_pca_training_time, "\n")
+rf_pca_train_time <- Sys.time() - rf_pca_train_time #Time difference of 3.99099 secs
 ```
 
 ```{r rf_pca_prediction}
 # Predictions with PCA data
-start_time_rf_pred <- Sys.time()
+rf_pca_pred_time <- Sys.time()
 
 rf_pca_pred <- predict(rf_pca_model, newdata = test_data_pca)
 
-end_time_rf_pred <- Sys.time()
-rf_prediction_time <- end_time_rf_pred - start_time_rf_pred
-cat("Random Forest prediction time with PCA:", rf_prediction_time, "\n")
-
+rf_pca_pred_time <- Sys.time() - rf_pca_pred_time # Time difference of 0.072191 secs
 ```
 
-```{r rf_pca_Confusion}
-rf_confusion_matrix_pca <- table(Predicted = rf_pca_pred, Actual = test_data_pca$label)
-print(rf_confusion_matrix_pca)
+```{r rf_pca_confusion}
+rf_pca_confusion <- table(predicted = rf_pca_pred,
+                           observed = test_data$label)
+
+print(rf_pca_confusion)
 ```
 
-```{r rf_pca_balanced_accuracy}
-rf_balanced_accuracy_pca <- fun_calc_balanced_accuracy(rf_confusion_matrix_pca,
-                                                       pos_label = 'TREG',
-                                                       neg_label = 'CD4+T')
+```{r rf_pca_diagnostics}
+rf_pca_accuracy <- mean(rf_pca_pred == test_data_pca$label)
 
-cat("The balanced accuracy with PCA is", rf_balanced_accuracy_pca, "\n")
+rf_pca_balanced_accuracy <- fun_calc_balanced_accuracy(rf_pca_confusion,
+                                                        pos_label = 'TREG',
+                                                        neg_label = 'CD4+T')
+
+rf_pca_f1_score <- F1_Score(y_true = test_data_pca$label, 
+                             y_pred = rf_pca_pred,
+                             positive = "TREG")
+
+rf_pca_pred_num <- ifelse(rf_pca_pred == "TREG", 1, 0)
+
+rf_pca_roc_curve <- roc(
+  response = test_data_pca$label_as_numeric,
+  predictor = rf_pca_pred_num, 
+  levels = c(0, 1),
+  direction = "<"
+  )
+
+rf_pca_auc <- auc(rf_pca_roc_curve)
+
+rf_pca_misclas <- mean(rf_pca_pred != test_data_pca$label)
+
+plot(rf_pca_roc_curve, col = "red", main = "ROC Curve for rf")
 ```
 
-```{r rf_pca_misclass}
-rf_misclassification_rate_pca <- mean(rf_pca_pred != test_data_pca$label)
-cat("Random Forest Misclassification Rate with PCA:", rf_misclassification_rate_pca, "\n")
-```
+```{r rf_PCA_evaluation}
+# Create a table of the evaluation metrics
+rf_pca_metrics_table <- data.frame(
+  Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
+  rf = c(rf_pca_accuracy, rf_pca_balanced_accuracy, rf_pca_f1_score, rf_pca_auc, rf_pca_misclas)
+)
 
-```{r rf_pca_accuracy}
-accuracy_rf_pca <- mean(rf_pca_pred == test_data_pca$label)
-cat("Random Forest Accuracy with PCA:", accuracy_rf_pca, "\n")
-```
-
-```{r rf_pca_ROC}
-roc_rf_pca <- roc(test_data_pca$label_as_numeric,
-                  as.numeric(rf_pca_pred))
-
-cat("Random Forest AUC with PCA:", auc(roc_rf_pca), "\n")
-plot(roc_rf_pca, main = "Random Forest ROC Curve with PCA")
-```
-
-```{r rf_pca_F1}
-# F1 Score
-rf_f1_score_pca <- F1_Score(y_pred = rf_pca_pred, y_true = test_data_pca$label)
-cat("F1 Score with PCA:", rf_f1_score_pca, "\n")
+print(rf_pca_metrics_table)
 ```
 
 #### Support Vector Machine (SVM) (Chi)
@@ -1351,7 +1352,7 @@ cat("F1 Score with PCA:", rf_f1_score_pca, "\n")
 ##### Linear SVM Model
 ```{r svm_linear_model_pca}
 ## K-fold CV for hyperparameter tuning of 'cost' for the training data with a linear kernel
-start_time_svm <- Sys.time()
+svm_train_time <- Sys.time()
 
 tune.out = tune(svm,
                 label ~ . -label_as_numeric,
@@ -1360,8 +1361,7 @@ tune.out = tune(svm,
 
 summary(tune.out)
 
-end_time_svm <- Sys.time()
-svm_training_time <- end_time_svm - start_time_svm # Time difference of 4.748707 secs
+svm_train_time <- Sys.time() - svm_train_time # Time difference of 4.748707 secs
 ```
 
 
@@ -1372,12 +1372,11 @@ summary(bestmod)
 ```
 
 ```{r svm_predictions_pca}
-start_time_svm_pred <-  Sys.time()
+svm_pred_time <-  Sys.time()
 
 svm_pca_pred = predict(bestmod, test_data_pca)
 
-end_time_svm_pred <- Sys.time()
-svm_prediction_time <- end_time_svm_pred - start_time_svm_pred 
+svm_pred_time <-  Sys.time() - svm_pred_time
 # Time difference of 0.01050401 secs
 ```
 
@@ -1401,7 +1400,7 @@ svm_pca_roc <- roc(test_data$label_as_numeric,
                levels = c(0,1),
                direction = "<")
 
-svm_pca_auc <- auc(svm_roc)
+svm_pca_auc <- auc(svm_pca_roc)
 
 plot(svm_pca_roc, main = "SVM ROC Curve") # Make the limits of the axes 0-1
 
@@ -1424,7 +1423,7 @@ print(svm_pca_metrics_table)
 ##### Radial SVM Model
 ```{r svm_radial_pca_model}
 ## K-fold CV for hyperparameter tuning of 'cost' for the training data with a radial basis function (RBF) kernel
-start_time_svm_rad <- Sys.time()
+svm_train_time_rad <- Sys.time()
 
 tune.out_rad = tune(svm,
                     label ~ . -label_as_numeric,
@@ -1434,25 +1433,18 @@ tune.out_rad = tune(svm,
                                   gamma = c(0.00003, 0.0003, 0.003)))
 summary(tune.out_rad)
 
-end_time_svm_rad <- Sys.time()
-svm_training_time_rad <- end_time_svm_rad - start_time_svm_rad
-cat("SVM model training time (radial kernel):", svm_training_time_rad, "\n")
+svm_train_time_rad <- Sys.time() - svm_train_time_rad # Time difference of 42.49734 secs
 
-# Note that a good rule of thumb is to start with a gamma that is (1/p)
-# where p is the number of features in the model. This would result in a value of
-# gamma approximately 0.0003
-
-# Save the model with the cost that results in the lowest cross validation error rate
 bestmod_rad <-  tune.out_rad$best.model
 summary(bestmod_rad)
 ```
 
 ```{r svm_radial_pca_predictions}
-start_time_svm_pred <-  Sys.time()
+svm_pred_time <-  Sys.time()
+
 svm_rad_pca_pred = predict(bestmod_rad, test_data_pca)
 
-end_time_svm_pred <- Sys.time()
-svm_prediction_time <- end_time_svm_pred - start_time_svm_pred #Time difference of 0.01661301 secs
+svm_pred_time <- Sys.time() - svm_pred_time # Time difference of 0.01661301 secs
 ```
 
 ```{r svm_radial_pca_confusion}
