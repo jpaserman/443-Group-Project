@@ -1060,9 +1060,6 @@ log_pca_roc_curve <- roc(
   direction = "<"
   )
 
-roc_curve_log_pca <- roc(test_data_pca$label_as_numeric,
-                         log_pca_pred_num, 
-                         levels = c(1, 0),
 log_pca_auc <- auc(log_pca_roc_curve)
 
 log_pca_misclas <- mean(log_pca_pred != test_data_pca$label)
@@ -1517,11 +1514,11 @@ Train and evaluating three classifiers of our choice with the goal of improving 
 
 #### Identifying the number of Principle Components to use 
 ```{r scree_plot}
-variance_explained <- (task_one_df_pca$sdev)^2 / sum((task_one_df_pca$sdev)^2)
+variance_explained <- (pca_model$sdev)^2 / sum((pca_model$sdev)^2)
 
 scree_data <- data.frame(
-  Component = c(1:100),
-  Variance = variance_explained[1:100]
+  Component = c(1:50),
+  Variance = variance_explained[1:50]
 )
 
 ggplot(scree_data, aes(x = Component, y = Variance)) + 
@@ -1530,7 +1527,7 @@ ggplot(scree_data, aes(x = Component, y = Variance)) +
   labs(title= 'Scree Plot', 
        x = 'Principal Component',
        y = 'Proportion of Variance Explained') +
-  scale_x_continuous(limits = c(0, 100))
+  scale_x_continuous(limits = c(0, 50))
 ```
 
 #### LDA (Chi)
@@ -1539,61 +1536,89 @@ LDA outperforms QDA. Does this imply a linear bayes decision boundary?
 
 ##### Cross-validation (Finding optimal number of Principal Components and tuning threshold)
 
-```{r lda_cv_train}
+```{r}
 lda_cv_time <- Sys.time()
-lda_cv_scores <- data.frame(no_pc = c(),
-                            threshold = c(),
-                            balanced_accuracy = c(),
-                            f1 = c())
-
-thresholds <- seq(0.1, 0.9, 0.1)
-
-set.seed(seed)
-
-fold_indices <- createFolds(train_data$label, k = 10, returnTrain = TRUE)
-
-for (prin_comps in no_prin_comps) {
+fun_lda_cvc <- function(no_prin_comps = c(2:25),
+                        thresholds = seq(0.1, 0.9, 0.1),
+                        no_folds = 5,
+                        seed = 443){
   
-  lda_train <- task_one_df_pca[train_indices, 1:prin_comps] %>%
-    
-    data.frame(., label = train_data$label) # Use the first n_components
+  lda_cv_scores <- data.frame(no_pc = c(),
+                              threshold = c(),
+                              balanced_accuracy = c(),
+                              f1 = c())
   
-  lda_test_X <- task_one_df_pca[-train_indices, 1:prin_comps]
+  set.seed(seed)
+  
+  fold_indices <- createFolds(task_one_df$label, k = no_folds, returnTrain = TRUE)
+  
+  X_df <- task_one_df[, !colnames(task_one_df) %in% c("label", "label_as_numeric")]
+  
+  for (fold in fold_indices) {
+    # For each fold, perform PCA
+    fold_pca_model <- prcomp(X_df[fold,], 
+                             center = TRUE,
+                             scale. = TRUE, 
+                             rank. = max(no_prin_comps))
     
-  for (fold in fold_indices){
-    lda_cv_model <- lda(label ~ ., 
-                        data = lda_train[fold,])
+    # Fold from PCA to be trained and tested
+    fold_train_df <- data.frame(fold_pca_model$x, 
+                               label = task_one_df$label[fold]) 
     
-    lda_cv_probs <- predict(lda_cv_model, 
-                            lda_train[-fold,], 
-                            type = "prob")
+    fold_test_X <- predict(fold_pca_model, X_df[-fold,])
     
-    for (threshold in thresholds){
-      lda_cv_preds <- as.factor(ifelse(lda_cv_probs$posterior[, "TREG"] > threshold,
-                                       "TREG",
-                                       "CD4+T"))
+    fold_test_Y <- task_one_df$label[-fold]
+    
+    for (prin_comps in no_prin_comps){
+      #For each Fold, vary number of PCs used to train LDA 
       
-      cm <- table(lda_cv_preds, lda_train$label[-fold])
+      # Use the first n (prin_comps) components
+      lda_train <- fold_train_df[, c(1:prin_comps, ncol(fold_train_df))]
       
-      balanced_accuracy <- fun_calc_balanced_accuracy(cm, 
-                                                      pos_label = "TREG", 
-                                                      neg_label = "CD4+T")
+      lda_test_X <- fold_test_X[, 1:prin_comps]
       
-      f1 <- F1_Score(y_true = lda_train[-fold,]$label,
-                     y_pred = lda_cv_preds,
-                     positive = "TREG")
+      # Train model on n PCs
+      lda_cv_model <- lda(label ~ ., 
+                          data = lda_train)
       
-      return_df <- data.frame(no_pc = prin_comps,
-                              threshold = threshold,
-                              balanced_accuracy = balanced_accuracy,
-                              f1 = f1)
+      # Predict the probabilities it belongs to a class using model on left out fold 
+      lda_cv_probs <- predict(lda_cv_model, 
+                              data.frame(fold_test_X), 
+                              type = "prob")
       
-      # Store the scores
-      lda_cv_scores <- rbind(lda_cv_scores, return_df)
+      for (threshold in thresholds){
+        #For each fold and each model, vary the threshold that decides class
+        lda_cv_preds <- as.factor(ifelse(lda_cv_probs$posterior[, "TREG"] > threshold,
+                                         "TREG",
+                                         "CD4+T"))
+        
+        #Calculate balanced accuracy and f1
+        cm <- table(lda_cv_preds, fold_test_Y)
+        
+        balanced_accuracy <- fun_calc_balanced_accuracy(cm, 
+                                                        pos_label = "TREG", 
+                                                        neg_label = "CD4+T")
+        
+        f1 <- F1_Score(y_true = fold_test_Y,
+                       y_pred = lda_cv_preds,
+                       positive = "TREG")
+        
+        # Store the scores
+        return_df <- data.frame(no_pc = prin_comps,
+                                threshold = threshold,
+                                balanced_accuracy = balanced_accuracy,
+                                f1 = f1)
+        
+        lda_cv_scores <- rbind(lda_cv_scores, return_df)
+      }
     }
   }
+  return(lda_cv_scores)
 }
-lda_cv_time <- Sys.time() - lda_cv_time # Time difference of 11.68833 secs
+
+lda_cv_time <- Sys.time()
+lda_cv_scores <- fun_lda_cvc(no_prin_comps = c(10:30))
+lda_cv_time <- Sys.time() - lda_cv_time
 
 lda_avg_scores <- lda_cv_scores %>%
   
@@ -1604,33 +1629,38 @@ lda_avg_scores <- lda_cv_scores %>%
             F1 = mean(f1), 
             F1_sd = sd(f1),
             .groups = "keep")
-
 ```
 
+
 ```{r}
-ggplot(lda_avg_scores, aes(x = threshold, y = F1, color = as.factor(no_pc))) +
+ggplot(filter(lda_avg_scores, no_pc >= 15), aes(x = threshold, y = F1, color = as.factor(no_pc))) +
   geom_line() +
   geom_point()
 ```
 
 ```{r}
-lda_improved_models <- lda_avg_scores[order(lda_avg_scores$F1,
-                                                 decreasing = TRUE),]
+ggplot(filter(lda_avg_scores, threshold == 0.2), aes(x = no_pc, y = F1)) +
+  geom_line() +
+  geom_point()
+```
 
-lda_best_no_pc <- 28 #as.integer(lda_improved_models[1, 'no_pc'])
+```{r}
+# lda_improved_models <- lda_avg_scores[order(lda_avg_scores$F1,
+#                                                  decreasing = TRUE),]
 
-lda_tuned_training <- task_one_df_pca[train_indices, 1:lda_best_no_pc] %>%
+lda_best_no_pc <- 25 #as.integer(lda_improved_models[1, 'no_pc'])
+
+lda_tuned_training <- pca_model$x[, 1:lda_best_no_pc] %>%
   
   data.frame(., label = train_data$label)
 
-test_lda_tuned <- task_one_df_pca[-train_indices, 1:lda_best_no_pc]
-
-data_pca <- data.frame(X_pca, label = train_data_pca$label)
+test_lda_tuned <- predict(pca_model, test_data)[, 1:lda_best_no_pc]
 
 lda_tuned_model <- lda(label ~ ., 
-                          lda_tuned_training)
+                       lda_tuned_training)
 
-lda_tuned_prob <- predict(lda_tuned_model, newdata = test_lda_tuned)$posterior[, "TREG"]
+lda_tuned_prob <- predict(lda_tuned_model, 
+                          newdata = data.frame(test_lda_tuned))$posterior[, "TREG"]
 
 lda_tuned_pred <- ifelse(lda_tuned_prob > 0.2, "TREG", "CD4+T")
 ```
@@ -1643,8 +1673,6 @@ print(lda_tuned_confusion)
 ```
 
 ```{r lda_tuned_diagnostics}
-lda_tuned_probs <- predict(lda_tuned_model, newdata = test_lda_tuned, type = "prob")
-
 lda_tuned_accuracy <- mean(lda_tuned_pred == test_data_pca$label)
 
 lda_tuned_balanced_accuracy <- fun_calc_balanced_accuracy(lda_tuned_confusion,
@@ -1666,7 +1694,7 @@ lda_tuned_auc <- auc(lda_tuned_roc_curve)
 
 lda_tuned_misclas <- mean(lda_tuned_pred != test_data_pca$label)
 
-plot(lda_tuned_roc_curve, col = "red", main = "ROC Curve for QDA")
+plot(lda_tuned_roc_curve, col = "red", main = "ROC Curve for LDA")
 ```
 
 ```{r lda_tuned_evaluation}
@@ -1736,135 +1764,6 @@ lda_boosted_pred <- sapply(c(1:3),
                              
                              return(weighted_vote)
                            })
-```
-
-
-#### Logistic Regression (Chi - only using graphs, can be deleted??)
-
-```{r}
-logreg_cv_time <- Sys.time()
-logreg_cv_scores <- data.frame(no_pc = c(),
-                        alpha = c(),
-                        lambda = c(),
-                        accuracy = c(),
-                        f1 = c())
-
-for (prin_comps in no_prin_comps) {
-  
-  set.seed(seed)
-  
-  X_pca <- train_data_pca[, 1:prin_comps]  # Use the first n_components
-  
-  # Combine PCA-transformed data with the target
-  data_pca <- data.frame(X_pca, label = task_one_df$label)
-  
-  # Perform LDA with 5-fold cross-validation
-  train_control <- trainControl(method = "cv", 
-                                number = no_folds,
-                                summaryFunction = cv_f1_score)
-  
-  logistic_regression_model <- train(label ~ ., 
-                                     data = data_pca, 
-                                     method = "glmnet", 
-                                     trControl = train_control,
-                                     tuneGrid = expand.grid(
-                                       alpha = c(0, 0.5, 1),
-                                       lambda = c(0.001,
-                                                  0.01, 0.02,
-                                                  0.05, 0.1)
-                                     ))
-  
-  model_result <- logistic_regression_model$results
-    
-  return_df <- data.frame(no_pc = c(rep(prin_comps, length(model_result$alpha))),
-                       alpha = c(model_result$alpha),
-                       lambda = c(model_result$lambda),
-                       accuracy = c(model_result$Accuracy),
-                       f1 = c(model_result$F1))  
-  
-  # Store the cross-validation accuracy
-  logreg_cv_scores <- rbind(logreg_cv_scores, scores)
-}
-
-logreg_cv_time <- Sys.time() - logreg_cv_time # Time difference of 3.394877 mins
-```
-
-```{r}
-logreg_improved_models <- logreg_cv_scores[order(logreg_cv_scores$f1, 
-                                                 decreasing = TRUE),]
-
-logreg_improved_models
-```
-
-```{r}
-graph_cv <- logreg_cv_scores %>% filter(no_pc == 37)
-
-ggplot(graph_cv, aes(x = alpha, y = lambda, fill = f1, labels = f1)) +
-
-  geom_tile() + 
-  
-  scale_fill_gradient(low = 'white', high = 'blue', limits = c(0.94,0.95)) + 
-  
-  geom_text(aes(label = round(f1, 5)), color = 'black', size = 3)
-  
-# alpha=1 for Lasso, alpha=0 for Ridge, or between 0 and 1 for Elastic Net
-```
-
-```{r}
-graph_cv <- logreg_cv_scores %>% filter(alpha == 1, f1 > 0)
-
-ggplot(graph_cv, aes(x = lambda, y = f1, colour = as.factor(no_pc))) +
-
-  geom_line() + 
-  
-  geom_text(aes(label = round(f1, 5)), color = 'black', size = 3)
-  
-# alpha=1 for Lasso, alpha=0 for Ridge, or between 0 and 1 for Elastic Net
-```
-
-
-#### Logistic Regression with Ridge Regularisation (Imar)
-
-```{r}
-logreg_start_time <- Sys.time()
-
-# Prepare the input data
-x_train_log_regularized <- as.matrix(train_data[, setdiff(names(train_data), "label")])
-y_train_log_regularized <- train_data$label_as_numeric
-
-# Fit a regularized logistic regression model
-logreg_fit_regularized <- glmnet(x_train_log_regularized, y_train_log_regularized, family = "binomial", alpha = 0) 
-# alpha=1 for Lasso, alpha=0 for Ridge, or between 0 and 1 for Elastic Net
-
-logreg_run_time <- Sys.time() - logreg_start_time # Time difference of 16.91733 secs
-
-# Make predictions on the test data
-x_test_log_regularized <- as.matrix(test_data[, setdiff(names(test_data), "label")])
-logreg_probs_regularized <- predict(logreg_fit_regularized, newx = x_test_log_regularized, type = "response", s = 0.1)  # s = 0.1 is the regularization parameter
-
-logreg_pred_ridge <- ifelse(logreg_probs_regularized > 0.5, 'TREG', 'CD4+T')
-```
-
-```{r logreg_ridge_save, include = FALSE}
-write.csv(logreg_pred_ridge, file = "predictions_1.3/logreg_ridge.csv", row.names = TRUE)
-```
-
-```{r log_ridge_load, include = FALSE}
-logreg_pred_ridge <- read.csv("predictions_1.3/logreg_ridge.csv") %>% 
-  
-  dplyr::select(s1)
-
-logreg_pred_ridge <- logreg_pred_ridge[,'s1']
-```
-
-```{r}
-log_ridge_confusion <- table(prediction = logreg_pred_ridge, truth = test_data$label)
-log_ridge_confusion
-```
-
-```{r log_pca_f1_score}
-log_ridge_f1_score <- F1_Score(y_true = test_data$label, y_pred = logreg_pred_ridge)
-cat("F1 Score of Logistic Regression with Ridge Regularization:", log_ridge_f1_score, "\n")
 ```
 
 #### Logistic Regression with Ridge Regularisation and Cross Validation (Chi)
