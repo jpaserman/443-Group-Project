@@ -1532,7 +1532,7 @@ fun_lda_cvc <- function(no_prin_comps = c(2:25),
 
 lda_cv_time <- Sys.time()
 lda_cv_scores <- fun_lda_cvc(no_prin_comps = c(10:30))
-lda_cv_time <- Sys.time() - lda_cv_time
+lda_cv_time <- Sys.time() - lda_cv_time # Time difference of 14.50283 mins
 
 lda_avg_scores <- lda_cv_scores %>%
   
