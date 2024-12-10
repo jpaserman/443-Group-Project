@@ -6,6 +6,8 @@ output:
 date: "2024-11-12"
 ---
 
+## T1: Setup
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 options(warn=-1)
@@ -49,8 +51,13 @@ no_prin_comps <- c(2:30)
 ## Number of folds for Cross-Validation 
 no_folds <- 5
 
-## SVM Bootstraps
-no_bootstraps <- c(10, 25, 50)
+## Threshold tuning
+thresholds <- seq(0.1, 0.9, 0.1)
+
+## Logistic Ridge/Lasso Tuning
+lambda_tuning = c(10^seq(-4, 1, 1))
+
+
 ```
 
 ```{r load_packages, include=FALSE}
@@ -63,7 +70,7 @@ for (package in packages){
 }
 ```
 
-# Task 1: binary classification
+## T1: Binary classification
 
 ```{r train_test_split}
 set.seed(seed)
@@ -83,7 +90,8 @@ train_data <- task_one_df[train_indices,]
 test_data <- task_one_df[-train_indices,]
 ```
 
-## Functions 
+## T1: Functions 
+
 ```{r functions}
 fun_calc_balanced_accuracy <- function(confusion_matrix, pos_label, neg_label){
   tp <- confusion_matrix[pos_label, pos_label]
@@ -97,29 +105,24 @@ fun_calc_balanced_accuracy <- function(confusion_matrix, pos_label, neg_label){
 }
 
 cv_f1_score <- function(data, lev = NULL, model = NULL) {
-  # Calculate confusion matrix
-  cm <- table(data$pred, data$obs)
   
-  tp <- cm["TREG", "TREG"]
-  fp <- cm["TREG", "CD4+T"]
-  fn <- cm["CD4+T", "TREG"]
+  precision <- posPredValue(data$pred, data$obs, positive = "TREG")
   
-  precision <- tp / (tp + fp)
+  recall <- sensitivity(data$pred, data$obs, positive = "TREG")
   
-  recall <- tp / (tp + fn)
-  
-  # Extract precision, recall, and F1-score
-  f1 <- 2 * (precision * recall) / (precision + recall)
+  F1 <- ifelse((precision + recall) == 0, 
+               0, 
+               2 * precision * recall / (precision + recall))
   
   accuracy <- mean(data$pred == data$obs)
-  
   # Return a named vector
-  c(Accuracy = accuracy, F1 = f1)
+  c(Accuracy = accuracy, F1 = F1)
 }
+
 ```
 
 
-## T1.1: exploratory data analysis and summary statistics (Peter?)
+## T1.1: Exploratory data analysis and summary statistics (Peter?)
 
 ```{r EDA}
 dim(task_one_df)  # The data has 5471 observations and 4125 variables-- 4124 originally, 1 added (label)
@@ -198,7 +201,7 @@ for (var in top_3_abs_diff$genes) {
 
 ```
 
-## T1.2: training and evaluating on various classifiers
+## T1.2: Training and evaluating various classifiers
 
 ### Without PCA
 
@@ -216,7 +219,6 @@ lda_pred <- predict(lda_fit, test_data)$class
 ```{r lda_save, include = FALSE}
 write.csv(lda_pred, file = "predictions_1.2/lda_predictions.csv", row.names = TRUE)
 ```
-
 
 ```{r lda_load, include = FALSE}
 lda_pred <- read.csv("predictions_1.2/lda_predictions.csv") %>% 
@@ -287,9 +289,9 @@ logreg_pred <- ifelse(logreg_probs > 0.5, 'TREG', 'CD4+T')
 ```
 
 ```{r logreg_save, include = FALSE}
+write.csv(logreg_probs, file = "predictions_1.2/logreg_probabilities.csv", row.names = TRUE)
 write.csv(logreg_pred, file = "predictions_1.2/logreg_predictions.csv", row.names = TRUE)
 ```
-
 
 ```{r logreg_load, include = FALSE}
 logreg_pred <- read.csv("predictions_1.2/logreg_predictions.csv") %>% 
@@ -297,6 +299,12 @@ logreg_pred <- read.csv("predictions_1.2/logreg_predictions.csv") %>%
   dplyr::select(x)
 
 logreg_pred <- logreg_pred[,'x']
+
+logreg_probs <- read.csv("predictions_1.2/logreg_probabilities.csv") %>% 
+  
+  dplyr::select(x)
+
+logreg_probs <- logreg_probs[,'x']
 ```
 
 ```{r logreg_confusion}
@@ -394,6 +402,8 @@ The current dimensionality of the data is too high for a QDA classifier. During 
 #### Nearest Neighbor Classifier (k-NN) (Chi)
 
 ```{r kNN_train, eval = FALSE}
+set.seed(seed)
+
 knn_train_X <- train_data %>% 
   dplyr::select(-label, -label_as_numeric)
 
@@ -403,10 +413,10 @@ knn_test_X <- test_data %>%
   dplyr::select(-label, -label_as_numeric)
 
 knn_start_time <- Sys.time()
-knn_pred <- sapply(kk_vector,
-                   function(k)
-                     {knn(train = knn_train_X, test = knn_test_X, cl = knn_train_Y, k = k)}
-                   )
+knn_pred <- knn(train = knn_train_X, 
+                test = knn_test_X, 
+                cl = knn_train_Y,
+                k = 8)
 knn_end_time <- Sys.time()
 
 knn_train_runtime <- knn_end_time - knn_start_time
@@ -424,85 +434,50 @@ write.csv(knn_pred, file = "knn_predictions.csv", row.names = TRUE)
 knn_pred <- read.csv("knn_predictions.csv") %>% 
   dplyr::select(-X)
 
-## CAUTION: currently hard-coded numbers here. To be changed (Chi)
-colnames(knn_pred) <- paste0("k=", 1:10)
-## CAUTION: currently hard-coded numbers here. To be changed (Chi)
+knn_pred <- knn_pred[, 'x']
 ```
 
-```{r kNN_Confusion}
-for (i in kk_vector){
-  print(paste("k =", i))
-  print(table(predicted = knn_pred[,i], 
-              observed = test_data$label))
-}
+```{r knn_pca_confusion}
+knn_confusion <- table(predicted = knn_pred,
+                           observed = test_data$label)
+
+print(knn_confusion)
 ```
 
-```{r kNN_Misclass}
-knn_misclas = c(rep(0,length(kk_vector)))
+```{r knn_diagnostics}
+knn_accuracy <- mean(knn_pred == test_data_pca$label)
 
-for (i in kk_vector){
-  knn_misclas[i] = mean(knn_pred[,i] != test_data$label)
-}
-plot(knn_misclas, type = "l")
-```
+knn_balanced_accuracy <- fun_calc_balanced_accuracy(knn_confusion,
+                                                        pos_label = 'TREG',
+                                                        neg_label = 'CD4+T')
 
-```{r kNN_ROC}
-knn_pred_numeric <- ifelse(knn_pred == "TREG", 1, 0)
+knn_f1_score <- F1_Score(y_true = test_data_pca$label, 
+                             y_pred = knn_pred,
+                             positive = "TREG")
 
-knn_roc_curves <- data.frame()
-
-knn_auc <- data.frame()
-
-for (kk in 1:ncol(knn_pred)) {
-  roc_curve <- roc(
-    response = test_data$label_as_numeric, 
-    predictor = knn_pred_numeric[,kk],
-    levels = c(0,1),
-    direction = "<"
-    )
-  
-  roc_curve_data <- data.frame(
-    k = kk,
-    FPR = 1 - roc_curve$specificities,
-    TPR = roc_curve$sensitivities
-    )
-  
-  auc_data <- data.frame(
-    k = kk,
-    AUC = roc_curve$auc
-    )
-  
-  knn_roc_curves <- rbind(knn_roc_curves, roc_curve_data)
-  
-  knn_auc <- rbind(knn_auc, auc_data)
-}
-
-knn_roc_curves$k <- as.factor(knn_roc_curves$k)
-
-ggplot(knn_roc_curves, aes(x = FPR, y = TPR, colour = k)) + 
-  geom_line(linewidth = 1) +
-  labs(
-    title = "ROC Curves for k-NN (k = 1 to 10)",
-    x = "False Positive Rate (FPR)",
-    y = "True Positive Rate (TPR)",
-    color = "k"
+knn_roc_curve <- roc(
+  response = test_data_pca$label,
+  predictor = as.numeric(knn_pred), 
+  levels = c('CD4+T','TREG'),
+  direction = "<"
   )
 
-ggplot(knn_auc, aes(x = k, y = AUC)) + 
-  geom_line(linewidth = 1) +
-  labs(
-    title = "ROC AUCs for k-NN (k = 1 to 10)",
-    x = "k",
-    y = "ROC AUC"
-  )
+knn_auc <- auc(knn_roc_curve)
+
+knn_misclas <- mean(knn_pred != test_data_pca$label)
+
+plot(knn_roc_curve, col = "red", main = "ROC Curve for QDA")
 ```
 
-```{r knn_TBD}
-knn_accuracy <- "n/a"
-knn_balanced_accuracy <- "n/a"
-knn_f1_score <- "n/a"
-```
+```{r knn_evaluation}
+# Create a table of the evaluation metrics
+knn_metrics_table <- data.frame(
+  Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
+  kNN = c(knn_accuracy, knn_balanced_accuracy, knn_f1_score, knn_auc, knn_misclas)
+)
 
+print(knn_metrics_table)
+```
 
 #### Gradient Boosting Decision Trees (GBDT) (Imar)
 
@@ -600,11 +575,8 @@ cat("Prediction time:", gbm_prediction_time, "\n")
 ```
 
 ```{r gbm_save, include = FALSE}
-write.csv(gbm_pred_classes, 
-          file = "predictions_1.2/gbm_predictions.csv",
-          row.names = TRUE)
+write.csv(gbm_pred_classes, file = "predictions_1.2/gbm_predictions.csv", row.names = TRUE)
 ```
-
 
 ```{r gbm_load, include = FALSE}
 gbm_pred_classes <- read.csv("predictions_1.2/gbm_predictions.csv") %>% 
@@ -674,11 +646,8 @@ cat("Random Forest prediction time:", rf_prediction_time, "\n")
 ```
 
 ```{r rf_save, include = FALSE}
-write.csv(yhat.rf, 
-          file = "predictions_1.2/rf_predictions.csv",
-          row.names = TRUE)
+write.csv(yhat.rf, file = "predictions_1.2/rf_predictions.csv", row.names = TRUE)
 ```
-
 
 ```{r rf_load, include = FALSE}
 yhat.rf <- read.csv("predictions_1.2/rf_predictions.csv") %>% 
@@ -709,7 +678,8 @@ cat("Random Forest Accuracy:", rf_accuracy, "\n")
 ```
 
 ```{r rf_roc_auc}
-roc_rf <- roc(test_data$label, as.numeric(yhat.rf))
+yhat.rf_numeric <- ifelse(yhat.rf == "CD4+T", 0, ifelse(yhat.rf == "TREG", 1, NA))
+roc_rf <- roc(test_data$label, yhat.rf_numeric)
 rf_auc <- auc(roc_rf)
 cat("Random Forest AUC:", rf_auc, "\n")
 plot(roc_rf, main = "Random Forest ROC Curve")
@@ -741,8 +711,7 @@ tune.out = tune(svm,
 summary(tune.out)
 
 end_time_svm <- Sys.time()
-svm_training_time <- end_time_svm - start_time_svm
-cat("SVM model training time:", svm_training_time, "\n") # 1.18 hrs (~ 1hr & 10 min)
+svm_training_time <- end_time_svm - start_time_svm # 1.18 hrs (~ 1hr & 10 min)
 ```
 
 ```{r svm_linear_tuned_model}
@@ -776,37 +745,44 @@ yhat.svm <- read.csv("predictions_1.2/svm_predictions.csv") %>%
 yhat.svm <- yhat.svm[,'x']
 ```
 
-```{r svm_Confusion}
-svm_confusion_matrix <- table(predict = yhat.svm, truth = test_data$label)
+```{r svm_confusion}
+svm_confusion_matrix <- table(predict = yhat.svm, 
+                              truth = test_data$label)
 print(svm_confusion_matrix)
-print(svm_confusion_matrix[2,2])
+```
+
+```{r svm_diagnostics}
 svm_balanced_accuracy <- fun_calc_balanced_accuracy(svm_confusion_matrix,
                                                     pos_label = "TREG",
                                                     neg_label = "CD4+T")
 
-cat("The balanced accuracy is", svm_balanced_accuracy, "\n") # 0.9479
-```
-
-```{r svm_Misclass}
 svm_misclass <- mean(yhat.svm != test_data$label)
-cat("SVM Misclassification Rate:", svm_misclass, "\n") # 0.0447
-```
 
-```{r svm_Accuracy}
 svm_accuracy <- mean(yhat.svm == test_data$label)
-cat("SVM Accuracy:", svm_accuracy, "\n") # 0.9553
-```
 
-```{r svm_ROC_AUC}
-svm_roc <- roc(test_data$label, as.numeric(yhat.svm))
+svm_roc <- roc(test_data$label, 
+               as.numeric(yhat.svm),
+               levels = c("CD4+T", "TREG"),
+               direction = "<")
+
 svm_auc <- auc(svm_roc)
-cat("SVM AUC:", svm_auc, "\n")
+
 plot(svm_roc, main = "SVM ROC Curve") # Make the limits of the axes 0-1
+
+svm_f1_score <- F1_Score(y_pred = yhat.svm, 
+                         y_true = test_data$label,
+                         positive = 'TREG')
+
 ```
 
-```{r svm_f1_score}
-svm_f1_score <- F1_Score(y_pred = yhat.svm, y_true = test_data$label)
-cat("F1 Score:", svm_f1_score, "\n") # 0.9645
+```{r svm_evaluation}
+# Create a table of the evaluation metrics
+svm_metrics_table <- data.frame(
+  Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
+  SVM_Linear = c(svm_accuracy, svm_balanced_accuracy, svm_f1_score, svm_auc, svm_misclass)
+)
+
+print(svm_metrics_table)
 ```
 
 ##### Radial SVM Model
@@ -958,7 +934,6 @@ pca_runtime <- pca_end - pca_start # Time difference of 4.244169 mins
 ```{r pca_save, eval = FALSE}
 write.csv(task_one_df_pca$x, file = "predictions_1.2/task_one_df_pca.csv", row.names = TRUE)
 ```
-
 
 ```{r logreg_load, include = FALSE}
 task_one_df_pca <- read.csv("predictions_1.2/task_one_df_pca.csv") %>% 
@@ -1155,19 +1130,19 @@ print(qda_pca_metrics_table)
 #### Nearest Neighbor Classifier (k-NN) (Chi)
 
 ```{r kNN_train, eval = FALSE}
-knn_train_X <- train_data_pca %>% 
+knn_train_X <- train_data_pca %>%
   dplyr::select(-label, -label_as_numeric)
 
 knn_train_Y <- train_data_pca$label
 
-knn_test_X <- test_data_pca %>% 
+knn_test_X <- test_data_pca %>%
   dplyr::select(-label, -label_as_numeric)
 
 knn_start_time <- Sys.time()
 knn_pca_pred <- knn(train = knn_train_X, 
                     test = knn_test_X, 
                     cl = knn_train_Y, 
-                    k = 5)
+                    k = 8)
 
 knn_end_time <- Sys.time()
 
@@ -1176,34 +1151,34 @@ knn_train_runtime <- knn_end_time - knn_start_time # Time difference of 0.352587
 rm(knn_train_X, knn_train_Y, knn_test_X)
 ```
 
-```{r kNN_Confusion}
-knn_pca_confusion <- table(predicted = knn_pca_pred,
+```{r knn_pca_confusion}
+knn_confusion <- table(predicted = knn_pca_pred,
                            observed = test_data$label)
 
-knn_pca_confusion
+print(knn_pca_confusion)
 ```
+
 ```{r knn_pca_diagnostics}
-knn_pred_numeric <- ifelse(knn_pca_pred == "TREG", 1, 0)
-
-knn_pca_misclass = mean(knn_pca_pred != test_data$label)
-
-knn_pca_accuracy <- mean(knn_pca_pred == test_data$label)
-
-knn_pca_roc_curve <- roc(response = test_data$label_as_numeric, 
-                 predictor = knn_pred_numeric,
-                 levels = c(1, 0),
-                 direction = ">"
-                 )
-
-knn_pca_auc = knn_pca_roc_curve$auc
+knn_pca_accuracy <- mean(knn_pca_pred == test_data_pca$label)
 
 knn_pca_balanced_accuracy <- fun_calc_balanced_accuracy(knn_pca_confusion,
                                                         pos_label = 'TREG',
                                                         neg_label = 'CD4+T')
 
-knn_pca_f1_score <- F1_Score(y_true = test_data$label, 
+knn_pca_f1_score <- F1_Score(y_true = test_data_pca$label, 
                              y_pred = knn_pca_pred,
                              positive = "TREG")
+
+knn_pca_roc_curve <- roc(
+  response = test_data_pca$label,
+  predictor = as.numeric(knn_pca_pred), 
+  levels = c('CD4+T','TREG'),
+  direction = "<"
+  )
+
+knn_pca_auc <- auc(knn_pca_roc_curve)
+
+knn_pca_misclas <- mean(knn_pca_pred != test_data_pca$label)
 
 plot(knn_pca_roc_curve, col = "red", main = "ROC Curve for QDA")
 ```
@@ -1212,12 +1187,10 @@ plot(knn_pca_roc_curve, col = "red", main = "ROC Curve for QDA")
 # Create a table of the evaluation metrics
 knn_pca_metrics_table <- data.frame(
   Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
-  kNN = c(knn_pca_accuracy, knn_pca_balanced_accuracy, knn_pca_f1_score, knn_pca_auc, knn_pca_misclass)
+  kNN = c(knn_pca_accuracy, knn_pca_balanced_accuracy, knn_pca_f1_score, knn_pca_auc, knn_pca_misclas)
 )
 
 print(knn_pca_metrics_table)
-
-print(left_join(knn_pca_metrics_table, qda_pca_metrics_table, by = "Metric"))
 ```
 
 #### Gradient Boosting Decision Trees (GBDT) (Imar)
@@ -1282,7 +1255,7 @@ cat("Misclassification Rate with PCA:", gbm_misclassification_rate_pca, "\n")
 
 ```{r gbm_pca_accuracy}
 # Accuracy
-gbm_accuracy_pca <- mean(gbm_pred_classes_pca == gbm_test_data_pca$label_as_numeric)
+gbm_accuracy_pca <- mean(gbm_pred_classes_pca == test_data_pca$label_as_numeric)
 cat("Accuracy with PCA:", gbm_accuracy_pca, "\n")
 ```
 
@@ -1560,60 +1533,213 @@ ggplot(scree_data, aes(x = Component, y = Variance)) +
   scale_x_continuous(limits = c(0, 100))
 ```
 
-#### LDA/QDA? - improve through PCA and CV (Chi)
+#### LDA (Chi)
 
 LDA outperforms QDA. Does this imply a linear bayes decision boundary?   
 
-```{r}
+##### Cross-validation (Finding optimal number of Principal Components and tuning threshold)
+
+```{r lda_cv_train}
 lda_cv_time <- Sys.time()
 lda_cv_scores <- data.frame(no_pc = c(),
-                   accuracy = c(),
-                   f1 = c())
+                            threshold = c(),
+                            balanced_accuracy = c(),
+                            f1 = c())
+
+thresholds <- seq(0.1, 0.9, 0.1)
+
+set.seed(seed)
+
+fold_indices <- createFolds(train_data$label, k = 10, returnTrain = TRUE)
 
 for (prin_comps in no_prin_comps) {
   
-  set.seed(seed)
+  lda_train <- task_one_df_pca[train_indices, 1:prin_comps] %>%
+    
+    data.frame(., label = train_data$label) # Use the first n_components
   
-  X_pca <- task_one_df_pca[, 1:prin_comps]  # Use the first n_components
-  
-  # Combine PCA-transformed data with the target
-  data_pca <- data.frame(X_pca, label = task_one_df$label)
-  
-  # Perform LDA with 5-fold cross-validation
-  train_control <- trainControl(method = "cv", 
-                                number = no_folds,
-                                summaryFunction = cv_f1_score)
-  
-  lda_model <- train(label ~ ., 
-                     data = data_pca, 
-                     method = "lda", 
-                     trControl = train_control)
-  
-  model_result <- lda_model$result
-  
-  return_df <- data.frame(no_pc = c(rep(prin_comps, length(model_result$F1))),
-                              accuracy = c(model_result$Accuracy),
-                              f1 = c(model_result$F1)
-                              )
-  
-  # Store the cross-validation accuracy
-  lda_cv_scores <- rbind(lda_cv_scores, return_df)
+  lda_test_X <- task_one_df_pca[-train_indices, 1:prin_comps]
+    
+  for (fold in fold_indices){
+    lda_cv_model <- lda(label ~ ., 
+                        data = lda_train[fold,])
+    
+    lda_cv_probs <- predict(lda_cv_model, 
+                            lda_train[-fold,], 
+                            type = "prob")
+    
+    for (threshold in thresholds){
+      lda_cv_preds <- as.factor(ifelse(lda_cv_probs$posterior[, "TREG"] > threshold,
+                                       "TREG",
+                                       "CD4+T"))
+      
+      cm <- table(lda_cv_preds, lda_train$label[-fold])
+      
+      balanced_accuracy <- fun_calc_balanced_accuracy(cm, 
+                                                      pos_label = "TREG", 
+                                                      neg_label = "CD4+T")
+      
+      f1 <- F1_Score(y_true = lda_train[-fold,]$label,
+                     y_pred = lda_cv_preds,
+                     positive = "TREG")
+      
+      return_df <- data.frame(no_pc = prin_comps,
+                              threshold = threshold,
+                              balanced_accuracy = balanced_accuracy,
+                              f1 = f1)
+      
+      # Store the scores
+      lda_cv_scores <- rbind(lda_cv_scores, return_df)
+    }
+  }
 }
 lda_cv_time <- Sys.time() - lda_cv_time # Time difference of 11.68833 secs
-lda_cv_scores
+
+lda_avg_scores <- lda_cv_scores %>%
+  
+  group_by(no_pc, threshold) %>%
+  
+  summarise(Balanced_Accuracy = mean(balanced_accuracy),
+            Balanced_Accuracy_sd = sd(balanced_accuracy),
+            F1 = mean(f1), 
+            F1_sd = sd(f1),
+            .groups = "keep")
+
 ```
 
 ```{r}
-ggplot(lda_cv_scores, aes(x = no_pc, y = f1)) +
+ggplot(lda_avg_scores, aes(x = threshold, y = F1, color = as.factor(no_pc))) +
   geom_line() +
   geom_point()
 ```
+
+```{r}
+lda_improved_models <- lda_avg_scores[order(lda_avg_scores$F1,
+                                                 decreasing = TRUE),]
+
+lda_best_no_pc <- 28 #as.integer(lda_improved_models[1, 'no_pc'])
+
+lda_tuned_training <- task_one_df_pca[train_indices, 1:lda_best_no_pc] %>%
+  
+  data.frame(., label = train_data$label)
+
+test_lda_tuned <- task_one_df_pca[-train_indices, 1:lda_best_no_pc]
+
+data_pca <- data.frame(X_pca, label = train_data_pca$label)
+
+lda_tuned_model <- lda(label ~ ., 
+                          lda_tuned_training)
+
+lda_tuned_prob <- predict(lda_tuned_model, newdata = test_lda_tuned)$posterior[, "TREG"]
+
+lda_tuned_pred <- ifelse(lda_tuned_prob > 0.2, "TREG", "CD4+T")
+```
+
+```{r lda_tuned_confusion}
+lda_tuned_confusion <- table(predicted = lda_tuned_pred,
+                           observed = test_data$label)
+
+print(lda_tuned_confusion)
+```
+
+```{r lda_tuned_diagnostics}
+lda_tuned_probs <- predict(lda_tuned_model, newdata = test_lda_tuned, type = "prob")
+
+lda_tuned_accuracy <- mean(lda_tuned_pred == test_data_pca$label)
+
+lda_tuned_balanced_accuracy <- fun_calc_balanced_accuracy(lda_tuned_confusion,
+                                                        pos_label = 'TREG',
+                                                        neg_label = 'CD4+T')
+
+lda_tuned_f1_score <- F1_Score(y_true = test_data_pca$label, 
+                             y_pred = lda_tuned_pred,
+                             positive = "TREG")
+
+lda_tuned_roc_curve <- roc(
+  response = test_data_pca$label,
+  predictor = lda_tuned_prob, 
+  levels = c('CD4+T','TREG'),
+  direction = "<"
+  )
+
+lda_tuned_auc <- auc(lda_tuned_roc_curve)
+
+lda_tuned_misclas <- mean(lda_tuned_pred != test_data_pca$label)
+
+plot(lda_tuned_roc_curve, col = "red", main = "ROC Curve for QDA")
+```
+
+```{r lda_tuned_evaluation}
+# Create a table of the evaluation metrics
+lda_tuned_metrics_table <- data.frame(
+  Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
+  LDA_tuned = c(lda_tuned_accuracy, lda_tuned_balanced_accuracy, lda_tuned_f1_score, lda_tuned_auc, lda_tuned_misclas)
+)
+
+print(lda_tuned_metrics_table)
+```
+##### Boosting an LDA 
+
+Not successful, the results of an LDA are too stable and the base classifier is too strong to have an effective improvement from boosting.
+
+```{r lda_adaboost}
+adaboost_lda <- function(train_data, train_labels, n_rounds = 50) {
+  n <- nrow(train_data)
+  weights <- rep(1/n, n) # Initialize weights equally
+  alphas <- numeric(n_rounds)
+  classifiers <- list()
+
+  for (t in 1:n_rounds) {
+    # Fit LDA model using weighted data
+    lda_model <- lda(train_labels ~ ., data = train_data, weights = weights)
+    classifiers[[t]] <- lda_model
+    
+    # Predict and calculate error
+    predictions <- predict(lda_model, train_data)$class
+    error <- sum(weights * (predictions != train_labels)) / sum(weights)
+    
+    # If error is high, stop boosting
+    if (error > 0.5) break
+    
+    # Compute alpha (classifier weight)
+    alpha <- 0.5 * log((1 - error) / error)
+    alphas[t] <- alpha
+    
+    # Update weights
+    weights <- weights * exp(-alpha * (predictions == train_labels) * 2 + 1)
+    weights <- weights / sum(weights) # Normalize weights
+  }
+  
+  return(list(models = classifiers, alphas = alphas))
+}
+
+lda_best_no_pc <- lda_improved_models[1, 'no_pc']
+
+X_pca <- task_one_df_pca[train_indices, 1:5]
+
+test_lda_improved <- task_one_df_pca[-train_indices, 1:lda_best_no_pc]
+
+data_pca <- data.frame(X_pca, label = train_data_pca$label)
+
+lda_boosted <- adaboost_lda(X_pca, train_data$label)
+```
+
+```{r}
+lda_boosted_pred <- sapply(c(1:3),
+                           function(ii){
+                             vote = as.numeric(predict(lda_boosted$models[[ii]], 
+                                     newdata = test_lda_improved)$class) -1.5
+                             
+                             alpha = lda_boosted$alphas[ii]
+                             
+                             weighted_vote = alpha * vote
+                             
+                             return(weighted_vote)
+                           })
 ```
 
 
-#### Logistic Regression 
-
-##### with Ridge Regression (Regularisation)
+#### Logistic Regression (Chi - only using graphs, can be deleted??)
 
 ```{r}
 logreg_cv_time <- Sys.time()
@@ -1627,7 +1753,7 @@ for (prin_comps in no_prin_comps) {
   
   set.seed(seed)
   
-  X_pca <- task_one_df_pca[, 1:prin_comps]  # Use the first n_components
+  X_pca <- train_data_pca[, 1:prin_comps]  # Use the first n_components
   
   # Combine PCA-transformed data with the target
   data_pca <- data.frame(X_pca, label = task_one_df$label)
@@ -1642,7 +1768,7 @@ for (prin_comps in no_prin_comps) {
                                      method = "glmnet", 
                                      trControl = train_control,
                                      tuneGrid = expand.grid(
-                                       alpha = c(0, 1),
+                                       alpha = c(0, 0.5, 1),
                                        lambda = c(0.001,
                                                   0.01, 0.02,
                                                   0.05, 0.1)
@@ -1669,7 +1795,6 @@ logreg_improved_models <- logreg_cv_scores[order(logreg_cv_scores$f1,
 
 logreg_improved_models
 ```
-
 
 ```{r}
 graph_cv <- logreg_cv_scores %>% filter(no_pc == 37)
@@ -1698,7 +1823,7 @@ ggplot(graph_cv, aes(x = lambda, y = f1, colour = as.factor(no_pc))) +
 ```
 
 
-#### Logistic Regression with Ridge Regression (Regularisation)
+#### Logistic Regression with Ridge Regularisation (Imar)
 
 ```{r}
 logreg_start_time <- Sys.time()
@@ -1708,16 +1833,28 @@ x_train_log_regularized <- as.matrix(train_data[, setdiff(names(train_data), "la
 y_train_log_regularized <- train_data$label_as_numeric
 
 # Fit a regularized logistic regression model
-logreg_fit_regularized <- glmnet(x_train_log_regularized, y_train_log_regularized, family = "binomial", alpha = 0)  
+logreg_fit_regularized <- glmnet(x_train_log_regularized, y_train_log_regularized, family = "binomial", alpha = 0) 
 # alpha=1 for Lasso, alpha=0 for Ridge, or between 0 and 1 for Elastic Net
 
-logreg_run_time <- Sys.time() - logreg_start_time 
+logreg_run_time <- Sys.time() - logreg_start_time # Time difference of 16.91733 secs
 
 # Make predictions on the test data
 x_test_log_regularized <- as.matrix(test_data[, setdiff(names(test_data), "label")])
 logreg_probs_regularized <- predict(logreg_fit_regularized, newx = x_test_log_regularized, type = "response", s = 0.1)  # s = 0.1 is the regularization parameter
 
 logreg_pred_ridge <- ifelse(logreg_probs_regularized > 0.5, 'TREG', 'CD4+T')
+```
+
+```{r logreg_ridge_save, include = FALSE}
+write.csv(logreg_pred_ridge, file = "predictions_1.3/logreg_ridge.csv", row.names = TRUE)
+```
+
+```{r log_ridge_load, include = FALSE}
+logreg_pred_ridge <- read.csv("predictions_1.3/logreg_ridge.csv") %>% 
+  
+  dplyr::select(s1)
+
+logreg_pred_ridge <- logreg_pred_ridge[,'s1']
 ```
 
 ```{r}
@@ -1730,19 +1867,356 @@ log_ridge_f1_score <- F1_Score(y_true = test_data$label, y_pred = logreg_pred_ri
 cat("F1 Score of Logistic Regression with Ridge Regularization:", log_ridge_f1_score, "\n")
 ```
 
-graph for f1 score with changing the s parameter = regularization parameter
+#### Logistic Regression with Ridge Regularisation and Cross Validation (Chi)
 
-##### with Boosting??
+```{r logreg_ridge_cv_train}
+logreg_ridge_cv_time <- Sys.time()
 
+logreg_ridge_cv_scores <- data.frame(no_pc = c(),
+                            threshold = c(),
+                            lambda = c(),
+                            #balanced_accuracy = c(),
+                            f1 = c())
 
-#### Random Forest with CV (Imar)
+thresholds <- seq(0.1, 0.9, 0.1)
 
-Hyperparameter tuning (cross-validation): Number of trees (n_estimators): Increasing the number of trees generally improves accuracy, but can slow down the model. Maximum tree depth (max_depth): Controls how deep each tree can grow, preventing overfitting with a smaller depth. Minimum samples per leaf (min_samples_leaf): Sets the minimum number of samples required to split a node, preventing overfitting. Number of features considered at each split (max_features): Controls the randomness in the feature selection process.
+set.seed(seed)
+
+fold_indices <- createFolds(train_data$label, k = 10, returnTrain = TRUE)
+
+for (prin_comps in no_prin_comps) {
+  
+  logreg_ridge_train_X <- task_one_df_pca[train_indices, 1:prin_comps] %>%
+    
+    as.matrix() # Use the first n_components
+    
+  for (fold in fold_indices){
+    logreg_ridge_cv_model <- glmnet(logreg_ridge_train_X[fold,],
+                              as.factor(train_data[fold, 'label']),
+                              family = "binomial",
+                              alpha = 0)
+    
+    for (lambda in lambda_tuning){
+      logreg_ridge_cv_probs <- predict(logreg_ridge_cv_model,
+                                 logreg_ridge_train_X[-fold,],
+                                 type = "response",
+                                 s = lambda)
+      
+      for (threshold in thresholds){
+        logreg_ridge_cv_preds <- as.factor(ifelse(logreg_ridge_cv_probs > threshold,
+                                         "TREG",
+                                         "CD4+T"))
+        
+        # cm <- table(logreg_ridge_cv_preds, train_data[-fold, "label"])
+        # 
+        # balanced_accuracy <- fun_calc_balanced_accuracy(cm, 
+        #                                                 pos_label = "TREG", 
+        #                                                 neg_label = "CD4+T")
+        
+        f1 <- F1_Score(y_true = train_data[-fold,"label"],
+                       y_pred = logreg_ridge_cv_preds,
+                       positive = "TREG")
+        
+        return_df <- data.frame(no_pc = prin_comps,
+                                threshold = threshold,
+                                lambda = lambda,
+                                # balanced_accuracy = balanced_accuracy,
+                                f1 = f1)
+        
+        # Store the scores
+        logreg_ridge_cv_scores <- rbind(logreg_ridge_cv_scores, return_df)
+      }
+    }
+  }
+}
+logreg_ridge_cv_time <- Sys.time() - logreg_ridge_cv_time # Time difference of 11.68833 secs
+
+logreg_ridge_avg_scores <- logreg_ridge_cv_scores %>%
+  
+  group_by(no_pc, threshold, lambda) %>%
+  
+  summarise(#Balanced_Accuracy = mean(balanced_accuracy),
+            #Balanced_Accuracy_sd = sd(balanced_accuracy),
+            F1 = mean(f1), 
+            F1_sd = sd(f1),
+            .groups = "keep")
+
+```
+
+```{r}
+ggplot(filter(logreg_ridge_avg_scores, lambda == 0.01), aes(x = threshold, y = F1, color = as.factor(no_pc))) +
+  geom_line() +
+  geom_point()
+```
+
+```{r}
+logreg_ridge_improved_models <- logreg_ridge_avg_scores[order(logreg_ridge_avg_scores$F1,
+                                                 decreasing = TRUE),]
+
+logreg_ridge_best_no_pc <- as.integer(logreg_ridge_improved_models[1, 'no_pc'])
+
+logreg_ridge_tuned_training <- task_one_df_pca[train_indices, 1:logreg_ridge_best_no_pc] %>%
+  
+  as.matrix()
+
+test_logreg_ridge_tuned <- task_one_df_pca[-train_indices, 1:logreg_ridge_best_no_pc] %>%
+  
+  as.matrix()
+
+logreg_ridge_tuned_model <- glmnet(logreg_ridge_tuned_training,
+                             as.factor(train_data$label),
+                             family = "binomial",
+                             alpha = 0)
+
+logreg_ridge_tuned_prob <- predict(logreg_ridge_tuned_model, 
+                             newx = test_logreg_ridge_tuned,
+                             type = "response",
+                             s = 0.01)
+
+logreg_ridge_tuned_pred <- ifelse(logreg_ridge_tuned_prob > 0.4, "TREG", "CD4+T")
+```
+
+```{r logreg_ridge_tuned_confusion}
+logreg_ridge_tuned_confusion <- table(predicted = logreg_ridge_tuned_pred,
+                           observed = test_data$label)
+
+print(logreg_ridge_tuned_confusion)
+```
+
+```{r logreg_ridge_tuned_diagnostics}
+logreg_ridge_tuned_accuracy <- mean(logreg_ridge_tuned_pred == test_data_pca$label)
+
+logreg_ridge_tuned_balanced_accuracy <- fun_calc_balanced_accuracy(logreg_ridge_tuned_confusion,
+                                                        pos_label = 'TREG',
+                                                        neg_label = 'CD4+T')
+
+logreg_ridge_tuned_f1_score <- F1_Score(y_true = test_data_pca$label, 
+                             y_pred = logreg_ridge_tuned_pred,
+                             positive = "TREG")
+
+logreg_ridge_tuned_roc_curve <- roc(
+  response = test_data_pca$label,
+  predictor = as.numeric(logreg_ridge_tuned_prob), 
+  levels = c('CD4+T','TREG'),
+  direction = "<"
+  )
+
+logreg_ridge_tuned_auc <- auc(logreg_ridge_tuned_roc_curve)
+
+logreg_ridge_tuned_misclas <- mean(logreg_ridge_tuned_pred != test_data_pca$label)
+
+plot(logreg_ridge_tuned_roc_curve, col = "red", main = "ROC Curve for Logistic w Ridge")
+```
+
+```{r logreg_ridge_tuned_evaluation}
+# Create a table of the evaluation metrics
+logreg_ridge_tuned_metrics_table <- data.frame(
+  Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
+  logreg_ridge_tuned = c(logreg_ridge_tuned_accuracy, logreg_ridge_tuned_balanced_accuracy, logreg_ridge_tuned_f1_score, logreg_ridge_tuned_auc, logreg_ridge_tuned_misclas)
+)
+
+print(logreg_ridge_tuned_metrics_table)
+```
+
+#### Logistic Regression with Lasso Regularisation and Cross Validation (Chi)
+
+```{r logreg_lasso_cv_train}
+logreg_lasso_cv_time <- Sys.time()
+
+logreg_lasso_cv_scores <- data.frame(no_pc = c(),
+                            threshold = c(),
+                            lambda = c(),
+                            #balanced_accuracy = c(),
+                            f1 = c())
+
+thresholds <- seq(0.1, 0.9, 0.1)
+
+set.seed(seed)
+
+fold_indices <- createFolds(train_data$label, k = 10, returnTrain = TRUE)
+
+for (prin_comps in no_prin_comps) {
+  
+  logreg_lasso_train_X <- task_one_df_pca[train_indices, 1:prin_comps] %>%
+    
+    as.matrix() # Use the first n_components
+    
+  for (fold in fold_indices){
+    logreg_lasso_cv_model <- glmnet(logreg_lasso_train_X[fold,],
+                              as.factor(train_data[fold, 'label']),
+                              family = "binomial",
+                              alpha = 1)
+    
+    for (lambda in lambda_tuning){
+      logreg_lasso_cv_probs <- predict(logreg_lasso_cv_model,
+                                 logreg_lasso_train_X[-fold,],
+                                 type = "response",
+                                 s = lambda)
+      
+      for (threshold in thresholds){
+        logreg_lasso_cv_preds <- as.factor(ifelse(logreg_lasso_cv_probs > threshold,
+                                         "TREG",
+                                         "CD4+T"))
+        
+        # cm <- table(logreg_lasso_cv_preds, train_data[-fold, "label"])
+        # 
+        # balanced_accuracy <- fun_calc_balanced_accuracy(cm, 
+        #                                                 pos_label = "TREG", 
+        #                                                 neg_label = "CD4+T")
+        
+        f1 <- F1_Score(y_true = train_data[-fold,"label"],
+                       y_pred = logreg_lasso_cv_preds,
+                       positive = "TREG")
+        
+        return_df <- data.frame(no_pc = prin_comps,
+                                threshold = threshold,
+                                lambda = lambda,
+                                # balanced_accuracy = balanced_accuracy,
+                                f1 = f1)
+        
+        # Store the scores
+        logreg_lasso_cv_scores <- rbind(logreg_lasso_cv_scores, return_df)
+      }
+    }
+  }
+}
+logreg_lasso_cv_time <- Sys.time() - logreg_lasso_cv_time # Time difference of 32.19582 secs
+
+logreg_lasso_avg_scores <- logreg_lasso_cv_scores %>%
+  
+  group_by(no_pc, threshold, lambda) %>%
+  
+  summarise(#Balanced_Accuracy = mean(balanced_accuracy),
+            #Balanced_Accuracy_sd = sd(balanced_accuracy),
+            F1 = mean(f1), 
+            F1_sd = sd(f1),
+            .groups = "keep")
+
+```
+
+```{r}
+ggplot(filter(logreg_lasso_avg_scores, lambda == 0.001), aes(x = threshold, y = F1, color = as.factor(no_pc))) +
+  geom_line() +
+  geom_point()
+```
+
+```{r}
+logreg_lasso_improved_models <- logreg_lasso_avg_scores[order(logreg_lasso_avg_scores$F1,
+                                                 decreasing = TRUE),]
+
+logreg_lasso_best_no_pc <- 25 #as.integer(logreg_lasso_improved_models[1, 'no_pc'])
+
+logreg_lasso_tuned_training <- task_one_df_pca[train_indices, 1:logreg_lasso_best_no_pc] %>%
+  
+  as.matrix()
+
+test_logreg_lasso_tuned <- task_one_df_pca[-train_indices, 1:logreg_lasso_best_no_pc] %>%
+  
+  as.matrix()
+
+logreg_lasso_tuned_model <- glmnet(logreg_lasso_tuned_training,
+                             as.factor(train_data$label),
+                             family = "binomial",
+                             alpha = 1)
+
+logreg_lasso_tuned_prob <- predict(logreg_lasso_tuned_model, 
+                             newx = test_logreg_lasso_tuned,
+                             type = "response",
+                             s = 0.001)
+
+logreg_lasso_tuned_pred <- ifelse(logreg_lasso_tuned_prob > 0.4, "TREG", "CD4+T")
+```
+
+```{r logreg_lasso_tuned_confusion}
+logreg_lasso_tuned_confusion <- table(predicted = logreg_lasso_tuned_pred,
+                           observed = test_data$label)
+
+print(logreg_lasso_tuned_confusion)
+```
+
+```{r logreg_lasso_tuned_diagnostics}
+logreg_lasso_tuned_accuracy <- mean(logreg_lasso_tuned_pred == test_data_pca$label)
+
+logreg_lasso_tuned_balanced_accuracy <- fun_calc_balanced_accuracy(logreg_lasso_tuned_confusion,
+                                                        pos_label = 'TREG',
+                                                        neg_label = 'CD4+T')
+
+logreg_lasso_tuned_f1_score <- F1_Score(y_true = test_data_pca$label, 
+                             y_pred = logreg_lasso_tuned_pred,
+                             positive = "TREG")
+
+logreg_lasso_tuned_roc_curve <- roc(
+  response = test_data_pca$label,
+  predictor = as.numeric(logreg_lasso_tuned_prob), 
+  levels = c('CD4+T','TREG'),
+  direction = "<"
+  )
+
+logreg_lasso_tuned_auc <- auc(logreg_lasso_tuned_roc_curve)
+
+logreg_lasso_tuned_misclas <- mean(logreg_lasso_tuned_pred != test_data_pca$label)
+
+plot(logreg_lasso_tuned_roc_curve, col = "red", main = "ROC Curve for QDA")
+```
+
+```{r logreg_lasso_tuned_evaluation}
+# Create a table of the evaluation metrics
+logreg_lasso_tuned_metrics_table <- data.frame(
+  Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
+  logreg_lasso_tuned = c(logreg_lasso_tuned_accuracy, logreg_lasso_tuned_balanced_accuracy, logreg_lasso_tuned_f1_score, logreg_lasso_tuned_auc, logreg_lasso_tuned_misclas)
+)
+
+print(logreg_lasso_tuned_metrics_table)
+```
+
+######TO DELETE
+
+```{r comparison to identify error}
+logreg_start_time <- Sys.time()
+
+# Prepare the input data
+x_train_log_regularized <- task_one_df[train_indices,] %>% 
+  dplyr::select(-label, -label_as_numeric)
+
+y_train_log_regularized <- train_data$label_as_numeric
+
+# Fit a regularized logistic regression model
+logreg_fit_regularized_fixed <- glmnet(as.matrix(x_train_log_regularized),
+                                 y_train_log_regularized, 
+                                 family = "binomial",
+                                 alpha = 0) 
+# alpha=1 for Lasso, alpha=0 for Ridge, or between 0 and 1 for Elastic Net
+
+logreg_run_time <- Sys.time() - logreg_start_time # Time difference of 16.91733 secs
+
+# Make predictions on the test data
+x_test_log_regularized <- task_one_df[-train_indices,] %>% 
+  dplyr::select(-label, -label_as_numeric) %>% as.matrix()
+
+logreg_probs_regularized <- predict(logreg_fit_regularized, 
+                                    newx = x_test_log_regularized, 
+                                    type = "response",
+                                    s = 0.1)  # s = 0.1 is the regularization parameter
+
+logreg_pred_ridge <- ifelse(logreg_probs_regularized > 0.5, 'TREG', 'CD4+T')
+```
+
+```{r}
+log_ridge_confusion <- table(prediction = logreg_pred_ridge, truth = test_data$label)
+log_ridge_confusion
+```
+######
+######
+######
+######
+
+#### Random Forest with AdaBoost (Imar)
 
 ```{r}
 # Train the AdaBoost model with Random Forest as the base learner
 start_time_rf_ab <- Sys.time()
 
+set.seed(seed)
 # Train AdaBoost using Random Forest as the base model
 rf_ab_model <- boosting(
   label ~ . - label_as_numeric,       # Formula excluding label_as_numeric
@@ -1762,22 +2236,30 @@ yhat.rf_ab <- predict(rf_ab_model, newdata = test_data)$class  # Predictions usi
 end_time_rf_ab_pred <- Sys.time()
 rf_ab_prediction_time <- end_time_rf_ab_pred - start_time_rf_ab_pred
 cat("AdaBoost with Random Forest prediction time:", rf_ab_prediction_time, "\n")
+```
 
+```{r rf_ab_save, include = FALSE}
+write.csv(yhat.rf_ab, file = "predictions_1.3/rf_ab.csv", row.names = TRUE)
+```
+
+```{r logreg_load, include = FALSE}
+yhat.rf_ab <- read.csv("predictions_1.3/rf_ab.csv") %>% 
+  
+  dplyr::select(x)
+
+yhat.rf_ab <- yhat.rf_ab[,'x']
+```
+
+```{r}
 # Evaluate F1 Score and other metrics
-cm_rf_ab <- confusionMatrix(yhat.rf_ab, test_data$label)
-cat("F1 Score on Test Set (AdaBoost with Random Forest): ", cm_rf_ab$byClass["F1"], "\n")
-
+cm_rf_ab <- table(prediction = yhat.rf_ab, truth = test_data$label)
+cm_rf_ab
 ```
 
 
 ```{r}
-# Check the performance on the test data
-confusionMatrix(rf_cv_pred, test_data$label)
-```
-
-```{r}
-rf_cv_f1_score <- F1_Score(y_true = test_data$label, y_pred = rf_cv_pred)
-cat("F1 Score of Random Forest with CV:", rf_cv_f1_score, "\n")
+rf_cv_f1_score <- F1_Score(y_true = test_data$label, y_pred = yhat.rf_ab)
+cat("F1 Score of Random Forest with AdaBoost:", rf_cv_f1_score, "\n")
 ```
 
 ## T1.4: Implement predictor (???)
