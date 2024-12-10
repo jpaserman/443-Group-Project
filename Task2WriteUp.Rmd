@@ -94,6 +94,7 @@ Our first attempt at running many of our models, we encountered computational/me
 Another difficulty we encountered, was the imbalance of the data. The original dataset had less than 10% of observations that were labeled by the positive class. This could have led to bias in the model towards the more frequently-observed negative class. Measures such as accuracy might be mislead by this bias, and we therefore we used balanced accuracy to evaluate our models instead. 
 
 The strength in our approach is that we employ many different types of feature selection methods. Each one attempts to identify the most important features in different manners. 
+
 #### Future Research
 A main goal of future research could be to improve the methods listed above in the hopes of obtaining even stronger results, there are multiple ways we can do this. 1.Ideally, our data would include more compounds (observations) so that there would be more even dimensionality, which would better protect our models from overfitting! 
 2. More time, computational power, and lower dimensional data would allow better tuning of the parameters. 3. We could identify features that are highly multicollinear. Failing to remove them,could lead to instability and inefficiency in our models.  
