@@ -920,7 +920,7 @@ metrics_df
 # Perform PCA to get first 10 principal components
 pca_start <- Sys.time()
 
-task_one_df_pca <- task_one_df %>% 
+pca_model <- train_data %>% 
   
   dplyr::select(-label, - label_as_numeric) %>% 
   
@@ -928,14 +928,18 @@ task_one_df_pca <- task_one_df %>%
 
 pca_end <- Sys.time()
 
-pca_runtime <- pca_end - pca_start # Time difference of 4.244169 mins
+pca_runtime <- pca_end - pca_start # Time difference of 3.264391 mins
 ```
 
 ```{r pca_save, eval = FALSE}
+saveRDS(pca_model, file = "predictions_1.2/pca_model.rds")
+
 write.csv(task_one_df_pca$x, file = "predictions_1.2/task_one_df_pca.csv", row.names = TRUE)
 ```
 
 ```{r logreg_load, include = FALSE}
+pca_model <- readRDS("predictions_1.2/pca_model.rds")
+
 task_one_df_pca <- read.csv("predictions_1.2/task_one_df_pca.csv") %>% 
   
   dplyr::select(-X)
@@ -943,16 +947,20 @@ task_one_df_pca <- read.csv("predictions_1.2/task_one_df_pca.csv") %>%
 
 ```{r pca_split}
 # Split into training and test data
+train_data_pca <- as.data.frame(pca_model$x[, 1:10])
 
-if(is.data.frame(task_one_df_pca$x)){
-  train_data_pca <- as.data.frame(task_one_df_pca$x[train_indices, 1:10])
+test_pca_runtime <- Sys.time()
+test_data_pca <- test_data %>%
+  
+  dplyr::select(-label, -label_as_numeric) %>%
+  
+  predict(pca_model, newdata = .) %>%
+  
+  as.data.frame()
 
-  test_data_pca <- as.data.frame(task_one_df_pca$x[-train_indices, 1:10])
-} else {
-  train_data_pca <- as.data.frame(task_one_df_pca[train_indices, 1:10])
+test_data_pca <- test_data_pca[,1:10]
 
-  test_data_pca <- as.data.frame(task_one_df_pca[-train_indices, 1:10])
-}
+test_pca_runtime <- Sys.time() - test_pca_runtime
 
 train_data_pca$label <- train_data$label
 
