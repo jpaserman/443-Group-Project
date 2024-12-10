@@ -26,9 +26,11 @@ Most of our exploratory data analysis was undertaken with the goal of preliminar
 -imbalanced data
 -var threshold
 
-```{r, echo=FALSE}
+```{r, echo=FALSE, out.width="50%"}
+par(mfrow = c(2,1))
 knitr::include_graphics("images/Task2_EDA_freq.png")
 knitr::include_graphics("images/Task2_EDA_var.png")
+
 ```
 
 
