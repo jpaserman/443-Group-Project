@@ -1945,6 +1945,112 @@ logreg_avg_scores <- logreg_cv_scores %>%
             .groups = "keep")
 
 ```
+
+```{r comparison to identify error}
+logreg_start_time <- Sys.time()
+
+# Prepare the input data
+x_train_log_regularized <- task_one_df[train_indices,] %>% 
+  dplyr::select(-label, -label_as_numeric)
+
+y_train_log_regularized <- train_data$label_as_numeric
+
+# Fit a regularized logistic regression model
+logreg_fit_regularized_fixed <- glmnet(as.matrix(x_train_log_regularized),
+                                 y_train_log_regularized, 
+                                 family = "binomial",
+                                 alpha = 0) 
+# alpha=1 for Lasso, alpha=0 for Ridge, or between 0 and 1 for Elastic Net
+
+logreg_run_time <- Sys.time() - logreg_start_time # Time difference of 16.91733 secs
+
+# Make predictions on the test data
+x_test_log_regularized <- task_one_df[-train_indices,] %>% 
+  dplyr::select(-label, -label_as_numeric) %>% as.matrix()
+
+logreg_probs_regularized <- predict(logreg_fit_regularized, 
+                                    newx = x_test_log_regularized, 
+                                    type = "response",
+                                    s = 0.1)  # s = 0.1 is the regularization parameter
+
+logreg_pred_ridge <- ifelse(logreg_probs_regularized > 0.5, 'TREG', 'CD4+T')
+```
+
+```{r}
+log_ridge_confusion <- table(prediction = logreg_pred_ridge, truth = test_data$label)
+log_ridge_confusion
+```
+
+```{r}
+logreg_start_time <- Sys.time()
+
+logistic_ridge_train_data <- task_one_df_pca[train_indices,]
+
+logistic_ridge_train_data$label <- train_data$label %>%
+  make.names() %>%
+  as.factor()
+
+set.seed(seed)
+# Fit a regularized logistic regression model
+train_control <- trainControl(method = "cv", 
+                              number = 10 ,
+                              classProbs = TRUE,
+                              summaryFunction = cv_f1_score)
+
+set.seed(seed)
+logistic_ridge_model <- train(x = x_train_log_regularized, 
+                              y = as.factor(make.names(train_data$label)), 
+                              method = "glmnet",
+                              trControl = train_control,
+                              tuneGrid = expand.grid(
+                                alpha = c(0, 1),
+                                # alpha=1 for Lasso, alpha=0 for Ridge,
+                                # or between 0 and 1 for Elastic Net
+                                lambda = c(0.0001, 0.0005,
+                                           0.001, 0.005,
+                                           0.01, 0.02)
+                                )
+                             )
+
+
+logreg_run_time <- Sys.time() - logreg_start_time # Time difference of 1.035202 mins
+
+# Make predictions on the test data
+logistic_ridge_test_data <- task_one_df[-train_indices,]
+
+logistic_ridge_test_data$label <- test_data$label %>%
+  make.names() %>%
+  as.factor()
+
+logreg_probs_regularized <- predict(logistic_ridge_model, 
+                                    newx = as.matrix(logistic_ridge_test_data), 
+                                    type = "prob")
+
+logreg_pred_ridge <- ifelse(logreg_probs_regularized[,2] > 0.5, 'TREG', 'CD4+T')
+```
+
+```{r logreg_ridge_save, include = FALSE}
+write.csv(logreg_pred_ridge, file = "predictions_1.3/logreg_ridge.csv", row.names = TRUE)
+```
+
+```{r log_ridge_load, include = FALSE}
+logreg_pred_ridge <- read.csv("predictions_1.3/logreg_ridge.csv") %>% 
+  
+  dplyr::select(s1)
+
+logreg_pred_ridge <- logreg_pred_ridge[,'s1']
+```
+
+```{r}
+log_ridge_confusion <- table(prediction = logreg_pred_ridge, truth = test_data$label)
+log_ridge_confusion
+```
+
+```{r log_pca_f1_score}
+log_ridge_f1_score <- F1_Score(y_true = test_data$label, y_pred = logreg_pred_ridge)
+cat("F1 Score of Logistic Regression with Ridge Regularization:", log_ridge_f1_score, "\n")
+```
+
 #### Random Forest with AdaBoost (Imar)
 
 ```{r}
