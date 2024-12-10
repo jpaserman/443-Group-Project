@@ -9,6 +9,7 @@ date: "2024-12-09"
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+
 # Task 2: Feature Selection
 
 ## Abstract Task 2
@@ -49,7 +50,11 @@ After the results obtained from the logistic classification method with a lasso 
 #### XGBoost
 Boosting is another technique that can be relevant for feature selection. Boosting combines weak learners (usually decision trees) to create a strong learner, and it does so by building models sequentially and attempting to correct the errors made n the previous model. While boosting, the algorithm records the importance of each feature based on how much it improved the model's performance. A boosting algorithm stores an importance score for each feature, and that way some features can be dropped. 
 We attempted to use the XGBoost (Extreme Gradient Boosting) algorithm. XGBoost, is a boosting algorithm that is able to handle very large datasets and uses regularization techniques as well. Since XGBoost handles imbalanced data quite well, we decided to not weight the data. Our process is similar to the one used for Lasso and the Elastic net, where we loop over certain hyper parameters, most importantly $\lambda$, which represents the shrinkage parameters, specifically the rate which boosting learns. We then returned the model which returned the best balanced accuracy on the cross validation, and then used that model to make predictions on the test data. The number of features selected were extracted from the XGB importance matrix, which calculates importance based on gain, cover and frequency.^[Gain is the improvement in accuracy brought by a feature to the branches it is on. Cover represents the second derivative to the loss function with respect to a variable, a large value means the feature has a large importance on the loss function. Frequency represents the number of times a feature is used in all generated trees.].Features with 0, are excluded from the matrix. Below is a chart for the features selected for our best XGBoost Model. 
-![](xgb_importance_plot.png)
+
+```{r, echo=FALSE, out.width="80%", fig.align="left"}
+knitr::include_graphics("xgb_selected_features_importance.png")
+```
+
 
 
 #### Support Vector Machines (SVM)
