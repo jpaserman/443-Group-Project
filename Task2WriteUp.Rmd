@@ -19,6 +19,9 @@ The focus of the following analysis is to attempt to achieve high classification
 We were given one dataset that contains binary features that describe the three-dimensional properties of a molecule in a compound or a random probe across different compounds. The data contains 800 observations, which represent 800 compounds, and 100,000 columns (50,000 real variables and 50,000 random probes). The first column named $label$ represents whether a compound bound to a target site on thrombin^[Thrombin is an enzyme that plays a key role in blood clotting and other biological processes.].
 
 ## Exploratory Data Analysis 
+Most of our exploratory data analysis was undertaken with the goal of preliminary feature reduction prior to model implementation. After confirming that there were no missing values within our data, we aim to remove features with extremely low to zero variance. The following histograms depict the number of compounds found to have bound to a particular target site and the associated variance ...
+
+
 -mention traintest split as well
 -imbalanced data
 -var threshold
@@ -29,7 +32,7 @@ The first model we attempted to run was logistic classifier with a Lasso-Penalty
 
 |Model            | Lambda Value | Number of Selected Features | Balanced Accuracy |
 |-----------------|--------------|-----------------------------|-------------------|
-| Worst Score     | 0.1917       | 234                         | 0.8189            |
+| Worst Score     | 1e-04        | 234                         | 0.8189            |
 | Best Score      | 0.0475081    | 47                          | 0.8189            |
 | Worst BA        | 0.2719       | 1                           | 0.8189            |
 
@@ -65,16 +68,19 @@ knitr::include_graphics("xgb_selected_features_importance.png")
 
 | Model               | Num. of Features   | Bal. Accuracy | Accuracy   | F1           |
 |---------------------|--------------------|---------------|------------|--------------|
-| Logistic Lasso      | **47**             | 0.8189        | 0.925      | 0.6          |
+| Logistic Lasso      | 47                 | 0.8189        | 0.925      | 0.6          |
 | FSS                 | 208                | 0.7805        | 0.9188     | 0.5517       |
 | Random Forest       | 100                | 0.8223        | 0.9313     | 0.6207       |
-| Log. Elastic Net.   | 88                 | **0.8608**    | **0.9375** | **0.6667**   |
+| Log. Elastic Net    | 88                 | **0.8608**    | **0.9375** | **0.6667**   |
 | XGBoost             | 73                 | 0.8257        | **0.9375** | 0.6429       |
-| SVM (Linear Kernel) | 1                  | 0.8257        | 0.9375     | 0.6429       |
+| SVM (Linear Kernel) | **35**             | 0.8574        | 0.9313     | 0.6452       |
 
 
 
 ## Conclusion
+The results above, lead us that there is an inherent trade-off between the number of features, the evaluation metrics such as the balanced accuracy on the test data. The reason we care about taking into consideration the smaller amount of number of features has to do with both efficiency and interpretability. For example, if one were to conduct future research, they could focus on a smaller subset of features. 
+
+Depending on one's preferences and goals, either the Elastic Net or the SVM model seem to be good models for the classification for whether a compound will bind to a target site. 
 #### Strengths and Weaknesses
 #### Future Research
 
