@@ -100,25 +100,20 @@ fun_calc_balanced_accuracy <- function(confusion_matrix, pos_label, neg_label){
 }
 
 cv_f1_score <- function(data, lev = NULL, model = NULL) {
-  # Calculate confusion matrix
-  cm <- table(data$pred, data$obs)
   
-  tp <- cm["TREG", "TREG"]
-  fp <- cm["TREG", "CD4+T"]
-  fn <- cm["CD4+T", "TREG"]
+  precision <- posPredValue(data$pred, data$obs, positive = "TREG")
   
-  precision <- tp / (tp + fp)
+  recall <- sensitivity(data$pred, data$obs, positive = "TREG")
   
-  recall <- tp / (tp + fn)
-  
-  # Extract precision, recall, and F1-score
-  f1 <- 2 * (precision * recall) / (precision + recall)
+  F1 <- ifelse((precision + recall) == 0, 
+               0, 
+               2 * precision * recall / (precision + recall))
   
   accuracy <- mean(data$pred == data$obs)
-  
   # Return a named vector
-  c(Accuracy = accuracy, F1 = f1)
+  c(Accuracy = accuracy, F1 = F1)
 }
+
 ```
 
 
@@ -1543,66 +1538,66 @@ LDA outperforms QDA. Does this imply a linear bayes decision boundary?
 lda_cv_time <- Sys.time()
 lda_cv_scores <- data.frame(no_pc = c(),
                             threshold = c(),
-                            # accuracy = c(),
+                            balanced_accuracy = c(),
                             f1 = c())
 
-thresholds <- seq(0.3, 0.7, 0.05)
+thresholds <- seq(0, 0.9, 0.1)
+
+set.seed(seed)
+
+fold_indices <- createFolds(train_data$label, k = no_folds, returnTrain = TRUE)
 
 for (prin_comps in no_prin_comps) {
   
-  X_pca <- task_one_df_pca[train_indices, 1:prin_comps]  # Use the first n_components
+  lda_train <- task_one_df_pca[train_indices, 1:prin_comps] %>%
+    
+    data.frame(., label = train_data$label) # Use the first n_components
   
-  test_lda_tuning <- task_one_df_pca[-train_indices, 1:prin_comps]
-  
-  set.seed(seed)
+  lda_test_X <- task_one_df_pca[-train_indices, 1:prin_comps]
     
-  # Combine PCA-transformed data with the target
-  data_pca <- data.frame(X_pca, label = make.names(train_data_pca$label))
+  for (fold in fold_indices){
+    lda_cv_model <- lda(label ~ ., 
+                        data = lda_train[fold,])
     
-  # Perform LDA with 5-fold cross-validation
-  train_control <- trainControl(method = "cv", 
-                                number = no_folds,
-                                classProbs = TRUE,
-                                summaryFunction = twoClassSummary)
-  
-  lda_cv_model <- train(as.factor(label) ~ ., 
-                     data = data_pca, 
-                     method = "lda", 
-                     trControl = train_control,
-                     metric = "ROC")
-  
-  lda_cv_probs <- predict(lda_cv_model, test_lda_tuning, type = "prob")
-  
-  for (threshold in thresholds){
-    lda_cv_preds <- as.factor(ifelse(lda_cv_probs[, "TREG"] > threshold,
-                                     1,
-                                     0))
+    lda_cv_probs <- predict(lda_cv_model, 
+                            lda_train[-fold,], 
+                            type = "prob")
     
-    f1 <- F1_Score(y_true = test_data$label_as_numeric,
-                   y_pred = lda_cv_preds,
-                   positive = 1)
-    
-    # model_result <- lda_model$result
-    
-    # return_df <- data.frame(no_pc = c(rep(prin_comps, length(model_result$F1))),
-    #                             accuracy = c(model_result$Accuracy),
-    #                             f1 = c(model_result$F1)
-    #                             )
-    
-    return_df <- data.frame(no_pc = prin_comps,
-                            decision_threshold = threshold,
-                            f1 = f1)
-    
-    # Store the cross-validation accuracy
-    lda_cv_scores <- rbind(lda_cv_scores, return_df)
+    for (threshold in thresholds){
+      lda_cv_preds <- as.factor(ifelse(lda_cv_probs$posterior[, "TREG"] > threshold,
+                                       "TREG",
+                                       "CD4+T"))
+      
+      cm <- table(lda_cv_preds, lda_train$label[-fold])
+      
+      balanced_accuracy <- fun_calc_balanced_accuracy(cm, "TREG", "CD4+T")
+      
+      f1 <- F1_Score(y_true = lda_train[-fold,]$label,
+                     y_pred = lda_cv_preds,
+                     positive = "TREG")
+      
+      return_df <- data.frame(no_pc = prin_comps,
+                              threshold = threshold,
+                              balanced_accuracy = balanced_accuracy,
+                              f1 = f1)
+      
+      # Store the scores
+      lda_cv_scores <- rbind(lda_cv_scores, return_df)
+    }
   }
 }
 lda_cv_time <- Sys.time() - lda_cv_time # Time difference of 11.68833 secs
 
-lda_improved_models <- lda_cv_scores[order(lda_cv_scores$f1, 
+lda_cv_scores <- lda_cv_scores %>%
+  
+  group_by(no_pc, threshold) %>%
+  
+  summarise(F1 = mean(f1), F1_sd = sd(f1), .groups = "keep")
+
+lda_improved_models <- lda_cv_scores[order(lda_cv_scores$F1,
                                                  decreasing = TRUE),]
 
-lda_improved_models %>% filter(no_pc == 15)
+lda_improved_models
 ```
 
 ```{r}
