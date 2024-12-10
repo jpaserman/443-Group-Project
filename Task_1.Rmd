@@ -1463,9 +1463,9 @@ fun_lda_cv <- function(no_prin_comps = c(2:25),
   
   set.seed(seed)
   
-  fold_indices <- createFolds(task_one_df$label, k = no_folds, returnTrain = TRUE)
+  fold_indices <- createFolds(train_data$label, k = no_folds, returnTrain = TRUE)
   
-  X_df <- task_one_df[, !colnames(task_one_df) %in% c("label", "label_as_numeric")]
+  X_df <- train_data[, !colnames(train_data) %in% c("label", "label_as_numeric")]
   
   for (fold in fold_indices) {
     # For each fold, perform PCA
@@ -1476,11 +1476,11 @@ fun_lda_cv <- function(no_prin_comps = c(2:25),
     
     # Fold from PCA to be trained and tested
     fold_train_df <- data.frame(fold_pca_model$x, 
-                               label = task_one_df$label[fold]) 
+                               label = train_data$label[fold]) 
     
     fold_test_X <- predict(fold_pca_model, X_df[-fold,])
     
-    fold_test_Y <- task_one_df$label[-fold]
+    fold_test_Y <- train_data$label[-fold]
     
     for (prin_comps in no_prin_comps){
       #For each Fold, vary number of PCs used to train LDA 
@@ -1646,9 +1646,9 @@ fun_logreg_cv <- function(no_prin_comps = c(2:25),
   
   set.seed(seed)
   
-  fold_indices <- createFolds(task_one_df$label, k = no_folds, returnTrain = TRUE)
+  fold_indices <- createFolds(train_data$label, k = no_folds, returnTrain = TRUE)
   
-  X_df <- task_one_df[, !colnames(task_one_df) %in% c("label", "label_as_numeric")]
+  X_df <- train_data[, !colnames(train_data) %in% c("label", "label_as_numeric")]
   
   for (fold in fold_indices) {
     # For each fold, perform PCA
@@ -1660,14 +1660,14 @@ fun_logreg_cv <- function(no_prin_comps = c(2:25),
     # Fold from PCA to be trained and tested
     fold_test_X <- predict(fold_pca_model, X_df[-fold,])
     
-    fold_test_Y <- task_one_df$label[-fold]
+    fold_test_Y <- train_data$label[-fold]
     
     for (prin_comps in no_prin_comps){
       #For each Fold, vary number of PCs used to train regression  
       
       # Train model on n PCs
       logreg_cv_model <- glmnet(as.matrix(fold_pca_model$x[, 1:prin_comps]),
-                                as.factor(task_one_df[fold, 'label']),
+                                as.factor(train_data[fold, 'label']),
                                 family = "binomial",
                                 alpha = alpha)
       
@@ -1819,7 +1819,7 @@ logreg_cv_time <- Sys.time()
 logreg_lasso_cv_scores <- fun_logreg_cv(no_prin_comps = c(10:30), 
                                         alpha = 1, 
                                         lambda = lambda_tuning)
-logreg_cv_time <- Sys.time() - logreg_cv_time 
+logreg_cv_time <- Sys.time() - logreg_cv_time # Time difference of 17.33742 mins
 ```
 
 ```{r}
@@ -1832,10 +1832,27 @@ logreg_lasso_cv_scores <- dplyr::select(read.csv(file = "predictions_1.3/logreg_
 ```
 
 ```{r}
+logreg_lasso_avg_scores <- logreg_lasso_cv_scores %>%
+  
+  group_by(no_pc, threshold, lambda) %>%
+  
+  summarise(F1 = mean(f1), 
+            F1_sd = sd(f1),
+            .groups = "keep")
+```
+
+```{r}
 ggplot(filter(logreg_lasso_avg_scores, lambda == 0.001), aes(x = threshold, y = F1, color = as.factor(no_pc))) +
   geom_line() +
   geom_point()
 ```
+```{r}
+ggplot(filter(logreg_lasso_avg_scores, threshold == 0.4), aes(x = lambda, y = F1, color = as.factor(no_pc))) +
+  geom_line() +
+  geom_point() +
+  scale_x_continuous(limits = c(0,0.1))
+```
+
 
 ```{r}
 logreg_lasso_improved_models <- logreg_lasso_avg_scores[order(logreg_lasso_avg_scores$F1,
