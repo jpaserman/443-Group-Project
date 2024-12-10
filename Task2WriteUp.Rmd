@@ -86,7 +86,7 @@ knitr::include_graphics("images/xgb_selected_features_importance.png")
 
 
 ## Conclusion
-The results above, lead us that there is an inherent trade-off between the number of features, the evaluation metrics such as the balanced accuracy on the test data. The reason we care about taking into consideration the smaller amount of number of features has to do with both efficiency and interpretability. For example, if one were to conduct future research, they could focus on a smaller subset of features. 
+The results above, show us that there is an inherent trade-off between the number of features, and the evaluation metrics such as the balanced accuracy on the test data. The reason we care about taking into consideration the smaller amount of number of features has to do with both efficiency and interpretability. For example, if one were to conduct future research, they could focus on a smaller subset of features. 
 
 Depending on one's preferences and goals, either the Elastic Net or the SVM model seem to be good models for the classification for whether a compound will bind to a target site. 
 
