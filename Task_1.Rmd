@@ -1528,7 +1528,10 @@ fun_lda_cv <- function(no_prin_comps = c(2:25),
   }
   return(lda_cv_scores)
 }
+```
 
+
+```{r}
 lda_cv_time <- Sys.time()
 lda_cv_scores <- fun_lda_cv(no_prin_comps = c(10:30))
 lda_cv_time <- Sys.time() - lda_cv_time # Time difference of 14.50283 mins
@@ -1967,6 +1970,14 @@ cm_rf_ab
 ```{r}
 rf_cv_f1_score <- F1_Score(y_true = test_data$label, y_pred = yhat.rf_ab)
 cat("F1 Score of Random Forest with AdaBoost:", rf_cv_f1_score, "\n")
+```
+
+#### AdaBoost
+
+```{r}
+boost_train_time <- Sys.time()
+boost_model <- boosting(label ~ . - label_as_numeric, data = train_data_pca, mfinal = 50)
+boost_train_time <- Sys.time() - boost_train_time
 ```
 
 ## T1.4: Implement predictor (???)
