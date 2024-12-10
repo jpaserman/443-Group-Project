@@ -1641,6 +1641,7 @@ fun_logreg_cv <- function(no_prin_comps = c(2:25),
   
   logreg_cv_scores <- data.frame(no_pc = c(),
                               threshold = c(),
+                              lambda = c(),
                               f1 = c())
   
   set.seed(seed)
@@ -1694,6 +1695,7 @@ fun_logreg_cv <- function(no_prin_comps = c(2:25),
           # Store the scores
           return_df <- data.frame(no_pc = prin_comps,
                                   threshold = threshold,
+                                  lambda = lambda,
                                   f1 = f1)
           
           logreg_cv_scores <- rbind(logreg_cv_scores, return_df)
@@ -1710,84 +1712,29 @@ fun_logreg_cv <- function(no_prin_comps = c(2:25),
 
 ```{r}
 logreg_cv_time <- Sys.time()
-logreg_cv_scores <- sapply(c(0, 1), 
-                           function(alpha){fun_logreg_cv(no_prin_comps = c(10:30), alpha = alpha, lambda = lambda_tuning)})
-logreg_cv_time <- Sys.time() - logreg_cv_time 
+logreg_ridge_cv_scores <- fun_logreg_cv(no_prin_comps = c(10:30), 
+                                        alpha = 0, 
+                                        lambda = lambda_tuning)
+logreg_cv_time <- Sys.time() - logreg_cv_time # Approx 15 mins
 ```
 
+```{r}
+write.csv(logreg_ridge_cv_scores, file = "predictions_1.3/logreg_ridge_cv_scores.csv")
+```
 
-```{r logreg_ridge_cv_train}
-logreg_ridge_cv_time <- Sys.time()
+```{r}
+logreg_ridge_cv_scores <- dplyr::select(read.csv(file = "predictions_1.3/logreg_ridge_cv_scores.csv"),
+                               -X)
+```
 
-logreg_ridge_cv_scores <- data.frame(no_pc = c(),
-                            threshold = c(),
-                            lambda = c(),
-                            #balanced_accuracy = c(),
-                            f1 = c())
-
-thresholds <- seq(0.1, 0.9, 0.1)
-
-set.seed(seed)
-
-fold_indices <- createFolds(train_data$label, k = 10, returnTrain = TRUE)
-
-for (prin_comps in no_prin_comps) {
-  
-  logreg_ridge_train_X <- task_one_df_pca[train_indices, 1:prin_comps] %>%
-    
-    as.matrix() # Use the first n_components
-    
-  for (fold in fold_indices){
-    logreg_ridge_cv_model <- glmnet(logreg_ridge_train_X[fold,],
-                              as.factor(train_data[fold, 'label']),
-                              family = "binomial",
-                              alpha = 0)
-    
-    for (lambda in lambda_tuning){
-      logreg_ridge_cv_probs <- predict(logreg_ridge_cv_model,
-                                 logreg_ridge_train_X[-fold,],
-                                 type = "response",
-                                 s = lambda)
-      
-      for (threshold in thresholds){
-        logreg_ridge_cv_preds <- as.factor(ifelse(logreg_ridge_cv_probs > threshold,
-                                         "TREG",
-                                         "CD4+T"))
-        
-        # cm <- table(logreg_ridge_cv_preds, train_data[-fold, "label"])
-        # 
-        # balanced_accuracy <- fun_calc_balanced_accuracy(cm, 
-        #                                                 pos_label = "TREG", 
-        #                                                 neg_label = "CD4+T")
-        
-        f1 <- F1_Score(y_true = train_data[-fold,"label"],
-                       y_pred = logreg_ridge_cv_preds,
-                       positive = "TREG")
-        
-        return_df <- data.frame(no_pc = prin_comps,
-                                threshold = threshold,
-                                lambda = lambda,
-                                # balanced_accuracy = balanced_accuracy,
-                                f1 = f1)
-        
-        # Store the scores
-        logreg_ridge_cv_scores <- rbind(logreg_ridge_cv_scores, return_df)
-      }
-    }
-  }
-}
-logreg_ridge_cv_time <- Sys.time() - logreg_ridge_cv_time # Time difference of 11.68833 secs
-
+```{r}
 logreg_ridge_avg_scores <- logreg_ridge_cv_scores %>%
   
   group_by(no_pc, threshold, lambda) %>%
   
-  summarise(#Balanced_Accuracy = mean(balanced_accuracy),
-            #Balanced_Accuracy_sd = sd(balanced_accuracy),
-            F1 = mean(f1), 
+  summarise(F1 = mean(f1), 
             F1_sd = sd(f1),
             .groups = "keep")
-
 ```
 
 ```{r}
@@ -1868,77 +1815,20 @@ print(logreg_ridge_tuned_metrics_table)
 ##### Lasso Regularisation and Cross Validation (Chi)
 
 ```{r logreg_lasso_cv_train}
-logreg_lasso_cv_time <- Sys.time()
+logreg_cv_time <- Sys.time()
+logreg_lasso_cv_scores <- fun_logreg_cv(no_prin_comps = c(10:30), 
+                                        alpha = 1, 
+                                        lambda = lambda_tuning)
+logreg_cv_time <- Sys.time() - logreg_cv_time 
+```
 
-logreg_lasso_cv_scores <- data.frame(no_pc = c(),
-                            threshold = c(),
-                            lambda = c(),
-                            #balanced_accuracy = c(),
-                            f1 = c())
+```{r}
+write.csv(logreg_lasso_cv_scores, file = "predictions_1.3/logreg_lasso_cv_scores.csv")
+```
 
-thresholds <- seq(0.1, 0.9, 0.1)
-
-set.seed(seed)
-
-fold_indices <- createFolds(train_data$label, k = 10, returnTrain = TRUE)
-
-for (prin_comps in no_prin_comps) {
-  
-  logreg_lasso_train_X <- task_one_df_pca[train_indices, 1:prin_comps] %>%
-    
-    as.matrix() # Use the first n_components
-    
-  for (fold in fold_indices){
-    logreg_lasso_cv_model <- glmnet(logreg_lasso_train_X[fold,],
-                              as.factor(train_data[fold, 'label']),
-                              family = "binomial",
-                              alpha = 1)
-    
-    for (lambda in lambda_tuning){
-      logreg_lasso_cv_probs <- predict(logreg_lasso_cv_model,
-                                 logreg_lasso_train_X[-fold,],
-                                 type = "response",
-                                 s = lambda)
-      
-      for (threshold in thresholds){
-        logreg_lasso_cv_preds <- as.factor(ifelse(logreg_lasso_cv_probs > threshold,
-                                         "TREG",
-                                         "CD4+T"))
-        
-        # cm <- table(logreg_lasso_cv_preds, train_data[-fold, "label"])
-        # 
-        # balanced_accuracy <- fun_calc_balanced_accuracy(cm, 
-        #                                                 pos_label = "TREG", 
-        #                                                 neg_label = "CD4+T")
-        
-        f1 <- F1_Score(y_true = train_data[-fold,"label"],
-                       y_pred = logreg_lasso_cv_preds,
-                       positive = "TREG")
-        
-        return_df <- data.frame(no_pc = prin_comps,
-                                threshold = threshold,
-                                lambda = lambda,
-                                # balanced_accuracy = balanced_accuracy,
-                                f1 = f1)
-        
-        # Store the scores
-        logreg_lasso_cv_scores <- rbind(logreg_lasso_cv_scores, return_df)
-      }
-    }
-  }
-}
-logreg_lasso_cv_time <- Sys.time() - logreg_lasso_cv_time # Time difference of 32.19582 secs
-
-logreg_lasso_avg_scores <- logreg_lasso_cv_scores %>%
-  
-  group_by(no_pc, threshold, lambda) %>%
-  
-  summarise(#Balanced_Accuracy = mean(balanced_accuracy),
-            #Balanced_Accuracy_sd = sd(balanced_accuracy),
-            F1 = mean(f1), 
-            F1_sd = sd(f1),
-            .groups = "keep")
-
+```{r}
+logreg_lasso_cv_scores <- dplyr::select(read.csv(file = "predictions_1.3/logreg_lasso_cv_scores.csv"),
+                               -X)
 ```
 
 ```{r}
