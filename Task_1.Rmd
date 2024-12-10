@@ -122,34 +122,20 @@ cv_f1_score <- function(data, lev = NULL, model = NULL) {
 ```
 
 
-## T1.1: Exploratory data analysis and summary statistics (Peter?)
+## T1.1: Exploratory data analysis and summary statistics
 
 ```{r EDA}
 dim(task_one_df)  # The data has 5471 observations and 4125 variables-- 4124 originally, 1 added (label)
 table(task_one_df$label) # 3356 observations are labelled as CD4+T and 2115 are labelled as TREG
 
 mean_table <- task_one_df %>%
-
   dplyr::select(-label_as_numeric) %>%
-
   group_by(label) %>%
-
   summarise(across(everything(), mean, na.rm = TRUE)) %>%
-
   pivot_longer(cols = -label, names_to = 'genes', values_to = 'mean_value') %>%
-
   pivot_wider(names_from = label, values_from = mean_value) %>%
-
   mutate(diff = abs(`CD4+T` - TREG))
-
-  # mutate(pct_diff = 100 * (diff / ((`CD4+T` + TREG)/2) )) ## This doesn't result in very nice graphs, perhaps stick to the absolute diff??
-
-
 top_3_abs_diff <- mean_table %>% top_n(3, diff) %>% arrange(desc(diff))
-
-# top_3_pct_diff <- mean_table %>% top_n(3, pct_diff) %>% arrange(desc(pct_diff)) # Doesn't result in very good graphs... perhaps remove
-
-par(mfrow=c(1,3))
 
 ### Add x-axis label and title
 for (var in top_3_abs_diff$genes) {
@@ -158,47 +144,21 @@ for (var in top_3_abs_diff$genes) {
   print(plot)
 }
 
-
-# # Doesn't result in very good graphs.. perhaps remove
-# for (var in top_3_pct_diff$genes) {
-#   formula <- as.formula(paste(var, "~ label"))
-#   plot <- boxplot(formula, data = task_one_df, col=c("blue", "red"))
-#   print(plot)
-#   quantile(task_one_df$var)
-# }
-
-## There are decent differences between the ranking of absolute difference in means of groups
-## and the ranking of percentage difference in means of groups
-## perhaps we create box plots of the top 3-5 of each metric??
-
-## Perhaps do summary(XXX) of a few variables??
-## If want to display multiple subgraphs --> par(mfrow=c(x,y))
-
-### Next steps --> 
-  ### (1) instead of absolute value difference, include also
-  ### percentage change. then plot box plots for the top 5? 10? variables
-  ### that appear to have the clearest distinction between the two labels
-  ### these specific variables provide a good baseline for what we expect
-  ### our subsequent models to choose for the most important fields
+# Create the barplot with the highest 'diff' at the top
+mean_table_sorted <- mean_table[order(mean_table$diff), ]
+barplot(mean_table_sorted$diff, 
+        names.arg = rownames(mean_table_sorted), 
+        horiz = TRUE)
   
-## Checking if there are any rows that have missing values... Keep this hashed unless you want to check, because it takes a while to run
-# for (i in 1:nrow(task_one_df)) {
-#   if (any(is.na(task_one_df[i, ]))) {
-#     print(paste("Row", i, "contains NA values."))
-#   }
-# }
-
-# twenty_random_columns <- sample(names(task_one_df)[-1], 20)
-# 
-# ## Create boxplots for the random sample of columns
-# for (column in twenty_random_columns) {
-#     p <- ggplot(task_one_df, aes_string(x = "label", y = column)) +
-#         geom_jitter(width = 0.2, height = 0) +  # Use jitter to avoid overplotting
-#         ggtitle(paste("Scatter Plot of", column, "by Label")) +
-#         theme_minimal()
-#     print(p)
-# }
-
+twenty_random_columns <- sample(names(task_one_df)[-1], 20)
+## Create boxplots for the random sample of columns
+for (column in twenty_random_columns) {
+    p <- ggplot(task_one_df, aes_string(x = "label", y = column)) +
+        geom_jitter(width = 0.2, height = 0) +
+        ggtitle(paste("Scatter Plot of", column, "by Label")) +
+        theme_minimal()
+    print(p)
+}
 ```
 
 ## T1.2: Training and evaluating various classifiers
@@ -229,32 +189,24 @@ lda_pred <- lda_pred[,'x']
 ```
 
 ```{r lda_confusion}
-lda_confusion <- table(predicted_label = lda_pred, true_label = test_data$label)
-lda_confusion
+lda_confusion <- table(predicted = lda_pred, 
+                       observed = test_data$label)
+
+print(lda_confusion)
 ```
 
-```{r lda_accuracy}
+```{r}
 lda_accuracy <- mean(lda_pred == test_data$label)
 
-cat("Accuracy of LDA:", lda_accuracy, "\n")
-```
+lda_balanced_accuracy <- fun_calc_balanced_accuracy(lda_confusion,
+                                                        pos_label = 'TREG',
+                                                        neg_label = 'CD4+T')
 
-```{r lda_balanced_accuracy}
-lda_balanced_accuracy <- fun_calc_balanced_accuracy(lda_confusion, 
-                                                    pos_label = 'TREG', 
-                                                    neg_label = 'CD4+T')
+lda_f1_score <- F1_Score(y_true = test_data$label, 
+                             y_pred = lda_pred,
+                             positive = "TREG")
 
-cat("Balanced Accuracy of LDA:", lda_balanced_accuracy, "\n")
-```
-
-```{r lda_f1_score}
-lda_f1_score <- F1_Score(y_true= test_data$label, y_pred = lda_pred)
-cat("F1 Score of LDA:", lda_f1_score, "\n")
-```
-
-```{r lda_roc}
 lda_pred_numeric <- ifelse(lda_pred == "TREG", 1, 0)
-  
 lda_roc_curve <- roc(
   response = test_data$label_as_numeric,
   predictor = lda_pred_numeric, 
@@ -265,12 +217,18 @@ lda_roc_curve <- roc(
 plot(lda_roc_curve, col = "red", main = "ROC Curve for LDA")
 
 lda_auc <- auc(lda_roc_curve)
-lda_auc
+
+lda_misclas <- mean(lda_pred != test_data$label)
 ```
 
-```{r lda_misclass}
-lda_misclas <- mean(lda_pred != test_data$label)
-cat("Misclassification error rate of LDA:", lda_misclas, "\n")
+```{r}
+# Create a table of the evaluation metrics
+lda_metrics_table <- data.frame(
+  Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
+  lda = c(lda_accuracy, lda_balanced_accuracy, lda_f1_score, lda_auc, lda_misclas)
+)
+
+print(lda_metrics_table)
 ```
 
 #### Logistic classifier (Imar)
@@ -308,40 +266,43 @@ logreg_probs <- logreg_probs[,'x']
 ```
 
 ```{r logreg_confusion}
-log_confusion <- table(prediction = logreg_pred, truth = test_data$label)
-log_confusion
+logreg_confusion <- table(predicted = logreg_pred, 
+                       observed = test_data$label)
+print(logreg_confusion)
 ```
 
-```{r logreg_accuracy}
-log_accuracy <- mean(logreg_pred == test_data$label)
-cat("Accuracy of Logistic Regression:", log_accuracy, "\n")
+```{r}
+logreg_accuracy <- mean(logreg_pred == test_data$label)
+
+logreg_balanced_accuracy <- fun_calc_balanced_accuracy(logreg_confusion,
+                                                        pos_label = 'TREG',
+                                                        neg_label = 'CD4+T')
+
+logreg_f1_score <- F1_Score(y_true = test_data$label, 
+                             y_pred = logreg_pred,
+                             positive = "TREG")
+
+logreg_roc_curve <- roc(
+  response = test_data$label,
+  predictor = logreg_probs, 
+  levels = c('CD4+T','TREG'),
+  direction = "<")
+
+plot(logreg_roc_curve, col = "red", main = "ROC Curve for Logistic Regression")
+
+logreg_auc <- auc(logreg_roc_curve)
+
+logreg_misclas <- mean(logreg_pred != test_data$label)
 ```
 
-```{r logreg_balanced_accuracy}
-log_balanced_accuracy <- fun_calc_balanced_accuracy(log_confusion,
-                                                    pos_label = 'TREG',
-                                                    neg_label = 'CD4+T')
+```{r log_PCA_evaluation}
+# Create a table of the evaluation metrics
+logreg_metrics_table <- data.frame(
+  Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
+  log = c(logreg_accuracy, logreg_balanced_accuracy, logreg_f1_score, logreg_auc, logreg_misclas)
+)
 
-cat("Balanced Accuracy of Logistic Regression:", log_balanced_accuracy, "\n")
-```
-
-```{r logreg_f1_score}
-log_f1_score <- F1_Score(y_true= test_data$label, y_pred = logreg_pred)
-cat("F1 Score for Logistic Regression:", log_f1_score, "\n")
-```
-
-```{r logreg_ROC_AUC}
-roc_curve_log <- roc(test_data$label, logreg_probs, levels=c("TREG", "CD4+T"), direction = ">")
-
-plot(roc_curve_log, col="blue", main="ROC Curve for Logistic Regression")
-
-log_auc <- as.numeric(auc(roc_curve_log))
-cat("The AUC of the ROC of Logistic Regression:", log_auc, "\n")
-```
-
-```{r logreg_Misclass}
-log_misclas <- mean(glm_pred != test_data_log$label)
-cat("The Misclassification rate of Logistic Regression:", log_misclas, "\n")
+print(logreg_metrics_table)
 ```
 
 #### Quadratic Discriminant Analysis (QDA) (Chi)
@@ -586,6 +547,13 @@ gbm_pred_classes <- read.csv("predictions_1.2/gbm_predictions.csv") %>%
 gbm_pred_classes <- gbm_pred_classes[,'x']
 ```
 
+```{r gbm_confusion}
+gbm_confusion <- table(predicted = gbm_pred_classes,
+                       observed = test_data$label)
+
+print(gbm_confusion)
+```
+
 ```{r gbm_Confusion}
 gbm_confusion_matrix <- table(Predicted = gbm_pred_classes, Actual = test_data_cleaned_gbm$label_as_numeric)
 print(gbm_confusion_matrix)
@@ -658,36 +626,47 @@ yhat.rf <- yhat.rf[,'x']
 ```
 
 ```{r rf_confusion}
-rf_confusion_matrix <- confusion_matrix <- table(Predicted = yhat.rf, Actual = test_data$label)
-print(rf_confusion_matrix)
-rf_balanced_accuracy <- fun_calc_balanced_accuracy(rf_confusion_matrix,
-                                                   pos_label = "TREG",
-                                                   neg_label = "CD4+T")
+rf_confusion <- table(predicted = yhat.rf,
+                           observed = test_data$label)
 
-cat("The balanced accuracy is", rf_balanced_accuracy, "\n")
+print(rf_confusion)
 ```
 
-```{r rf_misclass}
-rf_misclas <- mean(yhat.rf != test_data$label)
-cat("Random Forest Misclassification Rate:", rf_misclas, "\n")
-```
-
-```{r rf_accuracy}
+```{r log_pca_diagnostics}
 rf_accuracy <- mean(yhat.rf == test_data$label)
-cat("Random Forest Accuracy:", rf_accuracy, "\n")
-```
 
-```{r rf_roc_auc}
+rf_balanced_accuracy <- fun_calc_balanced_accuracy(rf_confusion,
+                                                        pos_label = 'TREG',
+                                                        neg_label = 'CD4+T')
+
+rf_f1_score <- F1_Score(y_true = test_data$label, 
+                             y_pred = yhat.rf,
+                             positive = "TREG")
+
+
 yhat.rf_numeric <- ifelse(yhat.rf == "CD4+T", 0, ifelse(yhat.rf == "TREG", 1, NA))
-roc_rf <- roc(test_data$label, yhat.rf_numeric)
-rf_auc <- auc(roc_rf)
-cat("Random Forest AUC:", rf_auc, "\n")
-plot(roc_rf, main = "Random Forest ROC Curve")
+rf_roc_curve <- roc(
+  response = test_data$label,
+  predictor = yhat.rf_numeric, 
+  levels = c('CD4+T','TREG'),
+  direction = "<"
+  )
+
+rf_auc <- auc(rf_roc_curve)
+
+rf_misclas <- mean(yhat.rf != test_data$label)
+
+plot(rf_roc_curve, col = "red", main = "ROC Curve for log")
 ```
 
-```{r rf_f1_score}
-rf_f1_score <- F1_Score(y_pred = yhat.rf, y_true = test_data$label)
-cat("F1 Score:", rf_f1_score, "\n")
+```{r rf_evaluation}
+# Create a table of the evaluation metrics
+rf_metrics_table <- data.frame(
+  Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
+  log = c(rf_accuracy, rf_balanced_accuracy, rf_f1_score, rf_auc, rf_misclas)
+)
+
+print(rf_metrics_table)
 ```
 
 Using a random forest tree model, we see that the accuracy of the model was 0.936 Which is quite accurate! Misclassification Rate was equal to 0.064. The F1 score was equal to 0.9504
@@ -818,9 +797,46 @@ cat("SVM prediction time:", svm_prediction_time, "\n")
 ```
 
 ```{r svm_confusion}
-svm_confusion_matrix <- table(predict = svm_rad_pca_pred, truth = test_data$label)
-print(svm_confusion_matrix)
-print(svm_confusion_matrix[2,2])
+svm_rad_confusion_matrix <- table(predicted = svm_rad_pca_pred,
+                           observed = test_data$label)
+
+print(svm_rad_confusion_matrix)
+print(svm_rad_confusion_matrix[2,2])
+```
+
+```{r log_pca_diagnostics}
+svm_rad_accuracy <- mean(log_pca_pred == test_data_pca$label)
+
+svm_rad_balanced_accuracy <- fun_calc_balanced_accuracy(svm_rad_confusion_matrix,
+                                                        pos_label = 'TREG',
+                                                        neg_label = 'CD4+T')
+
+svm_rad_f1_score <- F1_Score(y_true = test_data$label, 
+                             y_pred = svm_rad_pca_pred,
+                             positive = "TREG")
+
+svm_rad_roc_curve <- roc(
+  response = test_data$label,
+  predictor = as.numeric(svm_rad_pca_pred), 
+  levels = c('CD4+T','TREG'),
+  direction = "<"
+  )
+
+svm_rad_auc <- auc(svm_rad_roc_curve)
+
+svm_rad_misclas <- mean(svm_rad_pca_pred != test_data$label)
+
+plot(svm_rad_roc_curve, col = "red", main = "ROC Curve for SVM")
+```
+
+```{r svm_evaluation}
+# Create a table of the evaluation metrics
+svm_rad_metrics_table <- data.frame(
+  Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
+  log = c(svm_rad_accuracy, svm_rad_balanced_accuracy, svm_rad_f1_score, svm_rad_auc, svm_rad_misclas)
+)
+
+print(svm_rad_metrics_table)
 ```
 
 ```{r svm_balanced_accuracy}
