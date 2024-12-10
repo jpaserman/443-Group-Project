@@ -214,7 +214,7 @@ Train and evaluate feature selection methods with the goal of achieving high bal
 ### Lasso
 
 ```{r lasso with balanced accuracy}
-
+set.seed(seed)
 lasso_test_data <-test_data_2
 lasso_train_data <-train_data_2
 
@@ -306,6 +306,7 @@ cat("Worst score Lambda:", worst_lambda, "\n")
 cat("lowest Balanced Accuracy on CV:", worst_balanced_accuracy, "\n")
 cat("Number of Predictors for worst score:", worst_num_predictors, "\n")
 cat("Balanced Accuracy on Test Data:", worst_test_balanced_accuracy, "\n")
+cat("Score:", custom_scores[worst_lambda_index], "\n")
 
 ```
 
@@ -453,6 +454,7 @@ cat("F1 Score:", linear_lasso_f1_score, "\n")
 ### Forward stepwise selection (FSS)
 
 ```{r fss_Training, results='hold'}
+set.seed(seed)
 fss_test_data <- test_data_2_top_subset
 fss_train_data <- train_data_2_top_subset
 
@@ -684,6 +686,7 @@ For T2.2 and T2.3, your evaluation results should include the balanced accuracy 
 ### Elastic net
 
 ```{r}
+set.seed(seed)
 elastic_net_train_data <- train_data_2
 elastic_net_test_data <- test_data_2
 
@@ -845,6 +848,7 @@ cat("Balanced Accuracy on Test Data with Worst Balanced Accuracy Alpha and Lambd
 
 #### Linear Elastic Net
 ```{r lin_elastic_net model} 
+set.seed(seed)
 # Rename datasets for linear elastic net regression
 linear_elastic_net_train_data <- train_data_2
 linear_elastic_net_test_data <- test_data_2
@@ -964,6 +968,7 @@ cat("F1 Score:", lin_elastic_f1_score, "\n")
 ### XGBoost
 
 ```{r xgboost}
+set.seed(seed)
 # Replace -1 with 0 in labels
 xgb_train_data <- train_data_2
 xgb_test_data <- test_data_2
@@ -1091,6 +1096,98 @@ cat("F1 Score:", xgb_f1_score, "\n")
 ```
 
 
+
+```{r xgb_model_ save different params, and models}
+# Initialize a list to store results
+results <- list()
+
+# Looping the xgboost model over different parameters
+for (i in 1:nrow(grid_search)) {
+  params <- list(
+    eta = grid_search$eta[i],
+    max_depth = grid_search$max_depth[i],
+    objective = "binary:logistic",
+    scale_pos_weight = scale_pos_weight,
+    eval_metric = "logloss",
+    nthread = 4
+  )
+  
+  xgb_cv <- xgb.cv(
+    params = params,
+    data = xgb_train_matrix,
+    nrounds = grid_search$nrounds[i],
+    nfold = 5,
+    verbose = 0,
+    early_stopping_rounds = 50,
+    prediction = TRUE
+  )
+  
+  # Calculate balanced accuracy for each fold
+  balanced_accuracies <- sapply(1:5, function(fold) {
+    fold_indices <- xgb_cv$folds[[fold]]
+    fold_predictions <- ifelse(xgb_cv$pred[fold_indices] > 0.5, 1, 0)
+    fold_confusion_matrix <- table(Predicted = fold_predictions, Actual = xgb_train_data$label[fold_indices])
+    calculate_balanced_accuracy(fold_confusion_matrix)
+  })
+  
+  xgb_mean_balanced_accuracy <- mean(balanced_accuracies, na.rm = TRUE)
+  
+  # Store the results
+  results[[i]] <- list(params = params, balanced_accuracy = xgb_mean_balanced_accuracy, nrounds = xgb_cv$best_iteration)
+  
+  # Train final model if current balanced accuracy is better
+  if (!is.na(xgb_mean_balanced_accuracy) && xgb_mean_balanced_accuracy > xgb_best_balanced_accuracy) {
+    xgb_best_balanced_accuracy <- xgb_mean_balanced_accuracy
+    best_model <- xgb.train(
+      params = params,
+      data = xgb_train_matrix,
+      nrounds = xgb_cv$best_iteration
+    )
+    
+    # Get feature importance for the best model
+    importance_matrix <- xgb.importance(feature_names = colnames(xgb_train_data[, -1]), model = best_model)
+    selected_features <- importance_matrix$Feature
+  }
+}
+
+```
+```{r worst_ba}
+# Find the parameters with the worst balanced accuracy
+worst_result <- results[[which.min(sapply(results, function(x) x$balanced_accuracy))]]
+worst_params <- worst_result$params
+worst_nrounds <- worst_result$nrounds
+```
+```{r xgb_worst_param_test}
+# Train the model with the worst parameters
+worst_model <- xgb.train(
+  params = worst_params,
+  data = xgb_train_matrix,
+  nrounds = worst_nrounds
+)
+
+# Get feature importance for the worst model
+worst_importance_matrix <- xgb.importance(feature_names = colnames(xgb_train_data[, -1]), model = worst_model)
+worst_selected_features <- worst_importance_matrix$Feature
+
+# Test predictions and new balanced accuracy for the worst model
+worst_predictions <- predict(worst_model, newdata = xgb_test_matrix)
+worst_predictions <- ifelse(worst_predictions > 0.5, 1, 0)
+
+worst_confusion_matrix <- table(Predicted = worst_predictions, Actual = xgb_test_data$label)
+
+# Calculate Balanced Accuracy for the worst model
+worst_sensitivity <- worst_confusion_matrix[2, 2] / (worst_confusion_matrix[2, 2] + worst_confusion_matrix[1, 2])
+worst_specificity <- worst_confusion_matrix[1, 1] / (worst_confusion_matrix[1, 1] + worst_confusion_matrix[2, 1])
+worst_final_balanced_accuracy <- (worst_sensitivity + worst_specificity) / 2
+
+# Output results for the worst model
+cat("Final Balanced Accuracy for Worst XGboost Model:", worst_final_balanced_accuracy, "\n")
+cat("Selected Features Count for Worst XGboost Model:", length(worst_selected_features), "\n")
+cat("The worst parameters for our XGboost model were: eta:", worst_params$eta, "and max depth:", worst_params$max_depth, "\n")
+
+# Plot Feature Importance for the Worst Model
+xgb.plot.importance(worst_importance_matrix)
+```
 
 
 
