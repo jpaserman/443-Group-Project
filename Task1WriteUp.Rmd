@@ -51,20 +51,21 @@ In the following we are evaluating seven different classifiers regarding their c
 
 -   **SVM (Support Vector Machine)**: The SVM works by finding a hyperplane that best separates data into different classes, maximizing the margin between the classes. SVM can also handle non-linear data by using kernel functions to transform the data into higher-dimensional spaces.
 
-| w/o PCA  | Accuracy       | Bal. Accuracy  | AUC           | F1            |
-|----------|----------------|----------------|---------------|---------------|
-| LDA      | 0.9415525      | 0.9406989      | 0.9407        | **0.9525926** |
-| Logistic | 0.6392694      | 0.6413256      | 0.6596597     | 0.6857597     |
-| QDA      | N/A            | N/A            | N/A           | N/A           |
-| k-NN     | 0.7424658      | 0.6963545      | 0.6963545     | 0.5982906     |
-| GBDT     | 0.906821       | 0.8856173      | **0.9723815** | 0.9283372     |
-| RF       | 0.9351598      | 0.9170923      | 0.9170923     | 0.9500352     |
-| SVM      | **0.95525114** | **0.94792398** | 0.94792398    | 0.9394314     |
+| w/o PCA  | Accuracy   | Bal. Accuracy | AUC           | F1         |
+|----------|------------|---------------|---------------|------------|
+| LDA      | 0.94155    | 0.9407        | 0.9407        | **0.9526** |
+| Logistic | 0.6393     | 0.6413        | 0.6596597     | 0.6858     |
+| QDA      | N/A        | N/A           | N/A           | N/A        |
+| k-NN     | 0.7425     | 0.6964        | 0.6963545     | 0.5983     |
+| GBDT     | 0.9068     | 0.8856        | **0.9723815** | 0.9283     |
+| RF       | 0.9352     | 0.9171        | 0.9170923     | 0.9500     |
+| SVM      | **0.9553** | **0.9479**    | 0.9479        | 0.9394     |
 
 ## Task 1.2 Summary Table with PCA
 
 In the following we are applying the dimensionality reduction tool PCA (Principal Component Analyis). It transforms data into a new coordinate system, where the axes (principal components) capture the maximum variance in the data. It finds a set of orthogonal directions (principal components) that explain the most variability, with the first component explaining the most, the second the second most, and so on. PCA is often used to reduce the number of features while preserving as much information as possible, simplifying data for analysis or visualization.
 
+<<<<<<< HEAD
 | with PCA            | Accuracy       | Bal. Accuracy  | AUC            | F1             |
 |---------------|---------------|---------------|---------------|-------------|
 | LDA                 | 0.93515982     | 0.91756581     | 0.98915349     | 0.90791180     |
@@ -75,6 +76,18 @@ In the following we are applying the dimensionality reduction tool PCA (Principa
 | RF                  | 0.93789954     | 0.92545064     | 0.92545064     | 0.91414141     |
 | SVM (Linear Kernel) | 0.94885845     | 0.94089042     | 0.94089042     | 0.93069307     |
 | SVM (Radial Kernel) | **0.94977169** | 0.93973058     | 0.93973058     | **0.93116395** |
+=======
+| with PCA            | Accuracy   | Bal. Accuracy | AUC        | F1         |
+|---------------------|------------|---------------|------------|------------|
+| LDA                 | 0.9361     | 0.9188        | **0.9892** | 0.9506     |
+| Logistic            | 0.9489     | **0.9423**    | 0.9423     | 0.9593     |
+| QDA                 | 0.9406     | 0.9300        | 0.9874     | 0.9186     |
+| k-NN                | 0.9114     | 0.8384        | 0.8900     | 0.8725     |
+| GDBT                | 0.8594     | 0.8165        | 0.9577     | 0.8948     |
+| RF                  | 0.9342     | 0.9235        | 0.9235     | **0.9482** |
+| SVM (Linear Kernel) | 0.9489     | 0.9418        | 0.9479     | 0.9310     |
+| SVM (Radial Kernel) | **0.9498** | 0.9402        | 0.9402     | 0.9313     |
+>>>>>>> 9225afb (write up commit)
 
 ## Task 1.3 Improved Classifiers
 
@@ -83,8 +96,8 @@ In the following we are applying the dimensionality reduction tool PCA (Principa
 |                       | F1 Score before | F1 Score after |
 |-----------------------|-----------------|----------------|
 | QDA/LDA??             |                 |                |
-| Logistic (with Ridge) | 0.6857597       |                |
-| RF (with AdaBoost)    | 0.9482014       | 0.9628551      |
+| Logistic (with Ridge) | 0.6858          |                |
+| RF (with AdaBoost)    | 0.9482          | 0.9629         |
 
 -   explanation how each classifier was improved and why this improvement method was chosen
 
