@@ -28,7 +28,7 @@ knitr::include_graphics("004_443.png")
 We can see that not all genes have a high amount of information for differentiating between the two cell types CD4+T and TREG and being thus a useful predictor for classification purposes. Rather it is a lower amount of top cells which are able to influence the classification models the most. We will discuss more on this when we talk about PCA and its principal components. In the following we can observe the summary of top 3 cells with the highest absolute difference in mean values, and in addition their boxplots.
 
 |  |  |  |
-|------------------------|------------------------|-----------------------|
+|----|----|----|
 | ![](images/001_443-01.png){width="200"} | ![](images/002_443-01.png){width="200"} | ![](images/003_443.png){width="200"} |
 
 The last plot for the third largest difference in absolute mean values differs from the other since the CD4+T 3rd quarter for TNFRSF1B is still 0 and the mean is located in the 4th quarter and therefore the box plot visually cannot be generated here.
