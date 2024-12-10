@@ -1605,10 +1605,6 @@ lda_avg_scores <- lda_cv_scores %>%
             F1_sd = sd(f1),
             .groups = "keep")
 
-lda_improved_models <- lda_cv_scores[order(lda_cv_scores$F1,
-                                                 decreasing = TRUE),]
-
-lda_improved_models
 ```
 
 ```{r}
@@ -1621,6 +1617,7 @@ ggplot(lda_avg_scores, aes(x = threshold, y = F1, color = as.factor(no_pc))) +
 lda_improved_models <- lda_avg_scores[order(lda_avg_scores$F1,
                                                  decreasing = TRUE),]
 
+lda_best_no_pc <- 28 #as.integer(lda_improved_models[1, 'no_pc'])
 
 lda_tuned_training <- task_one_df_pca[train_indices, 1:lda_best_no_pc] %>%
   
@@ -1771,7 +1768,7 @@ for (prin_comps in no_prin_comps) {
                                      method = "glmnet", 
                                      trControl = train_control,
                                      tuneGrid = expand.grid(
-                                       alpha = c(0, 1),
+                                       alpha = c(0, 0.5, 1),
                                        lambda = c(0.001,
                                                   0.01, 0.02,
                                                   0.05, 0.1)
@@ -1836,10 +1833,10 @@ x_train_log_regularized <- as.matrix(train_data[, setdiff(names(train_data), "la
 y_train_log_regularized <- train_data$label_as_numeric
 
 # Fit a regularized logistic regression model
-logreg_fit_regularized <- glmnet(x_train_log_regularized, y_train_log_regularized, family = "binomial", alpha = 0)  
+logreg_fit_regularized <- glmnet(x_train_log_regularized, y_train_log_regularized, family = "binomial", alpha = 0) 
 # alpha=1 for Lasso, alpha=0 for Ridge, or between 0 and 1 for Elastic Net
 
-logreg_run_time <- Sys.time() - logreg_start_time 
+logreg_run_time <- Sys.time() - logreg_start_time # Time difference of 16.91733 secs
 
 # Make predictions on the test data
 x_test_log_regularized <- as.matrix(test_data[, setdiff(names(test_data), "label")])
@@ -2057,6 +2054,7 @@ cat("F1 Score of Logistic Regression with Ridge Regularization:", log_ridge_f1_s
 # Train the AdaBoost model with Random Forest as the base learner
 start_time_rf_ab <- Sys.time()
 
+set.seed(seed)
 # Train AdaBoost using Random Forest as the base model
 rf_ab_model <- boosting(
   label ~ . - label_as_numeric,       # Formula excluding label_as_numeric
