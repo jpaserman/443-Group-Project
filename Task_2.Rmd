@@ -975,28 +975,33 @@ y_train <- as.factor(y_train)
 # Separate out the explanatory variables
 x_train <- svm_rfe_train_data[, -which(colnames(svm_rfe_train_data) == "label")]
 x_train <- as.data.frame(x_train)
-dim(x_train)
+dim(x_train) # (640 30121)
 
 # Remove variables in the training data that have constant values to allow for future scaling
-nzv <- nearZeroVar(x_train)
+nzv <- nearZeroVar(x_train, freqCut = 99/1) #update the name of this variable and tune the parameter for the cutoff (currently at 95%?) (98/2)
 if (length(nzv) > 0) {
   x_train <- x_train[, -nzv]
 }
 # x_train <- x_train[, apply(x, 2, function(column) length(unique(column)) > 1)]
-dim(x_train)
+dim(x_train) # (640 12378)
 
 # SVM RFE model
 start_time_sve_rfe <- Sys.time()
 
-# Preprocess the data: centering and scaling the predictors
+# Preprocess the data: centering and scaling the predictors  ### update this comment
 preProc <- preProcess(x_train, method = c("center", "scale"))
 x_train <- predict(preProc, x_train)
 
 # Define control setup for RFE, utilize cross-validation with 10-folds
 ctrl <- rfeControl(functions = caretFuncs, method = "cv", number = 10)
 
+seq_sizes_1 <- seq(3, 30, by = 3)
+seq_sizes_2 <- seq(35, 100, by = 5)
+seq_sizes_3 <- seq(110, 200, by = 10)
+seq_sizes_4 <- seq(300, 1300, by = 100)
+
 # RFE with linear kernel SVM
-svm_rfe <- rfe(x = x_train, y = y_train, sizes = c(1:10), rfeControl = ctrl, method = "svmLinear")
+svm_rfe <- rfe(x = x_train, y = y_train, sizes = c(1, seq_sizes_1, seq_sizes_2, seq_sizes_3, seq_sizes_4), rfeControl = ctrl, method = "svmLinear") # tune the sizes parameter
 
 
 end_time_svm_rfe <- Sys.time()
@@ -1038,32 +1043,32 @@ svm_rfe_balanced_accuracy <- fun_calc_balanced_accuracy(svm_rfe_confusion_matrix
                                                         pos_label = "1",
                                                         neg_label = "-1")
 
-cat("The balanced accuracy for SVM with RFE is:", svm_rfe_balanced_accuracy, "\n") # 0.8257457 
+cat("The balanced accuracy for SVM with RFE is:", svm_rfe_balanced_accuracy, "\n") # 0.8257457 (0.8574045)
 
 ```
 
 ```{r svm_rfe_misclass}
 svm_rfe_misclassification_rate <- mean(yhat.svm_rfe != y_test)
-cat("SVM with RFE Misclassification Rate:", svm_rfe_misclassification_rate, "\n") # 0.0625 
+cat("SVM with RFE Misclassification Rate:", svm_rfe_misclassification_rate, "\n") # 0.0625 (0.06875)
 
 ```
 
 ```{r svm_rfe_accuracy}
 svm_rfe_accuracy <- mean(yhat.svm_rfe == y_test)
-cat("SVM with RFE Accuracy:", svm_rfe_accuracy, "\n") # 0.9375
+cat("SVM with RFE Accuracy:", svm_rfe_accuracy, "\n") # 0.9375 (0.93125)
 
 ```
 
 ```{r svm_rfe_roc_auc}
 roc_svm_rfe <- roc(y_test, as.numeric(yhat.svm_rfe))
 cat("SVM with RFE AUC:", auc(roc_svm_rfe), "\n")
-plot(roc_svm_rfe, main = "SVM with RFE ROC Curve") # 0.8257457 
+plot(roc_svm_rfe, main = "SVM with RFE ROC Curve") # 0.8257457 (0.8574045)
 
 ```
 
 ```{r svm_rfe_f1_score}
 svm_rfe_f1_score <- F1_Score(y_pred = yhat.svm_rfe, y_true = y_test, positive = "1")
-cat("F1 Score:", svm_rfe_f1_score, "\n") # 0.6428571 
+cat("F1 Score:", svm_rfe_f1_score, "\n") # 0.6428571 (0.6451613)
 
 ```
 
