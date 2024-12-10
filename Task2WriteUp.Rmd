@@ -60,10 +60,10 @@ After the results obtained from the logistic classification method with a lasso 
 
 #### XGBoost
 Boosting is another technique that can be relevant for feature selection. Boosting combines weak learners (usually decision trees) to create a strong learner, and it does so by building models sequentially and attempting to correct the errors made n the previous model. While boosting, the algorithm records the importance of each feature based on how much it improved the model's performance. A boosting algorithm stores an importance score for each feature, and that way some features can be dropped. 
-We attempted to use the XGBoost (Extreme Gradient Boosting) algorithm. XGBoost, is a boosting algorithm that is able to handle very large datasets and uses regularization techniques as well. Since XGBoost handles imbalanced data quite well, we decided to not weight the data. Our process is similar to the one used for Lasso and the Elastic net, where we loop over certain hyper parameters, most importantly $\lambda$, which represents the shrinkage parameters, specifically the rate which boosting learns. We then returned the model which returned the best balanced accuracy on the cross validation, and then used that model to make predictions on the test data. The number of features selected were extracted from the XGB importance matrix, which calculates importance based on gain, cover and frequency.^[Gain is the improvement in accuracy brought by a feature to the branches it is on. Cover represents the second derivative to the loss function with respect to a variable, a large value means the feature has a large importance on the loss function. Frequency represents the number of times a feature is used in all generated trees.].Features with 0, are excluded from the matrix. Below is a chart for the features selected for our best XGBoost Model. 
+We attempted to use the XGBoost (Extreme Gradient Boosting) algorithm. XGBoost, is a boosting algorithm that is able to handle very large datasets and uses regularization techniques as well. Since XGBoost handles imbalanced data quite well, we decided to not weight the data. Our process is similar to the one used for Lasso and the Elastic net, where we loop over certain hyper parameters, most importantly $\lambda$, which represents the shrinkage parameters, specifically the rate which boosting learns. We then returned the model which returned the best balanced accuracy on the cross validation, and then used that model to make predictions on the test data. The number of features selected were extracted from the XGB importance matrix, which calculates importance based on gain, cover and frequency.^[Gain is the improvement in accuracy brought by a feature to the branches it is on. Cover represents the second derivative to the loss function with respect to a variable, a large value means the feature has a large importance on the loss function. Frequency represents the number of times a feature is used in all generated trees.].Features with 0, are excluded from the matrix. Below is a chart for the features selected for our best XGBoost Model. We found that the best learning rate, $\lambda$, was equal to 0.5!
 
 ```{r, echo=FALSE, out.width="80%", fig.align="left"}
-knitr::include_graphics("xgb_selected_features_importance.png")
+knitr::include_graphics("images/xgb_selected_features_importance.png")
 ```
 
 
@@ -80,7 +80,7 @@ knitr::include_graphics("xgb_selected_features_importance.png")
 | FSS                 | 208                | 0.7805        | 0.9188     | 0.5517       |
 | Random Forest       | 100                | 0.8223        | 0.9313     | 0.6207       |
 | Log. Elastic Net    | 88                 | **0.8608**    | **0.9375** | **0.6667**   |
-| XGBoost             | 73                 | 0.8257        | **0.9375** | 0.6429       |
+| XGBoost             | 81                 | 0.8257        | **0.9375** | 0.6429       |
 | SVM (Linear Kernel) | **35**             | 0.8574        | 0.9313     | 0.6452       |
 
 
