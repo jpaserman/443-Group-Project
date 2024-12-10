@@ -84,8 +84,6 @@ task_two_df <- read.csv(csv_file_two)
 # print(check_na_runtime) 
 
 
-# task_two_df$label_as_factor <- as.factor(task_two_df$label)
-
 ```
 
 ```{r EDA}
@@ -138,31 +136,6 @@ table(task_two_df$label) # 772 compounds did not bind and 78 compounds did bind
 
 ```
 
-```{r remove_multicollinearity, cache=TRUE}
-# # Must split the data into 2 sets of variables in order for the code to run
-# num_vars <- ncol(task_two_df)
-# chunk_size <- num_vars / 2
-# cor_indices <- seq(1, num_vars, by = chunk_size)
-# 
-# # Initialize vector to retain the variables to be dropped
-# all_redundant_vars <- c()
-# 
-# # Return the index of variables that have high pair-wise correlation (above 0.7)
-# # "If two variables have a high correlation, the function looks at the mean absolute correlation of each variable and removes the variable with the largest mean absolute correlation" (findCorrelation documentation)
-# for (i in cor_indices) {
-#   chunk_vars <- i:min(i + chunk_size - 1, num_vars)
-#   cor_matrix <- cor(task_two_df[, chunk_vars])
-#   redundant_vars <- findCorrelation(cor_matrix, cutoff = 0.7)
-#   all_redundant_vars <- c(all_redundant_vars, chunk_vars[redundant_vars])
-# }
-# 
-# # Remove variables with high multicollinearity
-# task_two_df <- task_two_df[, -unique(all_redundant_vars)]
-# 
-# # After removing features with high multicollinearity, our data prior to feature selection has 800 observations and now only 29,787 features
-# dim(task_two_df)
-
-```
 
 
 ```{r select_top_predictors, cache=TRUE}
