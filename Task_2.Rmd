@@ -308,6 +308,7 @@ cat("Number of Predictors for worst score:", worst_num_predictors, "\n")
 cat("Balanced Accuracy on Test Data:", worst_test_balanced_accuracy, "\n")
 
 ```
+
 ```{r worst_lambda_bal_acc}
 # Find the lambda with the highest balanced accuracy
 worst_lambda_index <- which.min(balanced_accuracies) #Max balanaced accuracy for the predictions. 
@@ -811,6 +812,7 @@ elastic_worst_test_balanced_accuracy <- calculate_balanced_accuracy(elastic_wors
 
 cat("Balanced Accuracy on Test Data with Worst Alpha and Lambda:", elastic_worst_test_balanced_accuracy, "\n")
 ```
+
 ```{r elastic worst balanced acc}
 # Extract the combination of alpha and lambda that gave the worst balanced accuracy on the CV
 worst_balanced_accuracy_result <- NULL
