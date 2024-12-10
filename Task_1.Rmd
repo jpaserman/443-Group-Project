@@ -2017,22 +2017,55 @@ logreg_ridge_tuned_metrics_table <- data.frame(
 
 print(logreg_ridge_tuned_metrics_table)
 ```
+
+#### Logistic Regression with Lasso Regularisation and Cross Validation (Chi)
+
+```{r logreg_lasso_cv_train}
+logreg_lasso_cv_time <- Sys.time()
+
+logreg_lasso_cv_scores <- data.frame(no_pc = c(),
+                            threshold = c(),
+                            lambda = c(),
+                            #balanced_accuracy = c(),
+                            f1 = c())
+
+thresholds <- seq(0.1, 0.9, 0.1)
+
+set.seed(seed)
+
+fold_indices <- createFolds(train_data$label, k = 10, returnTrain = TRUE)
+
+for (prin_comps in no_prin_comps) {
+  
+  logreg_lasso_train_X <- task_one_df_pca[train_indices, 1:prin_comps] %>%
+    
+    as.matrix() # Use the first n_components
+    
+  for (fold in fold_indices){
+    logreg_lasso_cv_model <- glmnet(logreg_lasso_train_X[fold,],
+                              as.factor(train_data[fold, 'label']),
+                              family = "binomial",
+                              alpha = 1)
+    
+    for (lambda in lambda_tuning){
+      logreg_lasso_cv_probs <- predict(logreg_lasso_cv_model,
+                                 logreg_lasso_train_X[-fold,],
                                  type = "response",
                                  s = lambda)
       
       for (threshold in thresholds){
-        logreg_cv_preds <- as.factor(ifelse(logreg_cv_probs > threshold,
+        logreg_lasso_cv_preds <- as.factor(ifelse(logreg_lasso_cv_probs > threshold,
                                          "TREG",
                                          "CD4+T"))
         
-        # cm <- table(logreg_cv_preds, train_data[-fold, "label"])
+        # cm <- table(logreg_lasso_cv_preds, train_data[-fold, "label"])
         # 
         # balanced_accuracy <- fun_calc_balanced_accuracy(cm, 
         #                                                 pos_label = "TREG", 
         #                                                 neg_label = "CD4+T")
         
         f1 <- F1_Score(y_true = train_data[-fold,"label"],
-                       y_pred = logreg_cv_preds,
+                       y_pred = logreg_lasso_cv_preds,
                        positive = "TREG")
         
         return_df <- data.frame(no_pc = prin_comps,
