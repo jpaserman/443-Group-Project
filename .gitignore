@@ -6,3 +6,5 @@ knn_predictions.csv
 .DS_Store
 Task_1_files
 Task_1.Rmd
+
+*.png
