@@ -110,21 +110,21 @@ For a classifier, the set of hyperparameters selected is a set that produces a h
 
 The following table shows the hyperparameters considered for each classifier, the range of values cross-validated for and the optimal set chosen.
 
-+---------------------------+---------------------------------+----------------------------------------+-------------+
-| Classifier                | Hyperparameters                 | Range Cross-Validated                  | Chosen Set  |
-+===========================+=================================+========================================+=============+
-| LDA                       | No. Principal Components,\      | $\{10, 11, \ldots, 30\}$,\             | 26,\        |
-|                           | Decision Threshold              | $\{0.1, 0.2, \ldots, 0.9\}$            | 0.2         |
-+---------------------------+---------------------------------+----------------------------------------+-------------+
-| Logistic Ridge Regression | No. Principal Components,\      | $\{10, 11, \ldots, 30\}$,\             | 48,\        |
-|                           | Decision Threshold,\            | $\{0.1, 0.2, \ldots, 0.9\}$,\          | 0.4,\       |
-|                           | Regularisation Term ($\lambda$) | $\{0, 0.00001, 0.0001, 0.001, 0.01\}$\ | 0.01        |
-+---------------------------+---------------------------------+----------------------------------------+-------------+
-| AdaBoost                  | No. Principal Components,\      | $\{15, 16, \ldots, 30\}$,\             | 26,\        |
-|                           | Decision Threshold,\            | $\{0.1, 0.2, \ldots, 0.9\}$,\          | 0.5,\       |
-|                           | Number of Weak Learners (M),\   | $\{50, 100, 150, 200\}$,\                | 200,\       |
-|                           | Depth of Trees                  |                                        | 5           |
-+---------------------------+---------------------------------+----------------------------------------+-------------+
++---------------------------+---------------------------------------------+----------------------------------------+--------------+
+| Classifier                | Hyperparameters                             | Range Cross-Validated                  | Chosen Set   |
++===========================+=============================================+========================================+==============+
+| LDA                       | No. Principal Components,\                  | $\{10, 11, \ldots, 30\}$,\             | 26,\         |
+|                           | Decision Threshold                          | $\{0.1, 0.2, \ldots, 0.9\}$            | 0.2          |
++---------------------------+---------------------------------------------+----------------------------------------+--------------+
+| Logistic Ridge Regression | No. Principal Components,\                  | $\{10, 11, \ldots, 30\}$,\             | 48,\         |
+|                           | Decision Threshold,\                        | $\{0.1, 0.2, \ldots, 0.9\}$,\          | 0.4,\        |
+|                           | Regularisation Term ($\lambda$)             | $\{0, 0.00001, 0.0001, 0.001, 0.01\}$\ | 0.01         |
++---------------------------+---------------------------------------------+----------------------------------------+--------------+
+| AdaBoost                  | No. Principal Components,\                  | $\{15, 16, \ldots, 30\}$,\             | 26,\         |
+|                           | Decision Threshold,\                        | $\{0.1, 0.2, \ldots, 0.9\}$,\          | 0.5,\        |
+|                           | Number of Weak Learners (M),\               | $\{50, 100, 150, 200\}$,\              | 200,\        |
+|                           | Depth of Trees                              | $\{3, 5, 7\}$                          | 3            |
++---------------------------+---------------------------------------------+----------------------------------------+--------------+
 
 -   **LDA with CV**: We enhance LDA by applying PCA and cross-validation (CV) to address a drop in accuracy, balanced accuracy, and F1 score when using PCA. This is likely due to fewer components/features, which reduce the model’s ability to linearly separate data in lower dimensions. Cross-validation helps select the best subset for training, identifying the features that provide the most valuable information for the model. Additionally, the number of principal components and the threshold for classifying positive vs. negative predictions are tuned. Lower thresholds (around 0.2 to 0.3) improve the F1 score. The slight imbalance in the classes within the training data set is considered during hyperparameter tuning to optimize model performance.
 -   **Logistic CV and Lasso**: Cross-validation splits the data into multiple subsets (folds), training the model on some and testing on the others. This process helps assess the performance of logistic regression more robustly by reducing overfitting and providing a better estimate of generalization to unseen data. Regularization adds a penalty to the loss function to control model complexity, preventing overfitting by penalizing large coefficients. Lasso regularization can also perform feature selection by driving some coefficients to zero, while Ridge shrinks all coefficients towards zero without eliminating any. Together, cross-validation and regularization help evaluate and improve the model’s performance, with regularization enhancing generalization. Additionally, Lasso and Ridge are compared using different values of lambda (regularization strength), while hyperparameter tuning of the logistic threshold (around 0.4) optimizes the F1 score. The number of principal components is also tuned to achieve the best F1 score.
