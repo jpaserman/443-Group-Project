@@ -1992,6 +1992,101 @@ cat("F1 Score of Random Forest with AdaBoost:", rf_cv_f1_score, "\n")
 #### AdaBoost
 
 ```{r}
+fun_boost_cv <- function(no_prin_comps = c(2:25),
+                         mfinals = seq(50, 200, 50),
+                         depths = seq(1, 11, 2),
+                         complexities = 10^seq(-4, 0, 1),
+                         thresholds = seq(0.1, 0.9, 0.1),
+                         no_folds = 5,
+                         seed = 443){
+  
+  boost_cv_scores <- data.frame(no_pc = c(),
+                              mfinal = c(),
+                              depth = c(),
+                              complexity = c(),
+                              threshold = c(),
+                              f1 = c())
+  
+  set.seed(seed)
+  
+  fold_indices <- createFolds(train_data$label, k = no_folds, returnTrain = TRUE)
+  
+  X_df <- train_data[, !colnames(train_data) %in% c("label", "label_as_numeric")]
+  
+  for (fold in fold_indices) {
+    # For each fold, perform PCA
+    fold_pca_model <- prcomp(X_df[fold,], 
+                             center = TRUE,
+                             scale. = TRUE, 
+                             rank. = max(no_prin_comps))
+    
+    # Fold from PCA to be trained and tested
+    fold_train_df <- data.frame(fold_pca_model$x, 
+                               label = train_data$label[fold]) 
+    
+    fold_test_X <- predict(fold_pca_model, X_df[-fold,])
+    
+    fold_test_Y <- train_data$label[-fold]
+    
+    for (prin_comps in no_prin_comps){
+      #For each Fold, vary number of PCs used to train AdaBoost 
+      
+      # Use the first n (prin_comps) components
+      boost_train <- fold_train_df[, c(1:prin_comps, ncol(fold_train_df))]
+      
+      boost_test_X <- fold_test_X[, 1:prin_comps]
+      
+      for (mfinal in mfinals){
+        for (depth in depths){
+          for (complexity in complexities){
+            # Set any randomness in boosting
+            set.seed(seed)
+            
+            # Train model on n PCs
+            boost_cv_model <- boosting(label ~ ., 
+                                data = boost_train,
+                                mfinal = mfinal,
+                                maxdepth = depth,
+                                cp = complexity)
+            
+            # Predict the probabilities it belongs to a class using model on left out fold 
+            boost_cv_probs <- predict.boosting(boost_cv_model, 
+                                               data.frame(fold_test_X))$prob[,2]
+            
+              for (threshold in thresholds){
+                #For each fold and each model, vary the threshold that decides class
+                boost_cv_preds <- as.factor(ifelse(boost_cv_probs > threshold,
+                                                   "TREG",
+                                                   "CD4+T"))
+                
+                #Calculate balanced accuracy and f1
+                cm <- table(boost_cv_preds, fold_test_Y)
+                
+                f1 <- F1_Score(y_true = fold_test_Y,
+                               y_pred = boost_cv_preds,
+                               positive = "TREG")
+                
+                # Store the scores
+                return_df <- data.frame(no_pc = prin_comps,
+                                mfinal = mfinal,
+                                depth = depth,
+                                complexity = complexity,
+                                threshold = threshold,
+                                f1 = f1)
+                
+                boost_cv_scores <- rbind(boost_cv_scores, return_df)
+            }
+          }
+        }
+      }
+    }
+  }
+  return(boost_cv_scores)
+}
+```
+
+
+```{r}
 boost_train_time <- Sys.time()
 boost_model <- boosting(label ~ . - label_as_numeric, data = train_data_pca, mfinal = 50)
 boost_train_time <- Sys.time() - boost_train_time #Time difference of 5.214975 secs
