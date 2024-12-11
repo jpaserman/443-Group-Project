@@ -1361,7 +1361,7 @@ LDA outperforms QDA. Does this imply a linear bayes decision boundary?
 
 ##### Cross-validation (Finding optimal number of Principal Components and tuning threshold)
 
-```{r}
+```{r fun_lda_cv}
 fun_lda_cv <- function(no_prin_comps = c(2:25),
                         thresholds = seq(0.1, 0.9, 0.1),
                         no_folds = 5,
@@ -1442,23 +1442,23 @@ fun_lda_cv <- function(no_prin_comps = c(2:25),
 ```
 
 
-```{r}
+```{r lda_cv_train}
 lda_cv_time <- Sys.time()
 lda_cv_scores <- fun_lda_cv(no_prin_comps = c(10:30))
 lda_cv_time <- Sys.time() - lda_cv_time # Time difference of 14.50283 mins
 ```
 
-```{r}
+```{r save_lda_cv_scores}
 write.csv(lda_cv_scores, file = "predictions_1.3/lda_cv_scores.csv")
 ```
 
-```{r}
+```{r load_lda_cv_scores}
 lda_cv_scores <- dplyr::select(read.csv(file = "predictions_1.3/lda_cv_scores.csv"),
                                -X)
 ```
 
 
-```{r}
+```{r lda_avg_scores}
 lda_avg_scores <- lda_cv_scores %>%
   
   group_by(no_pc, threshold) %>%
@@ -1475,22 +1475,29 @@ ggplot(filter(lda_avg_scores, no_pc >= 15), aes(x = threshold, y = F1, color = a
 ```
 
 ```{r}
-ggplot(filter(lda_avg_scores, threshold == 0.2), aes(x = no_pc, y = F1)) +
-  geom_line() +
-  geom_point()
+ggplot(filter(lda_cv_scores, threshold == 0.2), aes(x = no_pc, y = f1)) +
+  geom_point() + 
+  geom_smooth()
 ```
+
+##### Tuning
+
+```{r}
+tuning_test_data_pca <- predict(pca_model, test_data)
+```
+
 
 ```{r}
 # lda_improved_models <- lda_avg_scores[order(lda_avg_scores$F1,
 #                                                  decreasing = TRUE),]
 
-lda_best_no_pc <- 25 #as.integer(lda_improved_models[1, 'no_pc'])
+lda_best_no_pc <- 26 #as.integer(lda_improved_models[1, 'no_pc'])
 
 lda_tuned_training <- pca_model$x[, 1:lda_best_no_pc] %>%
   
   data.frame(., label = train_data$label)
 
-test_lda_tuned <- predict(pca_model, test_data)[, 1:lda_best_no_pc]
+test_lda_tuned <- tuning_test_data_pca[, 1:lda_best_no_pc]
 
 lda_tuned_model <- lda(label ~ ., 
                        lda_tuned_training)
@@ -1659,28 +1666,31 @@ ggplot(filter(logreg_ridge_avg_scores, lambda == 0.01), aes(x = threshold, y = F
 ```
 
 ```{r}
-logreg_ridge_improved_models <- logreg_ridge_avg_scores[order(logreg_ridge_avg_scores$F1,
-                                                 decreasing = TRUE),]
+ggplot(filter(logreg_ridge_cv_scores, threshold == 0.4, lambda == 0.01), aes(x = no_pc, y = f1)) +
+  geom_point() + 
+  geom_smooth()
+```
 
-logreg_ridge_best_no_pc <- as.integer(logreg_ridge_improved_models[1, 'no_pc'])
+###### Tuning
 
-logreg_ridge_tuned_training <- task_one_df_pca[train_indices, 1:logreg_ridge_best_no_pc] %>%
+```{r}
+logreg_ridge_best_no_pc <- 48 #as.integer(logreg_ridge_improved_models[1, 'no_pc'])
+
+logreg_ridge_tuned_training <- pca_model$x[, 1:logreg_ridge_best_no_pc] %>%
   
   as.matrix()
 
-test_logreg_ridge_tuned <- task_one_df_pca[-train_indices, 1:logreg_ridge_best_no_pc] %>%
-  
-  as.matrix()
+test_logreg_ridge_tuned <- tuning_test_data_pca[, 1:logreg_ridge_best_no_pc]
 
 logreg_ridge_tuned_model <- glmnet(logreg_ridge_tuned_training,
-                             as.factor(train_data$label),
-                             family = "binomial",
-                             alpha = 0)
+                                   as.factor(train_data$label),
+                                   family = "binomial",
+                                   alpha = 0)
 
 logreg_ridge_tuned_prob <- predict(logreg_ridge_tuned_model, 
-                             newx = test_logreg_ridge_tuned,
-                             type = "response",
-                             s = 0.01)
+                          newx = test_logreg_ridge_tuned,
+                          type = "response",
+                          s = 0.01)
 
 logreg_ridge_tuned_pred <- ifelse(logreg_ridge_tuned_prob > 0.4, "TREG", "CD4+T")
 ```
@@ -1714,7 +1724,7 @@ logreg_ridge_tuned_auc <- auc(logreg_ridge_tuned_roc_curve)
 
 logreg_ridge_tuned_misclas <- mean(logreg_ridge_tuned_pred != test_data_pca$label)
 
-plot(logreg_ridge_tuned_roc_curve, col = "red", main = "ROC Curve for Logistic w Ridge")
+plot(logreg_ridge_tuned_roc_curve, col = "red", main = "ROC Curve for Logistic ridge Regression")
 ```
 
 ```{r logreg_ridge_tuned_evaluation}
@@ -1762,37 +1772,32 @@ ggplot(filter(logreg_lasso_avg_scores, lambda == 0.001), aes(x = threshold, y = 
   geom_line() +
   geom_point()
 ```
+
 ```{r}
-ggplot(filter(logreg_lasso_avg_scores, threshold == 0.4), aes(x = lambda, y = F1, color = as.factor(no_pc))) +
-  geom_line() +
-  geom_point() +
-  scale_x_continuous(limits = c(0,0.1))
+ggplot(filter(logreg_lasso_cv_scores, threshold == 0.4, lambda == 0.001), aes(x = no_pc, y = f1)) +
+  geom_point() + 
+  geom_smooth()
 ```
 
-
+###### Tuning
 ```{r}
-logreg_lasso_improved_models <- logreg_lasso_avg_scores[order(logreg_lasso_avg_scores$F1,
-                                                 decreasing = TRUE),]
+logreg_lasso_best_no_pc <- 26 #as.integer(logreg_lasso_improved_models[1, 'no_pc'])
 
-logreg_lasso_best_no_pc <- 25 #as.integer(logreg_lasso_improved_models[1, 'no_pc'])
-
-logreg_lasso_tuned_training <- task_one_df_pca[train_indices, 1:logreg_lasso_best_no_pc] %>%
+logreg_lasso_tuned_training <- pca_model$x[, 1:logreg_lasso_best_no_pc] %>%
   
   as.matrix()
 
-test_logreg_lasso_tuned <- task_one_df_pca[-train_indices, 1:logreg_lasso_best_no_pc] %>%
-  
-  as.matrix()
+test_logreg_lasso_tuned <- tuning_test_data_pca[, 1:logreg_lasso_best_no_pc]
 
 logreg_lasso_tuned_model <- glmnet(logreg_lasso_tuned_training,
-                             as.factor(train_data$label),
-                             family = "binomial",
-                             alpha = 1)
+                                   as.factor(train_data$label),
+                                   family = "binomial",
+                                   alpha = 1)
 
 logreg_lasso_tuned_prob <- predict(logreg_lasso_tuned_model, 
-                             newx = test_logreg_lasso_tuned,
-                             type = "response",
-                             s = 0.001)
+                          newx = test_logreg_lasso_tuned,
+                          type = "response",
+                          s = 0.001)
 
 logreg_lasso_tuned_pred <- ifelse(logreg_lasso_tuned_prob > 0.4, "TREG", "CD4+T")
 ```
@@ -1826,7 +1831,7 @@ logreg_lasso_tuned_auc <- auc(logreg_lasso_tuned_roc_curve)
 
 logreg_lasso_tuned_misclas <- mean(logreg_lasso_tuned_pred != test_data_pca$label)
 
-plot(logreg_lasso_tuned_roc_curve, col = "red", main = "ROC Curve for QDA")
+plot(logreg_lasso_tuned_roc_curve, col = "red", main = "ROC Curve for Logistic Lasso Regression")
 ```
 
 ```{r logreg_lasso_tuned_evaluation}
@@ -1837,52 +1842,6 @@ logreg_lasso_tuned_metrics_table <- data.frame(
 )
 
 print(logreg_lasso_tuned_metrics_table)
-```
-
-#### Random Forest with AdaBoost (Imar)
-
-```{r}
-# Train the AdaBoost model with Random Forest as the base learner
-start_time_rf_ab <- Sys.time()
-
-set.seed(seed)
-# Train AdaBoost using Random Forest as the base model
-rf_ab_model <- boosting(label ~ . - label_as_numeric, data = train_data, boos = TRUE, mfinal = 50, baselearner = randomForest)
-
-end_time_rf_ab <- Sys.time()
-rf_ab_training_time <- end_time_rf_ab - start_time_rf_ab
-cat("AdaBoost with Random Forest training time:", rf_ab_training_time, "\n")
-
-# Predictions
-start_time_rf_ab_pred <- Sys.time()
-yhat.rf_ab <- predict(rf_ab_model, newdata = test_data)$class  # Predictions using the AdaBoost model
-end_time_rf_ab_pred <- Sys.time()
-rf_ab_prediction_time <- end_time_rf_ab_pred - start_time_rf_ab_pred
-cat("AdaBoost with Random Forest prediction time:", rf_ab_prediction_time, "\n")
-```
-
-```{r rf_ab_save, include = FALSE}
-write.csv(yhat.rf_ab, file = "predictions_1.3/rf_ab.csv", row.names = TRUE)
-```
-
-```{r logreg_load, include = FALSE}
-yhat.rf_ab <- read.csv("predictions_1.3/rf_ab.csv") %>% 
-  
-  dplyr::select(x)
-
-yhat.rf_ab <- yhat.rf_ab[,'x']
-```
-
-```{r}
-# Evaluate F1 Score and other metrics
-cm_rf_ab <- table(prediction = yhat.rf_ab, truth = test_data$label)
-cm_rf_ab
-```
-
-
-```{r}
-rf_cv_f1_score <- F1_Score(y_true = test_data$label, y_pred = yhat.rf_ab)
-cat("F1 Score of Random Forest with AdaBoost:", rf_cv_f1_score, "\n")
 ```
 
 #### AdaBoost
@@ -1996,17 +1955,20 @@ boost_cv_time <- Sys.time() - boost_cv_time # Time difference of 31.34519 mins
 ```
 
 ```{r}
+write.csv(boost_cv_scores, file = "predictions_1.3/boost_cv_scores_chosen_pc.csv")
+```
+
+```{r}
 boost_cv_time <- Sys.time()
 boost_cv_scores <- fun_boost_cv(no_prin_comps = c(15:30),
                                 mfinals = c(200),
                                 depths = c(5),
                                 thresholds = c(0.5))
-boost_cv_time <- Sys.time() - boost_cv_time # Time difference of 31.34519 mins
-
+boost_cv_time <- Sys.time() - boost_cv_time # Time difference of 47.41534 mins
 ```
 
 ```{r}
-write.csv(boost_cv_scores, file = "predictions_1.3/boost_cv_scores_chosen_pc.csv")
+write.csv(boost_cv_scores, file = "predictions_1.3/boost_cv_scores.csv")
 ```
 
 ```{r}
@@ -2023,6 +1985,74 @@ boost_avg_scores <- boost_cv_scores %>%
   summarise(F1 = mean(f1), 
             F1_sd = sd(f1),
             .groups = "keep")
+```
+
+```{r}
+ggplot(boost_cv_scores, aes(x = no_pc, y = f1)) + 
+  geom_point() + 
+  geom_smooth()
+```
+
+##### Tuning
+
+```{r}
+boost_best_no_pc <- 26 #as.integer(boost_improved_models[1, 'no_pc'])
+
+boost_tuned_training <- pca_model$x[, 1:boost_best_no_pc] %>%
+  
+  data.frame(., label = train_data$label)
+
+test_boost_tuned <- tuning_test_data_pca[, 1:boost_best_no_pc]
+
+boost_tuned_model <- boosting(label ~ ., 
+                           boost_tuned_training,
+                           mfinal = 200,
+                           maxdepth = 5)
+
+boost_tuned_pred <- predict(boost_tuned_model, 
+                            newdata = data.frame(test_boost_tuned))$class
+```
+
+```{r boost_tuned_confusion}
+boost_tuned_confusion <- table(predicted = boost_tuned_pred,
+                           observed = test_data$label)
+
+print(boost_tuned_confusion)
+```
+
+```{r boost_tuned_diagnostics}
+boost_tuned_accuracy <- mean(boost_tuned_pred == test_data_pca$label)
+
+boost_tuned_balanced_accuracy <- fun_calc_balanced_accuracy(boost_tuned_confusion,
+                                                        pos_label = 'TREG',
+                                                        neg_label = 'CD4+T')
+
+boost_tuned_f1_score <- F1_Score(y_true = test_data_pca$label, 
+                             y_pred = boost_tuned_pred,
+                             positive = "TREG")
+
+boost_tuned_roc_curve <- roc(
+  response = test_data_pca$label,
+  predictor = boost_tuned_prob, 
+  levels = c('CD4+T','TREG'),
+  direction = "<"
+  )
+
+boost_tuned_auc <- auc(boost_tuned_roc_curve)
+
+boost_tuned_misclas <- mean(boost_tuned_pred != test_data_pca$label)
+
+plot(boost_tuned_roc_curve, col = "red", main = "ROC Curve for boost")
+```
+
+```{r boost_tuned_evaluation}
+# Create a table of the evaluation metrics
+boost_tuned_metrics_table <- data.frame(
+  Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
+  boost_tuned = c(boost_tuned_accuracy, boost_tuned_balanced_accuracy, boost_tuned_f1_score, boost_tuned_auc, boost_tuned_misclas)
+)
+
+print(boost_tuned_metrics_table)
 ```
 
 ## T1.4: Implement predictor (???)
@@ -2062,7 +2092,7 @@ mypredict <- function(){
                           type = 'response')
   
   # Assign class based on probability and selected threshold
-  threshold <-
+  threshold <- 0.4
   predictions <- ifelse(probabilities > threshold, "TREG", "CD4+T")
   
   # Export to plain text file
