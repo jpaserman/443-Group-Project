@@ -75,12 +75,7 @@ knitr::include_graphics("images/xgb_selected_features_importance.png")
 
 #### Support Vector Machines (SVM)
 
-scale and center... 
-drop once again low variance features that appear in the training data split (at a 99/1 split threshold???)
-show a handful of the different variable options and their computed accuracy, column for the selecfted model, and only 
-for tha one do we report the balanced accuracy
-
-???
+Our final model involves training a support vector machine. Inherently SVMs do not fall under the umbrella of feature selection or return a value indicating a feature's relative importance, such as what happens under random forest. As such, we undertake an additional method called recursive feature elimination (RFE). RFE involves fitting multiple models with many features, and iteratively removing features of lowest importance until reach a predetermined model size. To begin we once again drop features that appear in our training data with low to zero variance. We set the cutoff to be features that have the positive class appear less than 1%, before scaling and centering our data. Then our primary tuning parameter involves determining how features should remain and models to be compared against one another. We end up testing 47 different models (1, 3, 6, 9, ..., 30, 35, 40, ..., 100, 110, 120, ..., 300, 400, 500, ...1300) and determine that the model with 35 features returns the best accuracy score on the training data, and as such will be the model will utilize for testing.
 
 ## Results 
 
@@ -92,8 +87,6 @@ for tha one do we report the balanced accuracy
 | Log. Elastic Net    | 88                 | **0.8608**    | **0.9375** | **0.6667**   |
 | XGBoost             | 81                 | 0.8257        | **0.9375** | 0.6429       |
 | SVM (Linear Kernel) | **35**             | 0.8574        | 0.9313     | 0.6452       |
-
-
 
 ## Conclusion
 The results above, show us that there is an inherent trade-off between the number of features, and the evaluation metrics such as the balanced accuracy on the test data. The reason we care about taking into consideration the smaller amount of number of features has to do with both efficiency and interpretability. For example, if one were to conduct future research, they could focus on a smaller subset of features. 
@@ -111,7 +104,6 @@ The strength in our approach is that we employ many different types of feature s
 A main goal of future research could be to improve the methods listed above in the hopes of obtaining even stronger results, there are multiple ways we can do this. 1.Ideally, our data would include more compounds (observations) so that there would be more even dimensionality, which would better protect our models from overfitting! 
 2. More time, computational power, and lower dimensional data would allow better tuning of the parameters. 3. We could identify features that are highly multicollinear. Failing to remove them,could lead to instability and inefficiency in our models.  
 
-
 ## Refrences
   Guyon, I., Gunn, S., Ben-Hur, A. and Dror, G. (2004) Result Analysis of the NIPS 2003
 Feature Selection Challenge. In Advances in Neural Information Processing Systems (Saul,
@@ -123,4 +115,6 @@ L., Weiss, Y. and Bottou, L., eds.), vol. 17, MIT Press.
   
   ### How do I reference / cite???
   https://www.css.cornell.edu/faculty/dgr2/_static/files/R_html/CompareRandomForestPackages.html#4_Conclusion 
-
+  
+  https://www.geeksforgeeks.org/variable-importance-for-support-vector-machine-and-naive-bayes-classifiers-in-r/
+  
