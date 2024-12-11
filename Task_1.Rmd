@@ -1957,6 +1957,7 @@ mypredict <- function(){
   
   # Load training data
   train_df <- read.csv("data1.csv.gz")
+  cat("Data loaded")
   
   # Remove label column 
   train_X <- train_df[, !colnames(train_df) %in% c("label")]
@@ -1966,7 +1967,7 @@ mypredict <- function(){
                 center = TRUE, 
                 scale. = TRUE, 
                 rank. = 48)
-  
+  cat("PCA Trained")
   # Load test data and transform using PCA model
   test_df <- read.csv("test.csv.gz")
   
