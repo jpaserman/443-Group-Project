@@ -1,5 +1,6 @@
 ---
 title: "report"
+author: "50098,"
 output:
   pdf_document: default
   html_document: default
@@ -124,7 +125,7 @@ The following table shows the hyperparameters considered for each classifier, th
 | LDA                       | No. Principal Components,\      | $\{10, 11, \ldots, 30\}$,\             | 26,\         |
 |                           | Decision Threshold              | $\{0.1, 0.2, \ldots, 0.9\}$\           | 0.2          |
 +---------------------------+---------------------------------+----------------------------------------+--------------+
-| Logistic Ridge Regression | No. Principal Components,\      | $\{10, 11, \ldots, 30\}$,\             | 48,\         |
+| Logistic Ridge Regression | No. Principal Components,\      | $\{10, 11, \ldots, 50\}$,\             | 48,\         |
 |                           | Decision Threshold,\            | $\{0.1, 0.2, \ldots, 0.9\}$,\          | 0.4,\        |
 |                           | Regularisation Term ($\lambda$) | $\{0, 0.00001, 0.0001, 0.001, 0.01\}$\ | 0.01         |
 +---------------------------+---------------------------------+----------------------------------------+--------------+
@@ -136,8 +137,10 @@ The following table shows the hyperparameters considered for each classifier, th
 
 The optimal decision thresholds based on the F1-Score varies between classifiers. For the two linear models, the optimal decision boundary is < 0.5, which could be attributed to the lower proportion of positive labels in the training data (~3000 CD4+T labels and ~2000 TREG labels). Additionally for LDA, the optimal threshold is much lower (0.2), which can stem from a violation of the multivariate normal assumption in the PCA space. The larger F1-Score results from lowering the threshold to below 0.5 indicating that the increase in recall is larger than the decrease in precision. AdaBoost's optimal threshold remains close to 0.5 because the boosting algorithm's focus on "harder-to-classify" samples make it less sensitive to a class imbalance. 
 
+It is worth noting that both the Ridge and Lasso regularisation techniques for the Logistic Regression were considered as part of cross-validation. The Lasso showed to be too aggressive even for different values of lambda on the principal components and would send additional coefficients to 0 after 35 principal components. 
+
 -   **LDA with CV**: We enhance LDA by applying PCA and cross-validation (CV) to address a drop in accuracy, balanced accuracy, and F1 score when using PCA. This is likely due to fewer components/features, which reduce the model’s ability to linearly separate data in lower dimensions. Cross-validation helps select the best subset for training, identifying the features that provide the most valuable information for the model. Additionally, the number of principal components and the threshold for classifying positive vs. negative predictions are tuned. Lower thresholds (around 0.2 to 0.3) improve the F1 score. The slight imbalance in the classes within the training data set is considered during hyperparameter tuning to optimize model performance.
 -   **Logistic CV and Lasso**: Cross-validation splits the data into multiple subsets (folds), training the model on some and testing on the others. This process helps assess the performance of logistic regression more robustly by reducing overfitting and providing a better estimate of generalization to unseen data. Regularization adds a penalty to the loss function to control model complexity, preventing overfitting by penalizing large coefficients. Lasso regularization can also perform feature selection by driving some coefficients to zero, while Ridge shrinks all coefficients towards zero without eliminating any. Together, cross-validation and regularization help evaluate and improve the model’s performance, with regularization enhancing generalization. Additionally, Lasso and Ridge are compared using different values of lambda (regularization strength), while hyperparameter tuning of the logistic threshold (around 0.4) optimizes the F1 score. The number of principal components is also tuned to achieve the best F1 score.
 -   **RF with AdaBoost**: We choose to improve the Random Forest with AdaBoost due to the fact that the Random Forest itself is already a bagged classifier, since the Decision Trees are consturcted on bootstrapped (with replacement) data sets and due to majority voting a decision is made which resembles the aggregation part of bagging. Boosting helps here to improve the weak classifiers which in this case are the Random Forests which misclassified the cells. By increasing their weights for the classification problem the classifier is focusing more on improving the flase classifiers, resulting in a better performance of the Random Forest.
 
-Ultimately, after comparing the F1 Scores, we are choosing XXX to implement into our mypredict() function for Task 1.
+After comparing the F1 Scores, the Logisitc Ridge Regression will be implemented into the `mypredict()` function for Task 1.
