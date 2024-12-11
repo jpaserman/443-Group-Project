@@ -35,7 +35,7 @@ The first model we attempted to run was logistic classifier with a Lasso-Penalty
 |Model            | Lambda Value | Number of Selected Features | Balanced Accuracy |
 |-----------------|--------------|-----------------------------|-------------------|
 | Worst Score     | 1e-04        | 234                         | 0.8189            |
-| Best Score      | 0.0475081    | 47                          | 0.8189            |
+| Best Score      | 0.0475       | 47                          | 0.8189            |
 | Worst BA        | 0.2719       | 1                           | 0.8189            |
 
 

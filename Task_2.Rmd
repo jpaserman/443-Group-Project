@@ -231,13 +231,15 @@ balanced_accuracies <- cv_results[1, ]
 # Saving the number of predictors from the new matrix formed
 num_predictors <- cv_results[2, ]
 custom_scores <- cv_results[3, ]
-
+```
+```{r extracting lambda values for lasso}
 # Find the lambda with the highest balanced accuracy
 best_lambda_index <- which.max(custom_scores) #Max balanaced accuracy for the predictions. 
 best_lambda <- lambdas[best_lambda_index] # Extracting the best lambda
 best_balanced_accuracy <- balanced_accuracies[best_lambda_index] # Taking the best balanced accuracy 
 best_num_predictors <- num_predictors[best_lambda_index] # Taking the best number of predictors for the given lambda 
-
+```
+```{r fit on final model and return results}
 # Fit the final model using the best lambda, in terms of lambda that returned highest bal. accuracy 
 final_model <- glmnet(train_data_matrix, train_labels, alpha = 1, lambda = lambdas[best_lambda_index], family = "binomial", weights = class_weights) # Lasso on train, with best balanced accuracy
 pred.test <- predict(final_model, newx = test_data_clean_matrix, family ="binomial", type = "response") # Predictions for test data
@@ -671,7 +673,7 @@ For T2.2 and T2.3, your evaluation results should include the balanced accuracy 
 
 ### Elastic net
 
-```{r}
+```{r elastic net model}
 set.seed(seed)
 elastic_net_train_data <- train_data_2
 elastic_net_test_data <- test_data_2
@@ -741,13 +743,16 @@ for (alpha in names(results)) {
     best_result <- results[[alpha]]
   }
 }
-
+```
+```{r print results for elastic net}
 cat("Overall Best Alpha:", best_result$alpha, "\n")
 cat("Best Lambda for Best Alpha:", best_result$best_lambda, "\n")
 cat("Highest Balanced Accuracy:", best_result$best_balanced_accuracy, "\n")
 cat("Number of Predictors for Best Combination:", best_result$num_predictors, "\n")
 cat("Custom Score for Best Combination:", best_result$custom_score, "\n")
 # Train the final model using the best alpha and lambda
+```
+```{r elastic net test final model}
 elastic_final_model <- glmnet(elastic_net_train_data_matrix, train_labels, alpha = best_result$alpha, 
                               lambda = best_result$best_lambda, family = "binomial", weights = class_weights)
 elastic_pred.test <- predict(elastic_final_model, newx = elastic_net_test_data_clean_matrix, 
@@ -829,7 +834,6 @@ elastic_worst_bal_acc_test_balanced_accuracy <- calculate_balanced_accuracy(elas
 cat("Balanced Accuracy on Test Data with Worst Balanced Accuracy Alpha and Lambda:", elastic_worst_bal_acc_test_balanced_accuracy, "\n")
 
 ```
-
 
 
 #### Linear Elastic Net
