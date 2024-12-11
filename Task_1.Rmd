@@ -2009,8 +2009,10 @@ boost_tuned_model <- boosting(label ~ .,
                            mfinal = 200,
                            maxdepth = 5)
 
-boost_tuned_pred <- predict(boost_tuned_model, 
-                            newdata = data.frame(test_boost_tuned))$class
+boost_tuned_prob <- predict(boost_tuned_model, 
+                            newdata = data.frame(test_boost_tuned))$prob[, 2]
+
+boost_tuned_pred <- ifelse(boost_tuned_prob > 0.5, "TREG", "CD4+T")
 ```
 
 ```{r boost_tuned_confusion}
@@ -2075,7 +2077,7 @@ mypredict <- function(){
   pca <- prcomp(train_X, 
                 center = TRUE, 
                 scale. = TRUE, 
-                rank. = 25)
+                rank. = 48)
   
   # Load test data and transform using PCA model
   test_df <- read.csv("test.csv.gz")
@@ -2085,15 +2087,16 @@ mypredict <- function(){
   # Train model and predict probabilities
   model <- glmnet(as.factor(train_df$label) ~ .,
                   data = data.frame(pca$x),
-                  alpha = 1)
+                  alpha = 0)
   
-  probabilities <- predict(model, 
-                          newdata = data.frame(test_X),
-                          type = 'response')
-  
+  probs <- predict(model, 
+                   newx = as.matrix(test_logreg_ridge_tuned),
+                   type = "response",
+                   s = 0.01)
+
   # Assign class based on probability and selected threshold
   threshold <- 0.4
-  predictions <- ifelse(probabilities > threshold, "TREG", "CD4+T")
+  predictions <- ifelse(probs > threshold, "TREG", "CD4+T")
   
   # Export to plain text file
   writeLines(predictions, "predictions.txt")
