@@ -720,7 +720,7 @@ yhat.svm <- read.csv("predictions_1.2/svm_predictions.csv") %>%
   
   dplyr::select(x)
 
-yhat.svm <- yhat.svm[,'x']
+yhat.svm <- as.factor(yhat.svm[,'x'])
 ```
 
 ```{r svm_confusion}
@@ -1724,7 +1724,7 @@ logreg_ridge_tuned_auc <- auc(logreg_ridge_tuned_roc_curve)
 
 logreg_ridge_tuned_misclas <- mean(logreg_ridge_tuned_pred != test_data_pca$label)
 
-plot(logreg_ridge_tuned_roc_curve, col = "red", main = "ROC Curve for Logistic ridge Regression")
+plot(logreg_ridge_tuned_roc_curve, col = "red", main = "ROC Curve for Logistic Ridge Regression")
 ```
 
 ```{r logreg_ridge_tuned_evaluation}
