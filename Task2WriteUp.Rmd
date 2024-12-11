@@ -40,9 +40,7 @@ The first model we attempted to run was logistic classifier with a Lasso-Penalty
 
 
 #### Forward Stepwise Selection (FSS)
-
-Even though utilizing the approach of selecting features via maximizing the Adjusted R-squared as opposed to minimizing BIC....
-we decided upon proceeding with BIC as the evaluation criteria due to having nearly half of the number of selected features in the final model.
+The next model we train is a Forward Stepwise Selection model (FSS). Starting from the null model, FSS trains 'k' models, each containing 0, 1, 2, ..., k features respectively. Each subsequent model includes an additional feature that results in the smallest RSS. From these 'k' models, the "top" model is selected on the basis of some predetermined evaluation criteria such as adjusted r-squared, AIC/BIC, or Cp. This "top" model is defined as the model that returns the maximum value for adjusted r-squared or the minimum value for BIC, which is easily identified due to the concave down and concave up shape for adjusted r-squared and BIC respectively for large enough 'k'. FSS is a relatively straight forward selection model where the only true parameter to decide upon is what evaluation criteria to utilize. With it being rather simplistic, we do not necessarily expect to receive amazing results in regards to the number of features or the resulting balanced accuracy. However, we believe that this will serve as a good to compare for our future models. However, one should note that given the fact that a large 'k' is needed, and each feature is tested to be added to every 1 through k model, FSS can be relatively computationally expensive. In fact, running FSS on the entirety of the data with 30,000 features causes memory storage issues. Therefore, FSS is the only feature selection model that we exclusively train on the subset of the top 1,000 features highly correlated with the $label$. Our results from this subset data when using adjusted r-squared and BIC as the evaluation criteria as shown below. Even though balanced accuracy on the test data is maximized by adjusted r-squared, we decide to proceed with BIC as the evaluation criteria due to it having nearly half of the number of selected features in the final model.
 
 | Evaluation Criteria | Number of Selected Features | Balanced Accuracy |
 |---------------------|-----------------------------|-------------------|
@@ -51,7 +49,11 @@ we decided upon proceeding with BIC as the evaluation criteria due to having nea
 
 #### Random Forest
 
+While originally utilized solely for computational efficiency in order to run the "entire" 30,000 (explain how could only do the subset with the randomForest package that we previously used in seminar), we see that for the same parameter value (number of trees) the rnager package does much better in terms of selecting far fewer features, and better balanced accuracy
 
+The balanced accuracy is tnot that much of a decrease for randomForest. Increasing our confidence in the decision to approach computational and memory errors by utilizing the subset dataset in FSS, likely still gave us comparable decent restulst
+
+Note that while we use the subset dataset for random forest in a comparative measure, our final random forest model was trained on the "entireity" of the 30,000 features
 
 | Package      | Initial Data # of Features | Number of Trees | Number of Selected Features | Balanced Accuracy |
 |--------------|----------------------------|-----------------|-----------------------------|-------------------|
@@ -77,7 +79,12 @@ knitr::include_graphics("images/xgb_selected_features_importance.png")
 
 #### Support Vector Machines (SVM)
 
+scale and center... 
+drop once again low variance features that appear in the training data split (at a 99/1 split threshold???)
+show a handful of the different variable options and their computed accuracy, column for the selecfted model, and only 
+for tha one do we report the balanced accuracy
 
+???
 
 ## Results 
 
