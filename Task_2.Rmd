@@ -7,6 +7,7 @@ date: "2024-11-19"
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 options(warn=-1)
+
 ```
 
 ```{r parameters}
@@ -38,6 +39,7 @@ for (package in packages){
     library(package, character.only = TRUE)
   }
 }
+
 ```
 
 ```{r functions}
@@ -56,18 +58,12 @@ fun_calc_balanced_accuracy <- function(confusion_matrix, pos_label, neg_label){
 
 # Task 2: feature selection
 
+## T2.1: exploratory data analysis and summary statistics
+
 ```{r load_data}
 set.seed(seed)
 
-# load_data_start_time <- Sys.time()
-
 task_two_df <- read.csv(csv_file_two)
-
-# load_data_end_time <- Sys.time()
-# 
-# load_data_runtime <- load_data_end_time - load_data_start_time
-# print(load_data_runtime) # 1.3 mins
-
 
 # check_na_start_time <- Sys.time()
 # 
@@ -82,7 +78,6 @@ task_two_df <- read.csv(csv_file_two)
 
 # check_na_runtime <- check_na_end_time - check_na_start_time
 # print(check_na_runtime) 
-
 
 ```
 
@@ -132,11 +127,9 @@ dim(task_two_df)
 
 # Labels represent whether given compound binds to target site on thrombin 
 # Possible values are -1 (compound did not bind) and 1 (compound did bind)
-table(task_two_df$label) # 772 compounds did not bind and 78 compounds did bind
+table(task_two_df$label) # 722 compounds did not bind and 78 compounds did bind
 
 ```
-
-
 
 ```{r select_top_predictors, cache=TRUE}
 # Determine the features that are most highly correlated with the label
@@ -155,11 +148,10 @@ top_1000_vars <- top_1000_cor$feature
 
 ```
 
-
 ```{r train_test_split}
-set.seed(seed) # Not sure why, but was required to reset the seed in this location
+set.seed(seed)
 
-# Split Data into Test and Train (We should all use the same data)
+# Split Data into Test and Train
 train_split = as.integer(nrow(task_two_df)*training_size)
 
 train_indices <- sample(1:nrow(task_two_df), train_split)
@@ -176,9 +168,7 @@ test_data_2_top_subset <- test_data_2[, top_1000_vars]
 
 ```
 
-## T2.1: exploratory data analysis and summary statistics (??? -- need to expand)
-
-Our partial EDA is in above chunk of code where we plot histograms of the totals and the variance amongst each of the 100,000 original features. Should this still be expanded?
+Our EDA incorporates initial feature selection by removing features that fall below a certain threshold of variance. This subsets our data from 100,000 explanatory features down to approximately 30,000 features. Additionally, we partition the data using a 80-20 split into a training and testing data set for upcoming feature selection models.
 
 ## T2.2: train and evaluate feature selection methods
 
@@ -314,7 +304,7 @@ cat("Lasso Accuracy:", lasso_accuracy, "\n") # .93125
 lasso_roc <- roc(lasso_test_data$label, pred.test_binary)
 lasso_auc <- auc(lasso_roc)
 cat("Lasso AUC:", lasso_auc, "\n") #
-plot(lasso_roc, main = "Lasso ROC Curve") # Make the limits of the axes 0-1
+plot(lasso_roc, main = "Lasso ROC Curve")
 ```
 
 ```{r lasso_f1_score}
@@ -414,7 +404,7 @@ cat("Lasso Accuracy:", linear_lasso_accuracy, "\n") # 0.925
 linear_lasso_roc <- roc(linear_lasso_test_data$label, linear_lasso_pred_test_binary)
 linear_lasso_auc <- auc(linear_lasso_roc)
 cat("Lasso AUC:", linear_lasso_auc, "\n") # 
-plot(linear_lasso_roc, main = "Lasso ROC Curve") # Make the limits of the axes 0-1
+plot(linear_lasso_roc, main = "Lasso ROC Curve")
 ```
 
 ```{r lin_lasso_f1_score}
@@ -485,19 +475,29 @@ predict_regsubsets = function(object, newdata, id) {
 }
 
 # test the function
-fss_test_data["value"] <- predict_regsubsets(regfit_fwd, fss_test_data, id=best_model_bic)
-fss_test_data["label_pred"] <- ifelse(fss_test_data["value"] < 0, -1, 1)
+fss_test_data["value_bic"] <- predict_regsubsets(regfit_fwd, fss_test_data, id=best_model_bic)
+fss_test_data["label_pred_bic"] <- ifelse(fss_test_data["value_bic"] < 0, -1, 1)
+
+fss_test_data["value_adjr2"] <- predict_regsubsets(regfit_fwd, fss_test_data, id=best_model_adjr2)
+fss_test_data["label_pred_adjr2"] <- ifelse(fss_test_data["value_adjr2"] < 0, -1, 1)
 
 ```
 
 ```{r fss_Confusion}
-fss_confusion_matrix <- table(predict = fss_test_data$label_pred, truth = fss_test_data$label)
-print(fss_confusion_matrix)
-print(fss_confusion_matrix[2,2])
-fss_balanced_accuracy <- fun_calc_balanced_accuracy(fss_confusion_matrix,
-                                                    pos_label = "1",
-                                                    neg_label = "-1")
-cat("The balanced accuracy is", fss_balanced_accuracy, "\n") # 0.7804
+fss_confusion_matrix_bic <- table(predict = fss_test_data$label_pred_bic, truth = fss_test_data$label)
+print(fss_confusion_matrix_bic)
+fss_balanced_accuracy_bic <- fun_calc_balanced_accuracy(fss_confusion_matrix_bic,
+                                                        pos_label = "1", 
+                                                        neg_label = "-1")
+cat("The balanced accuracy (BIC) is", fss_balanced_accuracy_bic, "\n") # 0.7804814
+
+
+fss_confusion_matrix_adjr2 <- table(predict = fss_test_data$label_pred_adjr2, truth = fss_test_data$label)
+print(fss_confusion_matrix_adjr2)
+fss_balanced_accuracy_adjr2 <- fun_calc_balanced_accuracy(fss_confusion_matrix_adjr2,
+                                                          pos_label = "1", 
+                                                          neg_label = "-1")
+cat("The balanced accuracy (adj r^2) is", fss_balanced_accuracy_adjr2, "\n") # 0.8257457
 
 ```
 
@@ -516,8 +516,8 @@ cat("fss Accuracy:", fss_accuracy, "\n") # 0.91875
 ```{r fss_ROC_AUC}
 fss_roc <- roc(fss_test_data$label, fss_test_data$label_pred)
 fss_auc <- auc(fss_roc)
-cat("fss AUC:", fss_auc, "\n") # 0.7804
-plot(fss_roc, main = "fss ROC Curve") # Make the limits of the axes 0-1
+cat("fss AUC:", fss_auc, "\n") # 0.7804814
+plot(fss_roc, main = "fss ROC Curve")
 
 ```
 
@@ -625,27 +625,40 @@ cat("The balanced accuracy (ranger) is:", rf_balanced_accuracy_ranger, "\n") # 0
 We notice that both the random forest built on only the subset of top 1000 features (randomForest), as well as the random forest built on the entire training data (ranger) have moderately successful results. This provides us with confidence in our approach of utilizing the subset of the top 1000 features within training data for the FSS model. Moving forward for the random forest, we will utilize the ranger:ranger random forest built on the entire training data as it performs better in terms of balanced accuracy as well as having less than half the number of features (368 as opposed to 785).  
 
 ```{r rf_misclass}
-rf_misclassification_rate <- mean(yhat.rf_ranger$predictions != rf_test_data$label)
-cat("Random Forest Misclassification Rate:", rf_misclassification_rate, "\n") # 0.06875 
+rf_misclassification_rate <- mean(yhat.rf != rf_test_data_top_subset$label)
+cat("Random Forest (randomForest) Misclassification Rate:", rf_misclassification_rate, "\n") # 0.05 
+
+rf_misclassification_rate_ranger <- mean(yhat.rf_ranger$predictions != rf_test_data$label)
+cat("Random Forest (ranger) Misclassification Rate:", rf_misclassification_rate_ranger, "\n") # 0.06875 
 
 ```
 
 ```{r rf_accuracy}
-rf_accuracy <- mean(yhat.rf_ranger$predictions == rf_test_data$label)
-cat("Random Forest Accuracy:", rf_accuracy, "\n") # 0.93125 
+rf_accuracy_ranger <- mean(yhat.rf == rf_test_data_top_subset$label)
+cat("Random Forest (randomForest) Accuracy:", rf_accuracy_ranger, "\n") # 0.95
+
+rf_accuracy_ranger <- mean(yhat.rf_ranger$predictions == rf_test_data$label)
+cat("Random Forest (ranger) Accuracy:", rf_accuracy_ranger, "\n") # 0.93125 
 
 ```
 
 ```{r rf_roc_auc}
-roc_rf <- roc(rf_test_data$label, as.numeric(yhat.rf_ranger$prediction))
-cat("Random Forest AUC:", auc(roc_rf), "\n")
-plot(roc_rf, main = "Random Forest ROC Curve") # 0.8223443 
+roc_rf <- roc(rf_test_data_top_subset$label, as.numeric(yhat.rf))
+cat("Random Forest (randomForest) AUC:", auc(roc_rf), "\n")
+plot(roc_rf, main = "Random Forest (randomForest) ROC Curve") # 0.7974882
+
+roc_rf_ranger <- roc(rf_test_data$label, as.numeric(yhat.rf_ranger$prediction))
+cat("Random Forest (ranger) AUC:", auc(roc_rf_ranger), "\n")
+plot(roc_rf_ranger, main = "Random Forest (ranger) ROC Curve") # 0.8223443 
 
 ```
 
 ```{r rf_f1_score}
-rf_f1_score <- F1_Score(y_pred = yhat.rf_ranger$prediction, y_true = rf_test_data$label, positive = "1")
-cat("F1 Score:", rf_f1_score, "\n") # 0.6206897
+rf_f1_score <- F1_Score(y_pred = yhat.rf, y_true = rf_test_data_top_subset$label, positive = "1")
+cat("F1 Score (randomForest):", rf_f1_score, "\n") # 0.6666667
+
+rf_f1_score_ranger <- F1_Score(y_pred = yhat.rf_ranger$prediction, y_true = rf_test_data$label, positive = "1")
+cat("F1 Score (ranger):", rf_f1_score_ranger, "\n") # 0.6206897
 
 ```
 
@@ -1130,7 +1143,7 @@ print(svm_rfe)
 ```{r svm_rfe_Prediction}
 # Extract the features identified by the SVM with RFE
 start_time_svm_rfe_pred <- Sys.time()
-svm_rfe_vars <- predictors(svm_rfe)
+svm_rfe_vars <- predictors(svm_rfe) # A model with 35 features is selected to maximize the training accuracy (0.9422)
 
 # Limit the training and test data to solely the identified features 
 x_test <- svm_rfe_test_data[, svm_rfe_vars, drop = FALSE]
@@ -1158,32 +1171,32 @@ svm_rfe_balanced_accuracy <- fun_calc_balanced_accuracy(svm_rfe_confusion_matrix
                                                         pos_label = "1",
                                                         neg_label = "-1")
 
-cat("The balanced accuracy for SVM with RFE is:", svm_rfe_balanced_accuracy, "\n") # 0.8257457 (0.8574045)
+cat("The balanced accuracy for SVM with RFE is:", svm_rfe_balanced_accuracy, "\n") # 0.8574045
 
 ```
 
 ```{r svm_rfe_misclass}
 svm_rfe_misclassification_rate <- mean(yhat.svm_rfe != y_test)
-cat("SVM with RFE Misclassification Rate:", svm_rfe_misclassification_rate, "\n") # 0.0625 (0.06875)
+cat("SVM with RFE Misclassification Rate:", svm_rfe_misclassification_rate, "\n") # 0.06875
 
 ```
 
 ```{r svm_rfe_accuracy}
 svm_rfe_accuracy <- mean(yhat.svm_rfe == y_test)
-cat("SVM with RFE Accuracy:", svm_rfe_accuracy, "\n") # 0.9375 (0.93125)
+cat("SVM with RFE Accuracy:", svm_rfe_accuracy, "\n") # 0.93125
 
 ```
 
 ```{r svm_rfe_roc_auc}
 roc_svm_rfe <- roc(y_test, as.numeric(yhat.svm_rfe))
 cat("SVM with RFE AUC:", auc(roc_svm_rfe), "\n")
-plot(roc_svm_rfe, main = "SVM with RFE ROC Curve") # 0.8257457 (0.8574045)
+plot(roc_svm_rfe, main = "SVM with RFE ROC Curve") # 0.8574045
 
 ```
 
 ```{r svm_rfe_f1_score}
 svm_rfe_f1_score <- F1_Score(y_pred = yhat.svm_rfe, y_true = y_test, positive = "1")
-cat("F1 Score:", svm_rfe_f1_score, "\n") # 0.6428571 (0.6451613)
+cat("F1 Score:", svm_rfe_f1_score, "\n") # 0.6451613
 
 ```
 

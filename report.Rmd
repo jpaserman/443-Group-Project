@@ -29,7 +29,7 @@ knitr::include_graphics("004_443.png")
 We can see that not all genes have a high amount of information for differentiating between the two cell types CD4+T and TREG and being thus a useful predictor for classification purposes. Rather it is a lower amount of top cells which are able to influence the classification models the most. We will discuss more on this when we talk about PCA and its principal components. In the following we can observe the summary of top 3 cells with the highest absolute difference in mean values, and in addition their boxplots.
 
 |  |  |  |
-|------------------------|------------------------|-----------------------|
+|------------------------|------------------------|------------------------|
 | ![](images/001_443-01.png){width="200"} | ![](images/002_443-01.png){width="200"} | ![](images/003_443.png){width="200"} |
 
 The last plot for the third largest difference in absolute mean values differs from the other since the CD4+T 3rd quarter for TNFRSF1B is still 0 and the mean is located in the 4th quarter and therefore the box plot visually cannot be generated here.
@@ -64,7 +64,11 @@ In the following we are evaluating seven different classifiers regarding their c
 
 ## Task 1.2 Summary Table with PCA
 
-In the following we are applying the dimensionality reduction tool PCA (Principal Component Analyis). It transforms data into a new coordinate system, where the axes (principal components) capture the maximum variance in the data. It finds a set of orthogonal directions (principal components) that explain the most variability, with the first component explaining the most, the second the second most, and so on. PCA is often used to reduce the number of features while preserving as much information as possible, simplifying data for analysis or visualization.
+In the following we are applying the dimensionality reduction tool PCA (Principal Component Analyis). It transforms data into a new coordinate system, where the axes (principal components) capture the maximum variance in the data. It finds a set of orthogonal directions (principal components) that explain the most variability, with the first component explaining the most, the second the second most, and so on. PCA is often used to reduce the number of features while preserving as much information as possible, simplifying data for analysis or visualization. In the following scree plot we can additionally see that approximately ten principal components form the elbow of the scree plot, meaning that ten principal components account for the most Variance within the data set which makes them powerful to use for prediction models.
+
+```{r echo=FALSE, fig.align='center', out.width="60%"}
+knitr::include_graphics("005_443.png")
+```
 
 | with PCA            | Accuracy   | Bal. Accuracy | AUC        | F1         |
 |---------------------|------------|---------------|------------|------------|
