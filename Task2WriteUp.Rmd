@@ -19,13 +19,19 @@ The focus of the following analysis is to attempt to achieve high classification
 We were given one dataset that contains binary features that describe the three-dimensional properties of a molecule in a compound or a random probe across different compounds. The data contains 800 observations, which represent 800 compounds, and 100,000 columns (50,000 real variables and 50,000 random probes). The first column named $label$ represents whether a compound bound to a target site on thrombin^[Thrombin is an enzyme that plays a key role in blood clotting and other biological processes.].
 
 ## Exploratory Data Analysis 
-Most of our exploratory data analysis was undertaken with the goal of preliminary feature reduction prior to model implementation. After confirming that there were no missing values within our data, we aim to remove features with extremely low to zero variance. The below histograms depict the number of compounds found to have bound to the target site and the variance associated with a given feature respectively. Notice how extremely right skewed both plots are, indicating a high density of features with low variance due to being largely associated with the negative class of compounds not binding. Features that contain little to no variance are not likely to be informative in explaining and as such, are not worthwhile to retain. By setting a variance threshold of 0.01, associated with a feature having less than or equal to 8 compounds binding out of 800, we are able to reduce the number of features in the dataset from 100,000 to only a little over 30,000. This will greatly speed up the subsequent feature reduction models and hopefully make our results more interpretable. However, even with decreasing our features to 30,000 there are some models that might struggle with the computational cost of training on the entire dataset. Therefore, we construct an additional subset of the dataset that solely contains the top 1,000 features that are highly correlated with the $label$. The only feature reduction models that utilize this extremely subset dataset are FSS and random forest, with the later solely using as a benchmark comparison as opposed to within the final model. You can assume otherwise if not specified, that the following models use the dataset that contains roughly 30,000 features. Lastly, an important aspect to note is that in terms of classes for the $label$ our data is very skewed with less than 10% (78/800) of the compounds being associated with the positive class. This structure of the data and its implications will be expanded upon later at the conclusion of the report.
+Most of our exploratory data analysis was undertaken with the goal of preliminary feature reduction prior to model implementation. After confirming that there were no missing values within our data, we aim to remove features with extremely low to zero variance. The below histograms depict the number of compounds found to have bound to the target site and the variance associated with a given feature respectively. Notice how extremely right skewed both plots are, indicating a high density of features with low variance due to being largely associated with the negative class of compounds not binding. Features that contain little to no variance are not likely to be informative in explaining and as such, are not worthwhile to retain. By setting a variance threshold of 0.01, associated with a feature having less than or equal to 8 compounds binding out of 800, we are able to reduce the number of features in the dataset from 100,000 to only a little over 30,000. This will greatly speed up the subsequent feature reduction models and hopefully make our results more interpretable. 
 
 ```{r, echo=FALSE, out.width="50%"}
 par(mfrow = c(2,1))
 knitr::include_graphics("images/Task2_EDA_freq.png")
 knitr::include_graphics("images/Task2_EDA_var.png")
 
+```
+
+However, even with decreasing our features to 30,000 there are some models that might struggle with the computational cost of training on the entire dataset. Therefore, we construct an additional subset of the dataset that solely contains the top 1,000 features that are highly correlated with the $label$. The only feature reduction models that utilize this extremely subset dataset are FSS and random forest, with the later solely using as a benchmark comparison as opposed to within the final model. You can assume otherwise if not specified, that the following models use the dataset that contains roughly 30,000 features. Lastly, an important aspect to note is that in terms of classes for the $label$ our data is very skewed with less than 10% (78/800) of the compounds being associated with the positive class. This structure of the data and its implications will be expanded upon later at the conclusion of the report.
+
+```{r, echo=FALSE, out.width="50%", fig.align='center'}
+knitr::include_graphics("images/bar_chart_eda_2.png")
 ```
 
 ## Models
@@ -67,7 +73,7 @@ After the results obtained from the logistic classification method with a lasso 
 
 #### XGBoost
 Boosting is another technique that can be relevant for feature selection. Boosting combines weak learners (usually decision trees) to create a strong learner, and it does so by building models sequentially and attempting to correct the errors made in the previous model. While boosting, the algorithm records the importance of each feature based on how much it improved the model's performance. A boosting algorithm stores an importance score for each feature, and that way some features can be dropped. 
-We attempted to use the XGBoost (Extreme Gradient Boosting) algorithm. XGBoost, is a boosting algorithm that is able to handle very large datasets and uses regularization techniques as well. Since XGBoost handles imbalanced data quite well, we decided to not place weights on the data. Our process is similar to the one used for Lasso and the Elastic net, where we loop over certain hyper parameters, most importantly $\lambda$, which represents the shrinkage parameter, specifically the rate which boosting learns. We then returned the model which returned the best balanced accuracy on the cross validation, and then used that model to make predictions on the test data. The number of features selected were extracted from the XGB importance matrix, which calculates importance based on gain, cover and frequency.^[Gain is the improvement in accuracy brought by a feature to the branches it is on. Cover represents the second derivative to the loss function with respect to a variable, a large value means the feature has a large importance on the loss function. Frequency represents the number of times a feature is used in all generated trees.].Features with 0, were excluded from the matrix. Below is a chart for the top features selected for our best XGBoost Model, meaning features with the highest values of importance. We also found that the best learning rate, $\lambda$, was equal to 0.5!
+We attempted to use the XGBoost (Extreme Gradient Boosting) algorithm. XGBoost, is a boosting algorithm that is able to handle very large datasets and uses regularization techniques as well. Since XGBoost handles imbalanced data quite well, we decided to not place weights on the data. Our process is similar to the one used for Lasso and the Elastic net, where we loop over certain hyper parameters, most importantly $\lambda$, which represents the shrinkage parameter, specifically the rate which boosting learns. We then returned the model which returned the best balanced accuracy on the cross validation, and then used that model to make predictions on the test data. The number of features selected were extracted from the XGB importance matrix, which calculates importance based on gain, cover and frequency.^[Gain is the improvement in accuracy brought by a feature to the branches it is on. Cover represents the second derivative to the loss function with respect to a variable, a large value means the feature has a large importance on the loss function. Frequency represents the number of times a feature is used in all generated trees.].Features with 0, were excluded from the matrix. Below is a chart for the top 27 features selected for our best XGBoost Model, meaning features with the highest values of importance. We also found that the best learning rate, $\lambda$, was equal to 0.5!
 
 ```{r, echo=FALSE, out.width="80%", fig.align="left"}
 knitr::include_graphics("images/xgb_selected_features_importance.png")
@@ -75,12 +81,7 @@ knitr::include_graphics("images/xgb_selected_features_importance.png")
 
 #### Support Vector Machines (SVM)
 
-scale and center... 
-drop once again low variance features that appear in the training data split (at a 99/1 split threshold???)
-show a handful of the different variable options and their computed accuracy, column for the selecfted model, and only 
-for tha one do we report the balanced accuracy
-
-???
+Our final model involves training a support vector machine. Inherently SVMs do not fall under the umbrella of feature selection or return a value indicating a feature's relative importance, such as what happens under random forest. As such, we undertake an additional method called recursive feature elimination (RFE). RFE involves fitting multiple models with many features, and iteratively removing features of lowest importance until reach a predetermined model size. To begin we once again drop features that appear in our training data with low to zero variance. We set the cutoff to be features that have the positive class appear less than 1%, before scaling and centering our data. Then our primary tuning parameter involves determining how features should remain and models to be compared against one another. We end up testing 47 different models (1, 3, 6, 9, ..., 30, 35, 40, ..., 100, 110, 120, ..., 300, 400, 500, ...1300) and determine that the model with 35 features returns the best accuracy score on the training data, and as such will be the model will utilize for testing.
 
 ## Results 
 
@@ -92,8 +93,6 @@ for tha one do we report the balanced accuracy
 | Log. Elastic Net    | 88                 | **0.8608**    | **0.9375** | **0.6667**   |
 | XGBoost             | 81                 | 0.8257        | **0.9375** | 0.6429       |
 | SVM (Linear Kernel) | **35**             | 0.8574        | 0.9313     | 0.6452       |
-
-
 
 ## Conclusion
 The results above, show us that there is an inherent trade-off between the number of features, and the evaluation metrics such as the balanced accuracy on the test data. The reason we care about taking into consideration the smaller amount of number of features has to do with both efficiency and interpretability. For example, if one were to conduct future research, they could focus on a smaller subset of features. 
@@ -111,7 +110,6 @@ The strength in our approach is that we employ many different types of feature s
 A main goal of future research could be to improve the methods listed above in the hopes of obtaining even stronger results, there are multiple ways we can do this. 1.Ideally, our data would include more compounds (observations) so that there would be more even dimensionality, which would better protect our models from overfitting! 
 2. More time, computational power, and lower dimensional data would allow better tuning of the parameters. 3. We could identify features that are highly multicollinear. Failing to remove them,could lead to instability and inefficiency in our models.  
 
-
 ## Refrences
   Guyon, I., Gunn, S., Ben-Hur, A. and Dror, G. (2004) Result Analysis of the NIPS 2003
 Feature Selection Challenge. In Advances in Neural Information Processing Systems (Saul,
@@ -123,4 +121,6 @@ L., Weiss, Y. and Bottou, L., eds.), vol. 17, MIT Press.
   
   ### How do I reference / cite???
   https://www.css.cornell.edu/faculty/dgr2/_static/files/R_html/CompareRandomForestPackages.html#4_Conclusion 
-
+  
+  https://www.geeksforgeeks.org/variable-importance-for-support-vector-machine-and-naive-bayes-classifiers-in-r/
+  

@@ -26,7 +26,8 @@ packages = list("caret",
                 "MLmetrics",
                 "ranger",
                 "kernlab",
-                "ggplot"
+                "ggplot2",
+                "reshape2"
                 )
 
 ```
@@ -98,17 +99,18 @@ quantile(variance_vector)
 
 # Histogram of the totals and the variance
 hist(totals_vector, breaks = seq(min(totals_vector), max(totals_vector), by = 1),
-     main = "Histogram of number of compounds per feature")
+     main = "Histogram of compounds per feature")
 hist(variance_vector, breaks = seq(min(variance_vector), max(variance_vector), length.out = 1000),
-     main = "Histogram of variance of compounds per feature")
+     main = "Histogram of feature variance")
+abline(v = .01, col = "red")
 
 ### We notice that there are numerous features that are present in almost no observations
-### As such, we investigate the possiblity of implementing a variance threshold to 
+### As such, we investigate the possibility of implementing a variance threshold to
 ### restrict the number of features we retain
 sum(totals_vector == 0)
 
 # If we implement a variance threshold of 0.01 (corresponding to a feature only being present
-# in a maximum of 8 out of 800 observations), we would remove 69,879 features
+# in a maximum of 8 out of 800 compounds), we would remove 69,879 features
 above_var_threshold <- totals_vector[variance_vector > .01]
 min(above_var_threshold)
 sum(variance_vector <= .01)
@@ -147,6 +149,29 @@ top_1000_cor <- cor_with_label %>%
 top_1000_vars <- top_1000_cor$feature
 
 ```
+
+```{r barcharts for top 3 correlated features}
+top_1000_cor_minus_label <- top_1000_cor[-1,]
+top_1000_cor_boxplot_data <- top_1000_cor_minus_label[order(-top_1000_cor_minus_label$abs_cor),]
+
+top3_correlated <- top_1000_cor_boxplot_data[1:3,]
+
+top_3_features <- top3_correlated$feature
+
+new_df_2_top3_correlated_features <- task_two_df[, top_3_features]
+
+# Melt to format data better
+long_df <- melt(new_df_2_top3_correlated_features)
+
+ggplot(long_df, aes(x = variable, fill = as.factor(value))) +
+  geom_bar(position = "dodge") +
+  geom_text(stat = "count", aes(label = ..count..), vjust = -0.5, position = position_dodge(width = 0.9)) +
+  labs(fill = "Value") +
+  theme_minimal() +
+  ggtitle("Distribution of Top 3 Features Correlated with the Label")
+
+```
+
 
 ```{r train_test_split}
 set.seed(seed)
