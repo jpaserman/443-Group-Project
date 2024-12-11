@@ -15,7 +15,7 @@ options(warn=-1)
 
 ```{r parameters}
 seed = 443
-csv_file_one = "data1.csv"
+csv_file_one = "data1.csv.gz"
 training_size = 0.8 # Proportion of dataset that is to be split for training
 packages = list("class", 
                 "randomForest",
@@ -1957,7 +1957,7 @@ mypredict <- function(){
   library(glmnet)
   
   # Load training data
-  train_df <- read.csv("data1.csv")
+  train_df <- read.csv("data1.csv.gz")
   print("Data loaded")
   
   # Remove label column 
@@ -1971,7 +1971,7 @@ mypredict <- function(){
                 rank. = 48)
   
   # Load test data and transform using PCA model
-  test_df <- read.csv("test.csv")
+  test_df <- read.csv("test.csv.gz")
   
   test_X <- predict(pca, test_df[, !colnames(test_df) %in% c("label")])
   
