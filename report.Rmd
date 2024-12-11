@@ -28,9 +28,9 @@ knitr::include_graphics("004_443.png")
 
 We can see that not all genes have a high amount of information for differentiating between the two cell types CD4+T and TREG and being thus a useful predictor for classification purposes. Rather it is a lower amount of top cells which are able to influence the classification models the most. We will discuss more on this when we talk about PCA and its principal components. In the following we can observe the summary of top 3 cells with the highest absolute difference in mean values, and in addition their boxplots.
 
-|  |  |  |
-|------------------------|------------------------|------------------------|
++-----------------------------------------+-----------------------------------------+--------------------------------------+
 | ![](images/001_443-01.png){width="200"} | ![](images/002_443-01.png){width="200"} | ![](images/003_443.png){width="200"} |
++-----------------------------------------+-----------------------------------------+--------------------------------------+
 
 The last plot for the third largest difference in absolute mean values differs from the other since the CD4+T 3rd quarter for TNFRSF1B is still 0 and the mean is located in the 4th quarter and therefore the box plot visually cannot be generated here.
 
@@ -42,7 +42,7 @@ In the following we are evaluating seven different classifiers regarding their c
 
 -   **Log Reg (Logistic Regression)**: The logistic regression uses a sigmoid function to classify the cells where the genes represent the coefficients of the function. The function outputs a value between 0 and 1 and a threshold (typcially 0.5) is used to either classify the cell as a CD4+T or TREG cell.
 
--   **QDA (Quadratic Discriminant Analysis**): The QDA assumes that each class follows a Gaussian distribution with its own covariance matrix. It works by finding a decision boundary that is quadratic (curved) rather than linear, unlike Linear Discriminant Analysis (LDA). QDA models the class-specific distributions and classifies data by comparing the likelihoods of the data points belonging to each class. The current dimensionality of the data is too high for a QDA classifier. During training, the covariance matrix estimation for each class, k, fails. This occurs because, when the data is partitioned into k classes, the number of observations, n, is much smaller than the number of features, p (i.e n << p). As a result, the covariance matrix estimate for class k becomes singular or nearly singular. Therefore, without dimension reduction or regularisation, training this classifier is not feasible.
+-   **QDA (Quadratic Discriminant Analysis**): The QDA assumes that each class follows a Gaussian distribution with its own covariance matrix. It works by finding a decision boundary that is quadratic (curved) rather than linear, unlike Linear Discriminant Analysis (LDA). QDA models the class-specific distributions and classifies data by comparing the likelihoods of the data points belonging to each class. The current dimensionality of the data is too high for a QDA classifier. During training, the covariance matrix estimation for each class, k, fails. This occurs because, when the data is partitioned into k classes, the number of observations, n, is much smaller than the number of features, p (i.e n \<\< p). As a result, the covariance matrix estimate for class k becomes singular or nearly singular. Therefore, without dimension reduction or regularisation, training this classifier is not feasible.
 
 -   **k-NN (k-nearest Neighbor)**: k-NN is a nonoparametric classficiation alogrithm which classifies a data point based on the majority class of its 'k' closest neighbors in the feature space, using a distance metric like Euclidean distance. K-NN makes predictions by examining the local structure of the data, with no explicit training phase, making it highly sensitive to the choice of 'k' and the scale of the features.
 
@@ -70,32 +70,64 @@ In the following we are applying the dimensionality reduction tool PCA (Principa
 knitr::include_graphics("005_443.png")
 ```
 
++---------------------+------------+---------------+------------+------------+
 | with PCA            | Accuracy   | Bal. Accuracy | AUC        | F1         |
-|---------------------|------------|---------------|------------|------------|
++=====================+============+===============+============+============+
 | LDA                 | 0.9352     | 0.9176        | 0.9892     | 0.9079     |
++---------------------+------------+---------------+------------+------------+
 | Logistic            | **0.9489** | 0.9414        | **0.9913** | 0.9309     |
++---------------------+------------+---------------+------------+------------+
 | QDA                 | 0.9416     | 0.9298        | 0.9876     | 0.9194     |
++---------------------+------------+---------------+------------+------------+
 | k-NN                | 0.9187     | 0.8982        | 0.8982     | 0.8834     |
++---------------------+------------+---------------+------------+------------+
 | GDBT                | 0.8703     | 0.8394        | 0.9483     | 0.8060     |
++---------------------+------------+---------------+------------+------------+
 | RF                  | 0.9379     | 0.9259        | 0.9259     | 0.9144     |
++---------------------+------------+---------------+------------+------------+
 | SVM (Linear Kernel) | 0.9516     | **0.9431**    | 0.9431     | **0.9342** |
++---------------------+------------+---------------+------------+------------+
 | SVM (Radial Kernel) | 0.9498     | 0.9397        | 0.9397     | 0.9312     |
++---------------------+------------+---------------+------------+------------+
 
 ## Task 1.3 Improved Classifiers
 
 Now we want to focus on improving a selection of classifiers with regards to the F1 score. For this exercise we choose to improve two linear classifiers and one more complex one. Hence, we are improving the LDA, Logistic Regression and AdaBoost with given improvement techniques.
 
++-----------------------------------------+-----------------+----------------+
 |                                         | F1 Score before | F1 Score after |
-|-----------------------------------------|-----------------|----------------|
++=========================================+=================+================+
 | LDA (with CV and Hyperparameter tuning) | 0.9079          | 0.9487         |
++-----------------------------------------+-----------------+----------------+
 | Logistic (with CV and Regularization)   | 0.9309          | 0.9510         |
++-----------------------------------------+-----------------+----------------+
 | AdaBoost                                | 0.9289          | 0.9323         |
++-----------------------------------------+-----------------+----------------+
 
-PCA is performed on the data as a means of dimension reduction and feature scaling. For each of the classifiers, 5-fold cross validations are run on the training data to estimate the F1-Score error under different hyperparameters. The main hyperparameters tuned for all classifiers is the number of principal components used in training and the classification threshold. The threshold, in particular, is a key hyperparameter due to its direct impact on the precision and recall of a model. There are other hyperparameters considered and tuned for in the chosen classifiers.
+PCA is performed on the data as a means of dimension reduction and feature scaling. For each of the classifiers, 5-fold cross validations are run on the training data to estimate the F1-Score under different hyperparameters. The main hyperparameters tuned for all classifiers is the number of principal components used in training and the classification threshold. The threshold, in particular, is a key hyperparameter due to its direct impact on the precision and recall of a model. There are other hyperparameters considered and tuned for specific to some of the chosen classifiers.
+
+For a classifier, the set of hyperparameters selected is a set that produces a high average F1-Score from the five folds with a low variance. The classifiers are then trained on the selected number of principal components produced by the training data with the selected set of hyperparameters. Predictions are then made on the principle components of the test set, which are obtained through the same transformation according to the training decomposition. The highest scoring classifier on the test set according to the F1-Score is then the selected classifier for the `mypredict()` function.
+
+The following table shows the hyperparameters considered for each classifier, the range of values cross-validated for and the optimal set chosen.
+
++---------------------------+---------------------------------+----------------------------------------+-------------+
+| Classifier                | Hyperparameters                 | Range Cross-Validated                  | Chosen Set  |
++===========================+=================================+========================================+=============+
+| LDA                       | No. Principal Components,\      | $\{10, 11, \ldots, 30\}$,\             | 26,\        |
+|                           | Decision Threshold              | $\{0.1, 0.2, \ldots, 0.9\}$            | 0.2         |
++---------------------------+---------------------------------+----------------------------------------+-------------+
+| Logistic Ridge Regression | No. Principal Components,\      | $\{10, 11, \ldots, 30\}$,\             | 48,\        |
+|                           | Decision Threshold,\            | $\{0.1, 0.2, \ldots, 0.9\}$,\          | 0.4,\       |
+|                           | Regularisation Term ($\lambda$) | $\{0, 0.00001, 0.0001, 0.001, 0.01\}$\ | 0.01        |
++---------------------------+---------------------------------+----------------------------------------+-------------+
+| AdaBoost                  | No. Principal Components,\      | $\{15, 16, \ldots, 30\}$,\             | 26,\        |
+|                           | Decision Threshold,\            | $\{0.1, 0.2, \ldots, 0.9\}$,\          | 0.5,\       |
+|                           | Number of Weak Learners (M),\   | $\{50, 100, 150, 200\}$,\                | 200,\       |
+|                           | Depth of Trees                  |                                        | 5           |
++---------------------------+---------------------------------+----------------------------------------+-------------+
 
 -   **LDA with CV**: We enhance LDA by applying PCA and cross-validation (CV) to address a drop in accuracy, balanced accuracy, and F1 score when using PCA. This is likely due to fewer components/features, which reduce the model’s ability to linearly separate data in lower dimensions. Cross-validation helps select the best subset for training, identifying the features that provide the most valuable information for the model. Additionally, the number of principal components and the threshold for classifying positive vs. negative predictions are tuned. Lower thresholds (around 0.2 to 0.3) improve the F1 score. The slight imbalance in the classes within the training data set is considered during hyperparameter tuning to optimize model performance.
 -   **Logistic CV and Lasso**: Cross-validation splits the data into multiple subsets (folds), training the model on some and testing on the others. This process helps assess the performance of logistic regression more robustly by reducing overfitting and providing a better estimate of generalization to unseen data. Regularization adds a penalty to the loss function to control model complexity, preventing overfitting by penalizing large coefficients. Lasso regularization can also perform feature selection by driving some coefficients to zero, while Ridge shrinks all coefficients towards zero without eliminating any. Together, cross-validation and regularization help evaluate and improve the model’s performance, with regularization enhancing generalization. Additionally, Lasso and Ridge are compared using different values of lambda (regularization strength), while hyperparameter tuning of the logistic threshold (around 0.4) optimizes the F1 score. The number of principal components is also tuned to achieve the best F1 score.
 -   **RF with AdaBoost**: We choose to improve the Random Forest with AdaBoost due to the fact that the Random Forest itself is already a bagged classifier, since the Decision Trees are consturcted on bootstrapped (with replacement) data sets and due to majority voting a decision is made which resembles the aggregation part of bagging. Boosting helps here to improve the weak classifiers which in this case are the Random Forests which misclassified the cells. By increasing their weights for the classification problem the classifier is focusing more on improving the flase classifiers, resulting in a better performance of the Random Forest.
 
 Ultimately, after comparing the F1 Scores, we are choosing XXX to implement into our mypredict() function for Task 1.
-
