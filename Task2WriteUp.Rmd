@@ -49,11 +49,7 @@ The next model we train is a Forward Stepwise Selection model (FSS). Starting fr
 
 #### Random Forest
 
-While originally utilized solely for computational efficiency in order to run the "entire" 30,000 (explain how could only do the subset with the randomForest package that we previously used in seminar), we see that for the same parameter value (number of trees) the rnager package does much better in terms of selecting far fewer features, and better balanced accuracy
-
-The balanced accuracy is tnot that much of a decrease for randomForest. Increasing our confidence in the decision to approach computational and memory errors by utilizing the subset dataset in FSS, likely still gave us comparable decent restulst
-
-Note that while we use the subset dataset for random forest in a comparative measure, our final random forest model was trained on the "entireity" of the 30,000 features
+Originally for random forest we were unable to train the entire dataset of 30,000 features due to memory constraints under the randomForest pacakage. Therefore, similar to FSS, we proceed with only running the random forest on the subset of the top 1,000 features that are most highly correlated with the $label$. After some researching, we found that conducting a random forest with ranger::ranger is much more computationally efficient (https://www.css.cornell.edu/faculty/dgr2/_static/files/R_html/CompareRandomForestPackages.html#4_Conclusion). When we use ranger::ranger we are able to build our random forest on the entirety of the training data (30,000 features). Additionally, when setting the parameter value for the number of trees constant, the ranger package returns far fewer features and a greater balanced accuracy in the final model compared to running random forest with the package randomForest. Note that the balanced accuracy is not that much of a decrease for randomForest. This increases our confidence in the decision to approach computational and memory errors by utilizing the subset dataset in FSS, indicating that likely the subset training data gives us comparably decent results. Note that while we use the subset dataset for random forest in a comparative measure, our final random forest model was trained on the "entireity" of the 30,000 features
 
 | Package      | Initial Data # of Features | Number of Trees | Number of Selected Features | Balanced Accuracy |
 |--------------|----------------------------|-----------------|-----------------------------|-------------------|
@@ -124,3 +120,6 @@ L., Weiss, Y. and Bottou, L., eds.), vol. 17, MIT Press.
   Shlobin NA, Har-Even M, Itsekson-Hayosh Z, Harnof S, Pick CG. Role of Thrombin in Central Nervous System Injury and Disease. Biomolecules. 2021 Apr 12;11(4):562. doi: 10.3390/biom11040562. PMID: 33921354; PMCID: PMC8070021.
   
   “Understand Your Dataset with Xgboost.” Understand Your Dataset with XGBoost - Xgboost 2.1.3 Documentation, xgboost.readthedocs.io/en/latest/R-package/discoverYourData.html. Accessed 11 Dec. 2024. 
+  
+  ### How do I reference / cite???
+  https://www.css.cornell.edu/faculty/dgr2/_static/files/R_html/CompareRandomForestPackages.html#4_Conclusion 
