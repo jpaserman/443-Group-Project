@@ -26,7 +26,8 @@ packages = list("caret",
                 "MLmetrics",
                 "ranger",
                 "kernlab",
-                "ggplot"
+                "ggplot2",
+                "reshape2"
                 )
 
 ```
@@ -147,6 +148,29 @@ top_1000_cor <- cor_with_label %>%
 top_1000_vars <- top_1000_cor$feature
 
 ```
+
+```{r barcharts for top 3 correlated features}
+top_1000_cor_minus_label <- top_1000_cor[-1,]
+top_1000_cor_boxplot_data <- top_1000_cor_minus_label[order(-top_1000_cor_minus_label$abs_cor),]
+
+top3_correlated <- top_1000_cor_boxplot_data[1:3,]
+
+top_3_features <- top3_correlated$feature
+
+new_df_2_top3_correlated_features <- task_two_df[, top_3_features]
+
+# Melt to format data better
+long_df <- melt(new_df_2_top3_correlated_features)
+
+ggplot(long_df, aes(x = variable, fill = as.factor(value))) +
+  geom_bar(position = "dodge") +
+  geom_text(stat = "count", aes(label = ..count..), vjust = -0.5, position = position_dodge(width = 0.9)) +
+  labs(fill = "Value") +
+  theme_minimal() +
+  ggtitle("Distribution of Top 3 Features Correlated with the Label")
+
+```
+
 
 ```{r train_test_split}
 set.seed(seed)
