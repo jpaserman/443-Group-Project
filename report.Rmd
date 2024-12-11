@@ -10,7 +10,7 @@ date: "2024-12-09"
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## Merge of both tasks' reports 
+## Merge of both tasks' reports
 
 # Task 1: Binary Classification
 
@@ -29,7 +29,7 @@ knitr::include_graphics("004_443.png")
 We can see that not all genes have a high amount of information for differentiating between the two cell types CD4+T and TREG and being thus a useful predictor for classification purposes. Rather it is a lower amount of top cells which are able to influence the classification models the most. We will discuss more on this when we talk about PCA and its principal components. In the following we can observe the summary of top 3 cells with the highest absolute difference in mean values, and in addition their boxplots.
 
 |  |  |  |
-|------------------------|------------------------|-----------------------|
+|------------------------|------------------------|------------------------|
 | ![](images/001_443-01.png){width="200"} | ![](images/002_443-01.png){width="200"} | ![](images/003_443.png){width="200"} |
 
 The last plot for the third largest difference in absolute mean values differs from the other since the CD4+T 3rd quarter for TNFRSF1B is still 0 and the mean is located in the 4th quarter and therefore the box plot visually cannot be generated here.
@@ -52,30 +52,34 @@ In the following we are evaluating seven different classifiers regarding their c
 
 -   **SVM (Support Vector Machine)**: The SVM works by finding a hyperplane that best separates data into different classes, maximizing the margin between the classes. SVM can also handle non-linear data by using kernel functions to transform the data into higher-dimensional spaces.
 
-| w/o PCA  | Accuracy   | Bal. Accuracy | AUC        | F1         |
-|----------|------------|---------------|------------|------------|
-| LDA      | 0.9416     | 0.9407        | 0.9407     | **0.9526** |
-| Logistic | 0.6393     | 0.6413        | 0.6597     | 0.6858     |
-| QDA      | N/A        | N/A           | N/A        | N/A        |
-| k-NN     | 0.7425     | 0.6964        | 0.6964     | 0.5983     |
-| GBDT     | 0.9068     | 0.8856        | **0.9724** | 0.9283     |
-| RF       | 0.9352     | 0.9171        | 0.9171     | 0.9500     |
-| SVM      | **0.9553** | **0.9479**    | 0.9479     | 0.9394     |
+| w/o PCA  | Accuracy   | Bal. Accuracy | AUC        | F1     |
+|----------|------------|---------------|------------|--------|
+| LDA      | 0.9416     | 0.9407        | 0.9407     | 0.9238 |
+| Logistic | 0.6393     | 0.6413        | 0.6597     | 0.5766 |
+| QDA      | N/A        | N/A           | N/A        | N/A    |
+| k-NN     | 0.7425     | 0.6964        | 0.6964     | 0.5983 |
+| GBDT     | 0.9087     | 0.8887        | **0.9731** | 0.8698 |
+| RF       | 0.9352     | 0.9171        | 0.9171     | 0.9077 |
+| SVM      | **0.9553** | **0.9479**    | 0.9479     | 0.9394 |
 
 ## Task 1.2 Summary Table with PCA
 
-In the following we are applying the dimensionality reduction tool PCA (Principal Component Analyis). It transforms data into a new coordinate system, where the axes (principal components) capture the maximum variance in the data. It finds a set of orthogonal directions (principal components) that explain the most variability, with the first component explaining the most, the second the second most, and so on. PCA is often used to reduce the number of features while preserving as much information as possible, simplifying data for analysis or visualization.
+In the following we are applying the dimensionality reduction tool PCA (Principal Component Analyis). It transforms data into a new coordinate system, where the axes (principal components) capture the maximum variance in the data. It finds a set of orthogonal directions (principal components) that explain the most variability, with the first component explaining the most, the second the second most, and so on. PCA is often used to reduce the number of features while preserving as much information as possible, simplifying data for analysis or visualization. In the following scree plot we can additionally see that approximately ten principal components form the elbow of the scree plot, meaning that ten principal components account for the most Variance within the data set which makes them powerful to use for prediction models.
+
+```{r echo=FALSE, fig.align='center', out.width="60%"}
+knitr::include_graphics("005_443.png")
+```
 
 | with PCA            | Accuracy   | Bal. Accuracy | AUC        | F1         |
 |---------------------|------------|---------------|------------|------------|
 | LDA                 | 0.9352     | 0.9176        | 0.9892     | 0.9079     |
-| Logistic            | 0.9489     | **0.9414**    | **0.9913** | 0.9309     |
+| Logistic            | **0.9489** | 0.9414        | **0.9913** | 0.9309     |
 | QDA                 | 0.9416     | 0.9298        | 0.9876     | 0.9194     |
-| k-NN                | 0.9160     | 0.8941        | 0.8941     | 0.8786     |
-| GDBT                | 0.8667     | 0.8341        | 0.9482     | 0.7989     |
-| RF                  | 0.9379     | 0.9255        | 0.9255     | 0.9141     |
-| SVM (Linear Kernel) | 0.9489     | 0.9409        | 0.9409     | 0.9307     |
-| SVM (Radial Kernel) | **0.9498** | 0.9397        | 0.9397     | **0.9312** |
+| k-NN                | 0.9187     | 0.8982        | 0.8982     | 0.8834     |
+| GDBT                | 0.8703     | 0.8394        | 0.9483     | 0.8060     |
+| RF                  | 0.9379     | 0.9259        | 0.9259     | 0.9144     |
+| SVM (Linear Kernel) | 0.9516     | **0.9431**    | 0.9431     | **0.9342** |
+| SVM (Radial Kernel) | **0.9498** | 0.9397        | 0.9397     | 0.9312     |
 
 ## Task 1.3 Improved Classifiers
 
@@ -83,12 +87,12 @@ Now we want to focus on improving a selection of classifiers with regards to the
 
 |                                         | F1 Score before | F1 Score after |
 |-----------------------------------------|-----------------|----------------|
-| LDA (with CV and Hyperparameter tuning) | 0.9079          | 0.9433         |
+| LDA (with CV and Hyperparameter tuning) | 0.9079          | 0.9487         |
 | Logistic (with CV and Regularization)   |                 |                |
 | RF (with AdaBoost)                      | 0.9141          | 0.9629         |
 
--   **LDA with CV**: We try to improve the LDA with PCA and CV since we have noticed that the accuracy and balanced accuracy and F1 Score of the LDA with PCA dropped compared to only LDA. This seems plausible since we have less components/features which are helping us to linearly separate the data in lower dimensions. That is why we apply Cross Validation to select the best subset to train the data on which helps us to identify the subsets which give us the most information for training the model.
--   **Logistic CV and Lasso**: Cross-validation involves splitting the data into multiple subsets (folds) and training the model on some subsets while testing it on the remaining subsets. It helps us to assess the performance of logistic regression in a more robust way by reducing overfitting and providing a better estimate of how the model will generalize to the test data as well as unseen data. Additionally, regularization helps us to add a penalty term to the logistic regression's loss function to control the complexity of the model. This discourages overfitting by penalizing large coefficients, leading to simpler models. Lasso regularization can also perform feature selection by driving some coefficients to zero, while Ridge regularization shrinks all coefficients towards zero without eliminating any. Together, both cross-validation and regularization helps to evaluate the model's performance, while regularization improves its generalization ability by preventing overfitting.
+-   **LDA with CV**: We enhance LDA by applying PCA and cross-validation (CV) to address a drop in accuracy, balanced accuracy, and F1 score when using PCA. This is likely due to fewer components/features, which reduce the model’s ability to linearly separate data in lower dimensions. Cross-validation helps select the best subset for training, identifying the features that provide the most valuable information for the model. Additionally, the number of principal components and the threshold for classifying positive vs. negative predictions are tuned. Lower thresholds (around 0.2 to 0.3) improve the F1 score. The slight imbalance in the classes within the training data set is considered during hyperparameter tuning to optimize model performance.
+-   **Logistic CV and Lasso**: Cross-validation splits the data into multiple subsets (folds), training the model on some and testing on the others. This process helps assess the performance of logistic regression more robustly by reducing overfitting and providing a better estimate of generalization to unseen data. Regularization adds a penalty to the loss function to control model complexity, preventing overfitting by penalizing large coefficients. Lasso regularization can also perform feature selection by driving some coefficients to zero, while Ridge shrinks all coefficients towards zero without eliminating any. Together, cross-validation and regularization help evaluate and improve the model’s performance, with regularization enhancing generalization. Additionally, Lasso and Ridge are compared using different values of lambda (regularization strength), while hyperparameter tuning of the logistic threshold (around 0.4) optimizes the F1 score. The number of principal components is also tuned to achieve the best F1 score.
 -   **RF with AdaBoost**: We choose to improve the Random Forest with AdaBoost due to the fact that the Random Forest itself is already a bagged classifier, since the Decision Trees are consturcted on bootstrapped (with replacement) data sets and due to majority voting a decision is made which resembles the aggregation part of bagging. Boosting helps here to improve the weak classifiers which in this case are the Random Forests which misclassified the cells. By increasing their weights for the classification problem the classifier is focusing more on improving the flase classifiers, resulting in a better performance of the Random Forest.
 
 ## Task 1.4 Final predict function

@@ -45,8 +45,8 @@ lambda_grid <- c(0.001, 0.01,0.03,0.05)
 ## Initialize a vector to store test errors for each lambda
 test_errors <- numeric(length(lambda_grid))
 
-## Number of Principal Components to train with
-no_prin_comps <- c(2:1000)
+## Number of Principal Components to Cross-Validate on
+no_prin_comps <- c(2:25)
 
 ## Number of folds for Cross-Validation 
 no_folds <- 5
@@ -55,9 +55,11 @@ no_folds <- 5
 thresholds <- seq(0.1, 0.9, 0.1)
 
 ## Logistic Ridge/Lasso Tuning
-lambda_tuning = c(10^seq(-4, 1, 1))
+lambda_tuning = c(0, 0.00001, 0.0001, 0.001, 0.01)
 
-
+## AdaBoost Tuning 
+mfinals = c(50, 100, 150, 200)
+depths = c(3,5,7)
 ```
 
 ```{r load_packages, include=FALSE}
@@ -104,1357 +106,11 @@ fun_calc_balanced_accuracy <- function(confusion_matrix, pos_label, neg_label){
   return(balanced_accuracy)
 }
 
-cv_f1_score <- function(data, lev = NULL, model = NULL) {
-  
-  precision <- posPredValue(data$pred, data$obs, positive = "TREG")
-  
-  recall <- sensitivity(data$pred, data$obs, positive = "TREG")
-  
-  F1 <- ifelse((precision + recall) == 0, 
-               0, 
-               2 * precision * recall / (precision + recall))
-  
-  accuracy <- mean(data$pred == data$obs)
-  # Return a named vector
-  c(Accuracy = accuracy, F1 = F1)
-}
-
-```
-
-
-## T1.1: Exploratory data analysis and summary statistics (Peter?)
-
-```{r EDA}
-dim(task_one_df)  # The data has 5471 observations and 4125 variables-- 4124 originally, 1 added (label)
-table(task_one_df$label) # 3356 observations are labelled as CD4+T and 2115 are labelled as TREG
-
-mean_table <- task_one_df %>%
-
-  dplyr::select(-label_as_numeric) %>%
-
-  group_by(label) %>%
-
-  summarise(across(everything(), mean, na.rm = TRUE)) %>%
-
-  pivot_longer(cols = -label, names_to = 'genes', values_to = 'mean_value') %>%
-
-  pivot_wider(names_from = label, values_from = mean_value) %>%
-
-  mutate(diff = abs(`CD4+T` - TREG))
-
-  # mutate(pct_diff = 100 * (diff / ((`CD4+T` + TREG)/2) )) ## This doesn't result in very nice graphs, perhaps stick to the absolute diff??
-
-
-top_3_abs_diff <- mean_table %>% top_n(3, diff) %>% arrange(desc(diff))
-
-# top_3_pct_diff <- mean_table %>% top_n(3, pct_diff) %>% arrange(desc(pct_diff)) # Doesn't result in very good graphs... perhaps remove
-
-par(mfrow=c(1,3))
-
-### Add x-axis label and title
-for (var in top_3_abs_diff$genes) {
-  formula <- as.formula(paste(var, "~ label"))
-  plot <- boxplot(formula, data = task_one_df, col=c("blue", "red"))
-  print(plot)
-}
-
-
-# # Doesn't result in very good graphs.. perhaps remove
-# for (var in top_3_pct_diff$genes) {
-#   formula <- as.formula(paste(var, "~ label"))
-#   plot <- boxplot(formula, data = task_one_df, col=c("blue", "red"))
-#   print(plot)
-#   quantile(task_one_df$var)
-# }
-
-## There are decent differences between the ranking of absolute difference in means of groups
-## and the ranking of percentage difference in means of groups
-## perhaps we create box plots of the top 3-5 of each metric??
-
-## Perhaps do summary(XXX) of a few variables??
-## If want to display multiple subgraphs --> par(mfrow=c(x,y))
-
-### Next steps --> 
-  ### (1) instead of absolute value difference, include also
-  ### percentage change. then plot box plots for the top 5? 10? variables
-  ### that appear to have the clearest distinction between the two labels
-  ### these specific variables provide a good baseline for what we expect
-  ### our subsequent models to choose for the most important fields
-  
-## Checking if there are any rows that have missing values... Keep this hashed unless you want to check, because it takes a while to run
-# for (i in 1:nrow(task_one_df)) {
-#   if (any(is.na(task_one_df[i, ]))) {
-#     print(paste("Row", i, "contains NA values."))
-#   }
-# }
-
-# twenty_random_columns <- sample(names(task_one_df)[-1], 20)
-# 
-# ## Create boxplots for the random sample of columns
-# for (column in twenty_random_columns) {
-#     p <- ggplot(task_one_df, aes_string(x = "label", y = column)) +
-#         geom_jitter(width = 0.2, height = 0) +  # Use jitter to avoid overplotting
-#         ggtitle(paste("Scatter Plot of", column, "by Label")) +
-#         theme_minimal()
-#     print(p)
-# }
-
-```
-
-## T1.2: Training and evaluating various classifiers
-
-### Without PCA
-
-#### Linear Discriminant Analysis (LDA) (Imar)
-
-```{r lda_train}
-lda_start_time  <- Sys.time()
-lda_fit <- lda(label ~ . -label_as_numeric, data=train_data)
-lda_end_time  <- Sys.time()
-lda_runtime <- lda_end_time - lda_start_time # Time difference of 4.937018 mins
-
-lda_pred <- predict(lda_fit, test_data)$class
-```
-
-```{r lda_save, include = FALSE}
-write.csv(lda_pred, file = "predictions_1.2/lda_predictions.csv", row.names = TRUE)
-```
-
-```{r lda_load, include = FALSE}
-lda_pred <- read.csv("predictions_1.2/lda_predictions.csv") %>% 
-  
-  dplyr::select(x)
-
-lda_pred <- lda_pred[,'x']
-```
-
-```{r lda_confusion}
-lda_confusion <- table(predicted_label = lda_pred, true_label = test_data$label)
-lda_confusion
-```
-
-```{r lda_accuracy}
-lda_accuracy <- mean(lda_pred == test_data$label)
-
-cat("Accuracy of LDA:", lda_accuracy, "\n")
-```
-
-```{r lda_balanced_accuracy}
-lda_balanced_accuracy <- fun_calc_balanced_accuracy(lda_confusion, 
-                                                    pos_label = 'TREG', 
-                                                    neg_label = 'CD4+T')
-
-cat("Balanced Accuracy of LDA:", lda_balanced_accuracy, "\n")
-```
-
-```{r lda_f1_score}
-lda_f1_score <- F1_Score(y_true= test_data$label, y_pred = lda_pred)
-cat("F1 Score of LDA:", lda_f1_score, "\n")
-```
-
-```{r lda_roc}
-lda_pred_numeric <- ifelse(lda_pred == "TREG", 1, 0)
-  
-lda_roc_curve <- roc(
-  response = test_data$label_as_numeric,
-  predictor = lda_pred_numeric, 
-  levels = c(0,1),
-  direction = "<"
-  )
-
-plot(lda_roc_curve, col = "red", main = "ROC Curve for LDA")
-
-lda_auc <- auc(lda_roc_curve)
-lda_auc
-```
-
-```{r lda_misclass}
-lda_misclas <- mean(lda_pred != test_data$label)
-cat("Misclassification error rate of LDA:", lda_misclas, "\n")
-```
-
-#### Logistic classifier (Imar)
-
-```{r logreg_train}
-logreg_start_time <- Sys.time()
-
-logreg_fit <- glm(label_as_numeric ~ . -label,
-                  data = train_data,
-                  family = binomial)
-
-logreg_run_time <- Sys.time() - logreg_start_time # Time difference of 17.64516 mins
-
-logreg_probs <- predict(logreg_fit, newdata = test_data, type = "response")
-logreg_pred <- ifelse(logreg_probs > 0.5, 'TREG', 'CD4+T')
-```
-
-```{r logreg_save, include = FALSE}
-write.csv(logreg_probs, file = "predictions_1.2/logreg_probabilities.csv", row.names = TRUE)
-write.csv(logreg_pred, file = "predictions_1.2/logreg_predictions.csv", row.names = TRUE)
-```
-
-```{r logreg_load, include = FALSE}
-logreg_pred <- read.csv("predictions_1.2/logreg_predictions.csv") %>% 
-  
-  dplyr::select(x)
-
-logreg_pred <- logreg_pred[,'x']
-
-logreg_probs <- read.csv("predictions_1.2/logreg_probabilities.csv") %>% 
-  
-  dplyr::select(x)
-
-logreg_probs <- logreg_probs[,'x']
-```
-
-```{r logreg_confusion}
-log_confusion <- table(prediction = logreg_pred, truth = test_data$label)
-log_confusion
-```
-
-```{r logreg_accuracy}
-log_accuracy <- mean(logreg_pred == test_data$label)
-cat("Accuracy of Logistic Regression:", log_accuracy, "\n")
-```
-
-```{r logreg_balanced_accuracy}
-log_balanced_accuracy <- fun_calc_balanced_accuracy(log_confusion,
-                                                    pos_label = 'TREG',
-                                                    neg_label = 'CD4+T')
-
-cat("Balanced Accuracy of Logistic Regression:", log_balanced_accuracy, "\n")
-```
-
-```{r logreg_f1_score}
-log_f1_score <- F1_Score(y_true= test_data$label, y_pred = logreg_pred)
-cat("F1 Score for Logistic Regression:", log_f1_score, "\n")
-```
-
-```{r logreg_ROC_AUC}
-roc_curve_log <- roc(test_data$label, logreg_probs, levels=c("TREG", "CD4+T"), direction = ">")
-
-plot(roc_curve_log, col="blue", main="ROC Curve for Logistic Regression")
-
-log_auc <- as.numeric(auc(roc_curve_log))
-cat("The AUC of the ROC of Logistic Regression:", log_auc, "\n")
-```
-
-```{r logreg_Misclass}
-log_misclas <- mean(glm_pred != test_data_log$label)
-cat("The Misclassification rate of Logistic Regression:", log_misclas, "\n")
-```
-
-#### Quadratic Discriminant Analysis (QDA) (Chi)
-
-The current dimensionality of the data is too high for a QDA classifier. During training, the covariance matrix estimation for each class, k, fails. This occurs because, when the data is partitioned into k classes, the number of observations, n, is much smaller than the number of features, p (i.e n << p). As a result, the covariance matrix estimate for class k becomes singular or nearly singular. Therefore, without dimension reduction or regularisation, training this classifier is not feasible.
-
-```{r qda_Train}
-# ## CAUTION: currently hard-coded numbers here. To be changed (Chi)
-# options(expressions = 10000)
-# qda_covariates = mean_table$genes[1:1100]
-# ## CAUTION: currently hard-coded numbers here. To be changed (Chi)
-# 
-# qda_formula = as.formula(
-#   paste(
-#     "label ~",
-#     paste(qda_covariates, collapse = " + ")
-#     ))
-# 
-# qda_fit <- qda(qda_formula, data = train_data)
-```
-
-```{r qda_Confusion}
-# qda_pred <- predict(qda_fit, test_data)$class
-# 
-# table(predicted = qda_pred, observed = test_data$label)
-```
-
-```{r qda_Misclass}
-# qda_misclas = mean(qda_pred != test_data$label)
-# 
-# cat("Misclassification rate:", qda_misclas*100, "%")
-```
-
-```{r qda_ROC}
-# qda_pred_numeric <- ifelse(qda_pred == "TREG", 1, 0)
-#   
-# qda_roc_curve <- roc(
-#   response = test_data$label_as_numeric,
-#   predictor = qda_pred_numeric, 
-#   levels = c(0,1),
-#   direction = "<"
-#   )
-# 
-# plot(qda_roc_curve, col = "red", main = "ROC Curve for QDA")
-# 
-# qda_auc <- auc(qda_roc_curve)
-# qda_auc
-```
-
-```{r QDA_TBD}
-# qda_accuracy <- "n/a"
-# qda_balanced_accuracy <- "n/a"
-# qda_f1_score <- "n/a"
-# qda_runtime <- "n/a"
-```
-
-
-#### Nearest Neighbor Classifier (k-NN) (Chi)
-
-```{r kNN_train, eval = FALSE}
-set.seed(seed)
-
-knn_train_X <- train_data %>% 
-  dplyr::select(-label, -label_as_numeric)
-
-knn_train_Y <- train_data$label
-
-knn_test_X <- test_data %>% 
-  dplyr::select(-label, -label_as_numeric)
-
-knn_start_time <- Sys.time()
-knn_pred <- knn(train = knn_train_X, 
-                test = knn_test_X, 
-                cl = knn_train_Y,
-                k = 8)
-knn_end_time <- Sys.time()
-
-knn_train_runtime <- knn_end_time - knn_start_time
-print(knn_train_runtime) #50 mins for k=1 to k=10 
-
-rm(knn_train_X, knn_train_Y, knn_test_X)
-```
-
-```{r kNN_save, include = FALSE}
-write.csv(knn_pred, file = "knn_predictions.csv", row.names = TRUE)
-```
-
-
-```{r kNN_load, include = FALSE}
-knn_pred <- read.csv("knn_predictions.csv") %>% 
-  dplyr::select(-X)
-
-knn_pred <- knn_pred[, 'x']
-```
-
-```{r knn_pca_confusion}
-knn_confusion <- table(predicted = knn_pred,
-                           observed = test_data$label)
-
-print(knn_confusion)
-```
-
-```{r knn_diagnostics}
-knn_accuracy <- mean(knn_pred == test_data_pca$label)
-
-knn_balanced_accuracy <- fun_calc_balanced_accuracy(knn_confusion,
-                                                        pos_label = 'TREG',
-                                                        neg_label = 'CD4+T')
-
-knn_f1_score <- F1_Score(y_true = test_data_pca$label, 
-                             y_pred = knn_pred,
-                             positive = "TREG")
-
-knn_roc_curve <- roc(
-  response = test_data_pca$label,
-  predictor = as.numeric(knn_pred), 
-  levels = c('CD4+T','TREG'),
-  direction = "<"
-  )
-
-knn_auc <- auc(knn_roc_curve)
-
-knn_misclas <- mean(knn_pred != test_data_pca$label)
-
-plot(knn_roc_curve, col = "red", main = "ROC Curve for QDA")
-```
-
-```{r knn_evaluation}
-# Create a table of the evaluation metrics
-knn_metrics_table <- data.frame(
-  Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
-  kNN = c(knn_accuracy, knn_balanced_accuracy, knn_f1_score, knn_auc, knn_misclas)
-)
-
-print(knn_metrics_table)
-```
-
-#### Gradient Boosting Decision Trees (GBDT) (Imar)
-
-```{r gbmparams}
-#Number of trees
-num_trees = 1000
-# Define grid of lambda (shrinkage) values to evaluate
-lambda_grid <- c(0.001, 0.01,0.03,0.05)
-
-# Initialize a vector to store test errors for each lambda
-test_errors <- numeric(length(lambda_grid))
-```
-
-```{r dataprepgbm}
-test_data_cleaned_gbm <- test_data[, !colnames(test_data) %in% c("label", "label")]
-```
-
-```{r gbmloop, eval=FALSE}
-gbm_optimal_lambda_start <- Sys.time()
-# Loop over each lambda value
-for (i in seq_along(lambda_grid)) {
-  lambda <- lambda_grid[i]
-  
-  # Train the gbm model with the current lambda (shrinkage) value
-  gbm_model <- gbm(label_as_numeric ~. - label, data = train_data, 
-                   distribution = "bernoulli", 
-                   n.trees = num_trees, 
-                   interaction.depth = 4, 
-                   shrinkage = lambda, 
-                   cv.folds = 5, 
-                   verbose = FALSE)
-  
-  # Make predictions on the test set using the optimal number of trees
-  predictions <- predict(gbm_model, newdata = test_data_cleaned_gbm, n.trees = num_trees)
-  
-  # Calculate the Mean Squared Error on the test set
-  test_errors[i] <- mean((predictions - test_data_cleaned_gbm$label_as_numeric)^2)
-}
-gbm_optimal_lambda_end <- Sys.time()
-gbm_optimal_lambda_total_time <- gbm_optimal_lambda_end - gbm_optimal_lambda_start
-print(gbm_optimal_lambda_total_time)
-```
-
-```{r gbmtse, eval=FALSE}
-# Combine lambda values and test errors into a data frame for plotting
-error_df <- data.frame(lambda = lambda_grid, test_error = test_errors)
-
-# Plot the test error over the range of lambda values
-ggplot(error_df, aes(x = lambda, y = test_error)) +
-  geom_line() +
-  geom_point() +
-  labs(title = "Test Error vs Lambda (Shrinkage)", 
-       x = "Lambda (Shrinkage)", 
-       y = "Test Mean Squared Error") +
-  theme_minimal()
-
-```
-
-The results above show use that the GLM model with the lowest Test Mean Squared Error, will be the one with the lowest lambda value we assigned of 0.001. This does not necessarily mean that the best Gradient Descent Boosting model that will work best will be the best model for our data, as it may not account for over fitting. However, we will continue using the GBDT model with a shrinkage value of 0.001 to analyze the model and to compare it to our other models.
-
-```{r gbm_model}
-# Set a single shrinkage value
-lambda <- 0.001
-
-# Measure the time it takes to run 
-gbm_start_time <- Sys.time()
-# Train the gbm model
-smallest_lambda_gbm_model <- gbm(label_as_numeric ~ . - label, 
-                 data = train_data, 
-                 distribution = "bernoulli", 
-                 n.trees = num_trees, 
-                 interaction.depth = 4, 
-                 shrinkage = lambda, 
-                 cv.folds = 5, 
-                 verbose = FALSE)
-
-# Get the best number of trees based on cross-validation
-best_trees <- gbm.perf(smallest_lambda_gbm_model, method = "cv")
-
-# Measure time after model training
-gbm_end_time <- Sys.time()
-gbm_model_training_time <- gbm_end_time - gbm_start_time
-cat("GBM Model training time:", gbm_model_training_time, "\n")
-
-# Measure time for predictions
-gbm_start_time_pred <- Sys.time()
-# Make predictions on the test set using the best number of trees
-gbm_pred_probs <- predict(smallest_lambda_gbm_model, newdata = test_data_cleaned_gbm, n.trees = best_trees, type = "response")
-gbm_pred_classes <- ifelse(gbm_pred_probs > 0.5, 1, 0)
-
-# Measure time after predictions
-gbm_end_time_pred <- Sys.time()
-gbm_prediction_time <- gbm_end_time_pred - gbm_start_time_pred
-cat("Prediction time:", gbm_prediction_time, "\n")
-```
-
-```{r gbm_save, include = FALSE}
-write.csv(gbm_pred_classes, file = "predictions_1.2/gbm_predictions.csv", row.names = TRUE)
-```
-
-```{r gbm_load, include = FALSE}
-gbm_pred_classes <- read.csv("predictions_1.2/gbm_predictions.csv") %>% 
-  
-  dplyr::select(x)
-
-gbm_pred_classes <- gbm_pred_classes[,'x']
-```
-
-```{r gbm_Confusion}
-gbm_confusion_matrix <- table(Predicted = gbm_pred_classes, Actual = test_data_cleaned_gbm$label_as_numeric)
-print(gbm_confusion_matrix)
-
-gbm_balanced_accuracy <- fun_calc_balanced_accuracy(gbm_confusion_matrix, 
-                                  pos_label = "1", 
-                                  neg_label = "0")
-
-cat("The balanced accuracy is", gbm_balanced_accuracy, "\n")
-```
-
-```{r gbm_Misclass}
-gbm_misclas <- mean(gbm_pred_classes != test_data_cleaned_gbm$label_as_numeric)
-cat("Misclassification Rate:", gbm_misclas, "\n")
-```
-
-```{r gbm_Accuracy}
-gbm_accuracy <- mean(gbm_pred_classes == test_data_cleaned_gbm$label_as_numeric)
-cat("Accuracy:", gbm_accuracy, "\n")
-```
-
-```{r gbm_ROC_AUC}
-gbm_roc_curve <- roc(test_data_cleaned_gbm$label_as_numeric, gbm_pred_probs)
-gbm_auc <- auc(gbm_roc_curve)
-cat("AUC:", gbm_auc, "\n")
-plot(gbm_roc_curve, main = "ROC Curve")
-```
-
-```{r gbm_f1_score}
-gbm_f1_score <- F1_Score(y_pred = gbm_pred_classes, y_true = test_data_cleaned_gbm$label_as_numeric)
-cat("F1 Score:", gbm_f1_score, "\n")
-```
-
-The accuracy for the gradient descent decision tree model (where the shrinkage term was equal to 0.001) was 0.904. The AUC was equal to 0.972 and the Test mean squared error was equal to 0.109. Misclassification rate was equal to 0.096. And F1 score was equal to 0.928
-
-#### Random Forest (Imar)
-
-Above we use a tree search to find.... When using the tree search, we get that there are 11 features that are the most important to classifying whether a cell is a TREG cell or a CD4+T cell. However, we can see based on the tree that there are certain features that appear more than once. Based on the tree plot, we can determine that the most important regressor that helps determine if a cell is a TREG cell or a CD4+T cell is the IL7R. From the National Library of medicine ("<https://www.ncbi.nlm.nih.gov/gene/3575>"), IL7R is a protein encoded by a gene that plays a critical role in the development of lymph nodes. Based on the analysis above, we decided to create a Random Forest regression that will have 12 terminal nodes.
-
-```{r rfmodel}
-# RF model
-start_time_rf <- Sys.time()
-
-rf.rna_features <-randomForest(label~. - label_as_numeric, data=train_data, mtry=64, importance=TRUE, n.tree = 5000) # RF Model
-
-end_time_rf <- Sys.time()
-rf_training_time <- end_time_rf - start_time_rf
-cat("Random Forest model training time:", rf_training_time, "\n")
-
-# Predictions
-start_time_rf_pred <- Sys.time()
-yhat.rf <-predict(rf.rna_features, newdata=test_data)
-
-end_time_rf_pred <- Sys.time()
-rf_prediction_time <- end_time_rf_pred - start_time_rf_pred
-cat("Random Forest prediction time:", rf_prediction_time, "\n")
-
-```
-
-```{r rf_save, include = FALSE}
-write.csv(yhat.rf, file = "predictions_1.2/rf_predictions.csv", row.names = TRUE)
-```
-
-```{r rf_load, include = FALSE}
-yhat.rf <- read.csv("predictions_1.2/rf_predictions.csv") %>% 
-  
-  dplyr::select(x)
-
-yhat.rf <- yhat.rf[,'x']
-```
-
-```{r rf_confusion}
-rf_confusion_matrix <- confusion_matrix <- table(Predicted = yhat.rf, Actual = test_data$label)
-print(rf_confusion_matrix)
-rf_balanced_accuracy <- fun_calc_balanced_accuracy(rf_confusion_matrix,
-                                                   pos_label = "TREG",
-                                                   neg_label = "CD4+T")
-
-cat("The balanced accuracy is", rf_balanced_accuracy, "\n")
-```
-
-```{r rf_misclass}
-rf_misclas <- mean(yhat.rf != test_data$label)
-cat("Random Forest Misclassification Rate:", rf_misclas, "\n")
-```
-
-```{r rf_accuracy}
-rf_accuracy <- mean(yhat.rf == test_data$label)
-cat("Random Forest Accuracy:", rf_accuracy, "\n")
-```
-
-```{r rf_roc_auc}
-yhat.rf_numeric <- ifelse(yhat.rf == "CD4+T", 0, ifelse(yhat.rf == "TREG", 1, NA))
-roc_rf <- roc(test_data$label, yhat.rf_numeric)
-rf_auc <- auc(roc_rf)
-cat("Random Forest AUC:", rf_auc, "\n")
-plot(roc_rf, main = "Random Forest ROC Curve")
-```
-
-```{r rf_f1_score}
-rf_f1_score <- F1_Score(y_pred = yhat.rf, y_true = test_data$label)
-cat("F1 Score:", rf_f1_score, "\n")
-```
-
-Using a random forest tree model, we see that the accuracy of the model was 0.936 Which is quite accurate! Misclassification Rate was equal to 0.064. The F1 score was equal to 0.9504
-
-#### Support Vector Machine (SVM) (Chi)
-
-##### Linear SVM Model
-```{r svm_linear_model}
-## Clean the test data for the SVM task
-test_data_cleaned_for_svm <- test_data[, !colnames(test_data) %in% c("label_as_numeric", "label")]
-
-## K-fold CV for hyperparameter tuning of 'cost' for the training data with a linear kernel
-start_time_svm <- Sys.time()
-
-tune.out = tune(svm, 
-                label ~ . -label_as_numeric, 
-                data = train_data, 
-                kernel = "linear", 
-                ranges = list(cost = c(0.01, 0.1, 1, 10)))
-
-summary(tune.out)
-
-end_time_svm <- Sys.time()
-svm_training_time <- end_time_svm - start_time_svm # 1.18 hrs (~ 1hr & 10 min)
-```
-
-```{r svm_linear_tuned_model}
-# Save the model with the cost that results in the lowest cross validation error rate
-bestmod <-  tune.out$best.model
-summary(bestmod)
-```
-
-```{r svm_predictions}
-# Predictions
-start_time_svm_pred <-  Sys.time()
-yhat.svm = predict(bestmod, test_data)
-
-end_time_svm_pred <- Sys.time()
-svm_prediction_time <- end_time_svm_pred - start_time_svm_pred
-cat("SVM prediction time:", svm_prediction_time, "\n")
-```
-
-```{r svm_save, include = FALSE}
-write.csv(yhat.svm, 
-          file = "predictions_1.2/svm_predictions.csv",
-          row.names = TRUE)
-```
-
-
-```{r svm_load, include = FALSE}
-yhat.svm <- read.csv("predictions_1.2/svm_predictions.csv") %>% 
-  
-  dplyr::select(x)
-
-yhat.svm <- yhat.svm[,'x']
-```
-
-```{r svm_confusion}
-svm_confusion_matrix <- table(predict = yhat.svm, 
-                              truth = test_data$label)
-print(svm_confusion_matrix)
-```
-
-```{r svm_diagnostics}
-svm_balanced_accuracy <- fun_calc_balanced_accuracy(svm_confusion_matrix,
-                                                    pos_label = "TREG",
-                                                    neg_label = "CD4+T")
-
-svm_misclass <- mean(yhat.svm != test_data$label)
-
-svm_accuracy <- mean(yhat.svm == test_data$label)
-
-svm_roc <- roc(test_data$label, 
-               as.numeric(yhat.svm),
-               levels = c("CD4+T", "TREG"),
-               direction = "<")
-
-svm_auc <- auc(svm_roc)
-
-plot(svm_roc, main = "SVM ROC Curve") # Make the limits of the axes 0-1
-
-svm_f1_score <- F1_Score(y_pred = yhat.svm, 
-                         y_true = test_data$label,
-                         positive = 'TREG')
-
-```
-
-```{r svm_evaluation}
-# Create a table of the evaluation metrics
-svm_metrics_table <- data.frame(
-  Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
-  SVM_Linear = c(svm_accuracy, svm_balanced_accuracy, svm_f1_score, svm_auc, svm_misclass)
-)
-
-print(svm_metrics_table)
-```
-
-##### Radial SVM Model
-
-```{r svm_radial_model}
-# ## K-fold CV for hyperparameter tuning of 'cost' for the training data with a radial basis function (RBF) kernel
-# start_time_svm_rad <- Sys.time()
-# 
-# tune.out_rad = tune(svm, label ~ . -label_as_numeric, data = train_data, kernel = "radial", ranges = list(cost = c(0.01, 0.1, 1, 10), gamma = c(0.00003, 0.0003, 0.003)))
-# summary(tune.out_rad)
-# 
-# end_time_svm_rad <- Sys.time()
-# svm_training_time_rad <- end_time_svm_rad - start_time_svm_rad
-# cat("SVM model training time (radial kernel):", svm_training_time_rad, "\n")
-
-# Note that a good rule of thumb is to start with a gamma that is (1/p)
-# where p is the number of features in the model. This would result in a value of
-# gamma approximately 0.0003
-
-# # Save the model with the cost that results in the lowest cross validation error rate
-# bestmod_rad <-  tune.out_rad$best.model
-# summary(bestmod_rad)
-```
-
-```{r svm_predictions}
-# Predictions
-start_time_svm_pred <-  Sys.time()
-svm_rad_pca_pred = predict(bestmod_rad, test_data)
-
-end_time_svm_pred <- Sys.time()
-svm_prediction_time <- end_time_svm_pred - start_time_svm_pred
-cat("SVM prediction time:", svm_prediction_time, "\n")
-```
-
-```{r svm_confusion}
-svm_confusion_matrix <- table(predict = svm_rad_pca_pred, truth = test_data$label)
-print(svm_confusion_matrix)
-print(svm_confusion_matrix[2,2])
-```
-
-```{r svm_balanced_accuracy}
-svm_balanced_accuracy <- fun_calc_balanced_accuracy(svm_confusion_matrix, 
-                                                    pos_label = "TREG",
-                                                    neg_label = "CD4+T")
-
-cat("The balanced accuracy is", svm_balanced_accuracy, "\n") # 0.9479
-```
-
-```{r svm_Misclass}
-svm_misclassification_rate <- mean(svm_rad_pca_pred != test_data$label)
-cat("SVM Misclassification Rate:", svm_misclassification_rate, "\n") # 0.0447
-```
-
-```{r svm_Accuracy}
-accuracy_svm <- mean(svm_rad_pca_pred == test_data$label)
-cat("SVM Accuracy:", accuracy_svm, "\n") # 0.9553
-```
-
-```{r svm_ROC_AUC}
-roc_svm <- roc(test_data$label, as.numeric(svm_rad_pca_pred))
-cat("SVM AUC:", auc(roc_svm), "\n")
-plot(roc_svm, main = "SVM ROC Curve") # Make the limits of the axes 0-1
-```
-
-```{r rf_f1_score}
-svm_f1_score <- F1_Score(y_pred = svm_rad_pca_pred, y_true = test_data$label)
-cat("F1 Score:", svm_f1_score, "\n") # 0.9645
-```
-
-### With PCA
-
-```{r pc_decomp, eval = FALSE}
-# Perform PCA to get first 10 principal components
-pca_start <- Sys.time()
-
-pca_model <- train_data %>% 
-  
-  dplyr::select(-label, - label_as_numeric) %>% 
-  
-  prcomp(center = TRUE, scale. = TRUE)
-
-pca_end <- Sys.time()
-
-pca_runtime <- pca_end - pca_start # Time difference of 3.264391 mins
-```
-
-```{r pca_save, eval = FALSE}
-saveRDS(pca_model, file = "predictions_1.2/pca_model.rds")
-
-write.csv(task_one_df_pca$x, file = "predictions_1.2/task_one_df_pca.csv", row.names = TRUE)
-```
-
-```{r logreg_load, include = FALSE}
-pca_model <- readRDS("predictions_1.2/pca_model.rds")
-
-task_one_df_pca <- read.csv("predictions_1.2/task_one_df_pca.csv") %>% 
-  
-  dplyr::select(-X)
-```
-
-```{r pca_split}
-# Split into training and test data
-train_data_pca <- as.data.frame(pca_model$x[, 1:10])
-
-test_pca_runtime <- Sys.time()
-test_data_pca <- test_data %>%
-  
-  dplyr::select(-label, -label_as_numeric) %>%
-  
-  predict(pca_model, newdata = .) %>%
-  
-  as.data.frame()
-
-test_data_pca <- test_data_pca[,1:10]
-
-test_pca_runtime <- Sys.time() - test_pca_runtime # Time difference of 6.589544 secs
-
-train_data_pca$label <- train_data$label
-
-train_data_pca$label_as_numeric <- train_data$label_as_numeric
-
-test_data_pca$label <- test_data$label
-
-test_data_pca$label_as_numeric <- test_data$label_as_numeric
-```
-
-
-#### Linear Discriminant Analysis (LDA) (Imar)
-
-```{r lda_pca_train}
-lda_pca_fit <- lda(label ~ .-label_as_numeric, data = train_data_pca)
-lda_pca_pred <- predict(lda_pca_model, test_data_pca)
-lda_test_data_labels <- as.factor(test_data_pca$label)
-```
-
-```{r lda_pca_confusion}
-lda_pca_pred <- predict(lda_pca_fit,
-                        test_data_pca)$class
-
-lda_pca_confusion <- table(predicted = lda_pca_pred,
-                           observed = test_data$label)
-
-print(lda_pca_confusion)
-```
-
-```{r lda_pca_diagnostics}
-lda_pca_probs <- predict(lda_pca_fit, newdata = test_data_pca, type = "prob")
-
-lda_pca_accuracy <- mean(lda_pca_pred == test_data_pca$label)
-
-lda_pca_balanced_accuracy <- fun_calc_balanced_accuracy(lda_pca_confusion,
-                                                        pos_label = 'TREG',
-                                                        neg_label = 'CD4+T')
-
-lda_pca_f1_score <- F1_Score(y_true = test_data_pca$label, 
-                             y_pred = lda_pca_pred,
-                             positive = "TREG")
-
-lda_pca_roc_curve <- roc(
-  response = test_data_pca$label,
-  predictor = lda_pca_probs$posterior[,'TREG'], 
-  levels = c('CD4+T','TREG'),
-  direction = "<"
-  )
-
-lda_pca_auc <- auc(lda_pca_roc_curve)
-
-lda_pca_misclas <- mean(lda_pca_pred != test_data_pca$label)
-
-plot(lda_pca_roc_curve, col = "red", main = "ROC Curve for lda")
-```
-
-```{r lda_PCA_evaluation}
-# Create a table of the evaluation metrics
-lda_pca_metrics_table <- data.frame(
-  Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
-  lda = c(lda_pca_accuracy, lda_pca_balanced_accuracy, lda_pca_f1_score, lda_pca_auc, lda_pca_misclas)
-)
-
-print(lda_pca_metrics_table)
-```
-
-#### Logistic classifier (Imar)
-
-```{r log_pca_train}
-log_pca_model <- glm(label ~ . -label_as_numeric, data=train_data_pca, family=binomial)
-log_pca_probs <- predict(log_pca_model, newdata = test_data_pca, type="response")
-log_pca_pred <- ifelse(log_pca_probs > 0.5, "TREG", "CD4+T")
-```
-
-```{r log_pca_confusion}
-log_pca_confusion <- table(predicted = log_pca_pred,
-                           observed = test_data$label)
-
-print(log_pca_confusion)
-```
-
-```{r log_pca_diagnostics}
-log_pca_accuracy <- mean(log_pca_pred == test_data_pca$label)
-
-log_pca_balanced_accuracy <- fun_calc_balanced_accuracy(log_pca_confusion,
-                                                        pos_label = 'TREG',
-                                                        neg_label = 'CD4+T')
-
-log_pca_f1_score <- F1_Score(y_true = test_data_pca$label, 
-                             y_pred = log_pca_pred,
-                             positive = "TREG")
-
-log_pca_roc_curve <- roc(
-  response = test_data_pca$label,
-  predictor = log_pca_probs, 
-  levels = c('CD4+T','TREG'),
-  direction = "<"
-  )
-
-log_pca_auc <- auc(log_pca_roc_curve)
-
-log_pca_misclas <- mean(log_pca_pred != test_data_pca$label)
-
-plot(log_pca_roc_curve, col = "red", main = "ROC Curve for log")
-```
-
-```{r log_PCA_evaluation}
-# Create a table of the evaluation metrics
-log_pca_metrics_table <- data.frame(
-  Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
-  log = c(log_pca_accuracy, log_pca_balanced_accuracy, log_pca_f1_score, log_pca_auc, log_pca_misclas)
-)
-
-print(log_pca_metrics_table)
-```
-
-#### Quadratic Discriminant Analysis (QDA) (Chi)
-
-```{r qda_pca_train}
-qda_start_time <- Sys.time()
-qda_pca_fit <- qda(label ~ . - label_as_numeric, 
-                   data = train_data_pca)
-qda_runtime <- Sys.time() - qda_start_time # Time difference of 0.01315498 secs
-```
-
-```{r qda_pca_confusion}
-qda_pca_pred <- predict(qda_pca_fit,
-                        test_data_pca)$class
-
-qda_pca_confusion <- table(predicted = qda_pca_pred,
-                           observed = test_data$label)
-
-print(qda_pca_confusion)
-```
-
-```{r qda_pca_diagnostics}
-qda_pca_probs <- predict(qda_pca_fit, newdata = test_data_pca, type = "prob")
-
-qda_pca_accuracy <- mean(qda_pca_pred == test_data_pca$label)
-
-qda_pca_balanced_accuracy <- fun_calc_balanced_accuracy(qda_pca_confusion,
-                                                        pos_label = 'TREG',
-                                                        neg_label = 'CD4+T')
-
-qda_pca_f1_score <- F1_Score(y_true = test_data_pca$label, 
-                             y_pred = qda_pca_pred,
-                             positive = "TREG")
-
-qda_pca_roc_curve <- roc(
-  response = test_data_pca$label,
-  predictor = qda_pca_probs$posterior[,'TREG'], 
-  levels = c('CD4+T','TREG'),
-  direction = "<"
-  )
-
-qda_pca_auc <- auc(qda_pca_roc_curve)
-
-qda_pca_misclas <- mean(qda_pca_pred != test_data_pca$label)
-
-plot(qda_pca_roc_curve, col = "red", main = "ROC Curve for QDA")
-```
-
-```{r qda_PCA_evaluation}
-# Create a table of the evaluation metrics
-qda_pca_metrics_table <- data.frame(
-  Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
-  QDA = c(qda_pca_accuracy, qda_pca_balanced_accuracy, qda_pca_f1_score, qda_pca_auc, qda_pca_misclas)
-)
-
-print(qda_pca_metrics_table)
-```
-
-#### Nearest Neighbor Classifier (k-NN) (Chi)
-
-```{r kNN_train, eval = FALSE}
-knn_train_X <- train_data_pca %>%
-  dplyr::select(-label, -label_as_numeric)
-
-knn_train_Y <- train_data_pca$label
-
-knn_test_X <- test_data_pca %>%
-  dplyr::select(-label, -label_as_numeric)
-
-knn_start_time <- Sys.time()
-knn_pca_pred <- knn(train = knn_train_X, 
-                    test = knn_test_X, 
-                    cl = knn_train_Y, 
-                    k = 8)
-
-knn_end_time <- Sys.time()
-
-knn_train_runtime <- knn_end_time - knn_start_time # Time difference of 0.3525879 secs
-
-rm(knn_train_X, knn_train_Y, knn_test_X)
-```
-
-```{r knn_pca_confusion}
-knn_pca_confusion <- table(predicted = knn_pca_pred,
-                           observed = test_data$label)
-
-print(knn_pca_confusion)
-```
-
-```{r knn_pca_diagnostics}
-knn_pca_accuracy <- mean(knn_pca_pred == test_data_pca$label)
-
-knn_pca_balanced_accuracy <- fun_calc_balanced_accuracy(knn_pca_confusion,
-                                                        pos_label = 'TREG',
-                                                        neg_label = 'CD4+T')
-
-knn_pca_f1_score <- F1_Score(y_true = test_data_pca$label, 
-                             y_pred = knn_pca_pred,
-                             positive = "TREG")
-
-knn_pca_roc_curve <- roc(
-  response = test_data_pca$label,
-  predictor = as.numeric(knn_pca_pred), 
-  levels = c('CD4+T','TREG'),
-  direction = "<"
-  )
-
-knn_pca_auc <- auc(knn_pca_roc_curve)
-
-knn_pca_misclas <- mean(knn_pca_pred != test_data_pca$label)
-
-plot(knn_pca_roc_curve, col = "red", main = "ROC Curve for QDA")
-```
-
-```{r knn_pca_evaluation}
-# Create a table of the evaluation metrics
-knn_pca_metrics_table <- data.frame(
-  Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
-  kNN = c(knn_pca_accuracy, knn_pca_balanced_accuracy, knn_pca_f1_score, knn_pca_auc, knn_pca_misclas)
-)
-
-print(knn_pca_metrics_table)
-```
-
-#### Gradient Boosting Decision Trees (GBDT) (Imar)
-```{r gbm_pca_training}
-lambda <- 0.001
-# Measure the time it takes to run 
-gbm_start_time <- Sys.time()
-# Train the gbm model with PCA data
-pca_gbm_model <- gbm(label_as_numeric ~ . - label, 
-                     data = train_data_pca, 
-                     distribution = "bernoulli", 
-                     n.trees = num_trees, 
-                     interaction.depth = 4, 
-                     shrinkage = lambda, 
-                     cv.folds = 5, 
-                     verbose = FALSE)
-
-# Get the best number of trees based on cross-validation
-best_trees_pca <- gbm.perf(pca_gbm_model, method = "cv")
-
-# Measure time after model training
-gbm_end_time <- Sys.time()
-gbm_model_training_time <- gbm_end_time - gbm_start_time #Time difference of 8.224947 secs
-
-```
-
-```{r gbm_pca_predict}
-# Measure time for predictions
-gbm_pred_time <- Sys.time()
-
-# Make predictions on the test set using the best number of trees
-gbm_pca_probs <- predict(pca_gbm_model, newdata = test_data_pca, n.trees = best_trees_pca, type = "response")
-gbm_pca_pred <- ifelse(gbm_pred_probs_pca > 0.5, "TREG", "CD4+T")
-
-# Measure time after predictions
-gbm_pred_time <- Sys.time() - gbm_pred_time # Time difference of 0.02414608 secs
-```
-
-```{r gbm_pca_confusion}
-gbm_pca_confusion <- table(predicted = gbm_pca_pred,
-                           observed = test_data$label)
-
-print(gbm_pca_confusion)
-```
-
-```{r gbm_pca_diagnostics}
-gbm_pca_accuracy <- mean(gbm_pca_pred == test_data_pca$label)
-
-gbm_pca_balanced_accuracy <- fun_calc_balanced_accuracy(gbm_pca_confusion,
-                                                        pos_label = 'TREG',
-                                                        neg_label = 'CD4+T')
-
-gbm_pca_f1_score <- F1_Score(y_true = test_data_pca$label, 
-                             y_pred = gbm_pca_pred,
-                             positive = "TREG")
-
-gbm_pca_roc_curve <- roc(
-  response = test_data_pca$label,
-  predictor = gbm_pca_probs, 
-  levels = c('CD4+T','TREG'),
-  direction = "<"
-  )
-
-gbm_pca_auc <- auc(gbm_pca_roc_curve)
-
-gbm_pca_misclas <- mean(gbm_pca_pred != test_data_pca$label)
-
-plot(gbm_pca_roc_curve, col = "red", main = "ROC Curve for gbm")
-```
-
-```{r gbm_PCA_evaluation}
-# Create a table of the evaluation metrics
-gbm_pca_metrics_table <- data.frame(
-  Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
-  gbm = c(gbm_pca_accuracy, gbm_pca_balanced_accuracy, gbm_pca_f1_score, gbm_pca_auc, gbm_pca_misclas)
-)
-
-print(gbm_pca_metrics_table)
-```
-
-#### Random Forest (Imar)
-```{r rf_pca_train}
-# RF model with PCA data
-rf_pca_train_time <- Sys.time()
-
-rf_pca_model <- randomForest(label ~ . - label_as_numeric, 
-                             data = train_data_pca,
-                             mtry = 3, 
-                             importance = TRUE, 
-                             n.tree = 5000)
-
-rf_pca_train_time <- Sys.time() - rf_pca_train_time #Time difference of 3.99099 secs
-```
-
-```{r rf_pca_prediction}
-# Predictions with PCA data
-rf_pca_pred_time <- Sys.time()
-
-rf_pca_pred <- predict(rf_pca_model, newdata = test_data_pca)
-
-rf_pca_pred_time <- Sys.time() - rf_pca_pred_time # Time difference of 0.072191 secs
-```
-
-```{r rf_pca_confusion}
-rf_pca_confusion <- table(predicted = rf_pca_pred,
-                           observed = test_data$label)
-
-print(rf_pca_confusion)
-```
-
-```{r rf_pca_diagnostics}
-rf_pca_accuracy <- mean(rf_pca_pred == test_data_pca$label)
-
-rf_pca_balanced_accuracy <- fun_calc_balanced_accuracy(rf_pca_confusion,
-                                                        pos_label = 'TREG',
-                                                        neg_label = 'CD4+T')
-
-rf_pca_f1_score <- F1_Score(y_true = test_data_pca$label, 
-                             y_pred = rf_pca_pred,
-                             positive = "TREG")
-
-rf_pca_pred_num <- ifelse(rf_pca_pred == "TREG", 1, 0)
-
-rf_pca_roc_curve <- roc(
-  response = test_data_pca$label_as_numeric,
-  predictor = rf_pca_pred_num, 
-  levels = c(0, 1),
-  direction = "<"
-  )
-
-rf_pca_auc <- auc(rf_pca_roc_curve)
-
-rf_pca_misclas <- mean(rf_pca_pred != test_data_pca$label)
-
-plot(rf_pca_roc_curve, col = "red", main = "ROC Curve for rf")
-```
-
-```{r rf_PCA_evaluation}
-# Create a table of the evaluation metrics
-rf_pca_metrics_table <- data.frame(
-  Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
-  rf = c(rf_pca_accuracy, rf_pca_balanced_accuracy, rf_pca_f1_score, rf_pca_auc, rf_pca_misclas)
-)
-
-print(rf_pca_metrics_table)
-```
-
-#### Support Vector Machine (SVM) (Chi)
-
-##### Linear SVM Model
-```{r svm_linear_model_pca}
-## K-fold CV for hyperparameter tuning of 'cost' for the training data with a linear kernel
-svm_train_time <- Sys.time()
-
-tune.out = tune(svm,
-                label ~ . -label_as_numeric,
-                data = train_data_pca, kernel = "linear", 
-                ranges = list(cost = c(0.01, 0.1, 1, 10)))
-
-summary(tune.out)
-
-svm_train_time <- Sys.time() - svm_train_time # Time difference of 4.748707 secs
-```
-
-
-```{r svm_linear_tuned_model_pca}
-# Save the model with the cost that results in the lowest cross validation error rate
-bestmod <-  tune.out$best.model
-summary(bestmod)
-```
-
-```{r svm_predictions_pca}
-svm_pred_time <-  Sys.time()
-
-svm_pca_pred = predict(bestmod, test_data_pca)
-
-svm_pred_time <-  Sys.time() - svm_pred_time
-# Time difference of 0.01050401 secs
-```
-
-```{r svm_pca_confusion}
-svm_pca_confusion_matrix <- table(predict = svm_pca_pred,
-                                  truth = test_data_pca$label)
-print(svm_pca_confusion_matrix)
-```
-
-```{r svm_pca_diagnostics}
-svm_pca_balanced_accuracy <- fun_calc_balanced_accuracy(svm_pca_confusion_matrix,
-                                                    pos_label = "TREG",
-                                                    neg_label = "CD4+T")
-
-svm_pca_misclass <- mean(svm_pca_pred != test_data$label)
-
-svm_pca_accuracy <- mean(svm_pca_pred == test_data$label)
-
-svm_pca_roc <- roc(test_data$label_as_numeric,
-               as.numeric(svm_pca_pred), 
-               levels = c(0,1),
-               direction = "<")
-
-svm_pca_auc <- auc(svm_pca_roc)
-
-plot(svm_pca_roc, main = "SVM ROC Curve") # Make the limits of the axes 0-1
-
-svm_pca_f1_score <- F1_Score(y_pred = svm_pca_pred, 
-                             y_true = test_data$label,
-                             positive = "TREG")
-
-```
-
-```{r svm_pca_evaluation}
-# Create a table of the evaluation metrics
-svm_pca_metrics_table <- data.frame(
-  Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
-  SVM_Linear = c(svm_pca_accuracy, svm_pca_balanced_accuracy, svm_pca_f1_score, svm_pca_auc, svm_pca_misclass)
-)
-
-print(svm_pca_metrics_table)
-```
-
-##### Radial SVM Model
-```{r svm_radial_pca_model}
-## K-fold CV for hyperparameter tuning of 'cost' for the training data with a radial basis function (RBF) kernel
-svm_train_time_rad <- Sys.time()
-
-tune.out_rad = tune(svm,
-                    label ~ . -label_as_numeric,
-                    data = train_data_pca, 
-                    kernel = "radial", 
-                    ranges = list(cost = c(0.01, 0.1, 1, 10),
-                                  gamma = c(0.00003, 0.0003, 0.003)))
-summary(tune.out_rad)
-
-svm_train_time_rad <- Sys.time() - svm_train_time_rad # Time difference of 42.49734 secs
-
-bestmod_rad <-  tune.out_rad$best.model
-summary(bestmod_rad)
-```
-
-```{r svm_radial_pca_predictions}
-svm_pred_time <-  Sys.time()
-
-svm_rad_pca_pred = predict(bestmod_rad, test_data_pca)
-
-svm_pred_time <- Sys.time() - svm_pred_time # Time difference of 0.01661301 secs
-```
-
-```{r svm_radial_pca_confusion}
-svm_rad_pca_confusion_matrix <- table(predict = svm_rad_pca_pred,
-                                      truth = test_data_pca$label)
-print(svm_rad_pca_confusion_matrix)
-```
-
-```{r svm_radial_pca_balanced_accuracy}
-svm_rad_pca_balanced_accuracy <- fun_calc_balanced_accuracy(svm_rad_pca_confusion_matrix, 
-                                                    pos_label = "TREG",
-                                                    neg_label = "CD4+T")
-
-svm_rad_pca_misclass <- mean(svm_rad_pca_pred != test_data$label)
-
-svm_rad_pca_accuracy <- mean(svm_rad_pca_pred == test_data$label)
-
-svm_rad_pca_roc <- roc(test_data$label, 
-                       as.numeric(svm_rad_pca_pred),
-                       levels = c("CD4+T", 'TREG'),
-                       direction = "<")
-
-svm_rad_pca_auc <- auc(svm_rad_pca_roc)
-
-plot(svm_rad_pca_roc, main = "SVM ROC Curve") # Make the limits of the axes 0-1
-
-svm_rad_pca_f1_score <- F1_Score(y_pred = svm_rad_pca_pred, 
-                                 y_true = test_data$label,
-                                 positive = 'TREG')
-
-```
-
-```{r svm_rad_pca_evaluation}
-# Create a table of the evaluation metrics
-svm_rad_pca_metrics_table <- data.frame(
-  Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
-  SVM_Radial = c(svm_rad_pca_accuracy, svm_rad_pca_balanced_accuracy, svm_rad_pca_f1_score, svm_rad_pca_auc, svm_rad_pca_misclass)
-)
-
-print(svm_rad_pca_metrics_table)
-```
-
-## T1.3: Improving F1 Score (???)
-
-Train and evaluating three classifiers of our choice with the goal of improving the F1 score (can use methods like bagging, boosting, and regularization (cross-fold validation, ridge/lasso)).
-
-#### Identifying the number of Principle Components to use 
-```{r scree_plot}
-variance_explained <- (pca_model$sdev)^2 / sum((pca_model$sdev)^2)
-
-scree_data <- data.frame(
-  Component = c(1:50),
-  Variance = variance_explained[1:50]
-)
-
-ggplot(scree_data, aes(x = Component, y = Variance)) + 
-   
-  geom_line() +
-  labs(title= 'Scree Plot', 
-       x = 'Principal Component',
-       y = 'Proportion of Variance Explained') +
-  scale_x_continuous(limits = c(0, 50))
-```
-
-#### LDA (Chi)
-
-LDA outperforms QDA. Does this imply a linear bayes decision boundary?   
-
-##### Cross-validation (Finding optimal number of Principal Components and tuning threshold)
-
-```{r}
-fun_lda_cv <- function(no_prin_comps = c(2:25),
-                        thresholds = seq(0.1, 0.9, 0.1),
-                        no_folds = 5,
-                        seed = 443){
+## LDA Cross-Validation and Hyperparameter Tuning Function
+fun_lda_cv <- function(no_prin_comps = no_prin_comps,
+                        thresholds = thresholds,
+                        no_folds = no_folds,
+                        seed = seed){
   
   lda_cv_scores <- data.frame(no_pc = c(),
                               threshold = c(),
@@ -1528,117 +184,12 @@ fun_lda_cv <- function(no_prin_comps = c(2:25),
   }
   return(lda_cv_scores)
 }
-```
 
-
-```{r}
-lda_cv_time <- Sys.time()
-lda_cv_scores <- fun_lda_cv(no_prin_comps = c(10:30))
-lda_cv_time <- Sys.time() - lda_cv_time # Time difference of 14.50283 mins
-```
-
-```{r}
-write.csv(lda_cv_scores, file = "predictions_1.3/lda_cv_scores.csv")
-```
-
-```{r}
-lda_cv_scores <- dplyr::select(read.csv(file = "predictions_1.3/lda_cv_scores.csv"),
-                               -X)
-```
-
-
-```{r}
-lda_avg_scores <- lda_cv_scores %>%
-  
-  group_by(no_pc, threshold) %>%
-  
-  summarise(Balanced_Accuracy = mean(balanced_accuracy),
-            Balanced_Accuracy_sd = sd(balanced_accuracy),
-            F1 = mean(f1), 
-            F1_sd = sd(f1),
-            .groups = "keep")
-
-ggplot(filter(lda_avg_scores, no_pc >= 15), aes(x = threshold, y = F1, color = as.factor(no_pc))) +
-  geom_line() +
-  geom_point()
-```
-
-```{r}
-ggplot(filter(lda_avg_scores, threshold == 0.2), aes(x = no_pc, y = F1)) +
-  geom_line() +
-  geom_point()
-```
-
-```{r}
-# lda_improved_models <- lda_avg_scores[order(lda_avg_scores$F1,
-#                                                  decreasing = TRUE),]
-
-lda_best_no_pc <- 25 #as.integer(lda_improved_models[1, 'no_pc'])
-
-lda_tuned_training <- pca_model$x[, 1:lda_best_no_pc] %>%
-  
-  data.frame(., label = train_data$label)
-
-test_lda_tuned <- predict(pca_model, test_data)[, 1:lda_best_no_pc]
-
-lda_tuned_model <- lda(label ~ ., 
-                       lda_tuned_training)
-
-lda_tuned_prob <- predict(lda_tuned_model, 
-                          newdata = data.frame(test_lda_tuned))$posterior[, "TREG"]
-
-lda_tuned_pred <- ifelse(lda_tuned_prob > 0.2, "TREG", "CD4+T")
-```
-
-```{r lda_tuned_confusion}
-lda_tuned_confusion <- table(predicted = lda_tuned_pred,
-                           observed = test_data$label)
-
-print(lda_tuned_confusion)
-```
-
-```{r lda_tuned_diagnostics}
-lda_tuned_accuracy <- mean(lda_tuned_pred == test_data_pca$label)
-
-lda_tuned_balanced_accuracy <- fun_calc_balanced_accuracy(lda_tuned_confusion,
-                                                        pos_label = 'TREG',
-                                                        neg_label = 'CD4+T')
-
-lda_tuned_f1_score <- F1_Score(y_true = test_data_pca$label, 
-                             y_pred = lda_tuned_pred,
-                             positive = "TREG")
-
-lda_tuned_roc_curve <- roc(
-  response = test_data_pca$label,
-  predictor = lda_tuned_prob, 
-  levels = c('CD4+T','TREG'),
-  direction = "<"
-  )
-
-lda_tuned_auc <- auc(lda_tuned_roc_curve)
-
-lda_tuned_misclas <- mean(lda_tuned_pred != test_data_pca$label)
-
-plot(lda_tuned_roc_curve, col = "red", main = "ROC Curve for LDA")
-```
-
-```{r lda_tuned_evaluation}
-# Create a table of the evaluation metrics
-lda_tuned_metrics_table <- data.frame(
-  Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
-  LDA_tuned = c(lda_tuned_accuracy, lda_tuned_balanced_accuracy, lda_tuned_f1_score, lda_tuned_auc, lda_tuned_misclas)
-)
-
-print(lda_tuned_metrics_table)
-```
-
-#### Logistic Regression
-
-```{r}
-fun_logreg_cv <- function(no_prin_comps = c(2:25),
-                       thresholds = seq(0.1, 0.9, 0.1),
-                       no_folds = 5,
-                       seed = 443,
+## Logistic Regression Cross-Validation and Hyperparameter Tuning Function
+fun_logreg_cv <- function(no_prin_comps = no_prin_comps,
+                       thresholds = thresholds,
+                       no_folds = no_folds,
+                       seed = seed,
                        lambda,
                        alpha){
   
@@ -1708,29 +259,1368 @@ fun_logreg_cv <- function(no_prin_comps = c(2:25),
   }
   return(logreg_cv_scores)
 }
+
+## AdaBoost Cross-Validation and Hyperparameter Tuning Function
+fun_boost_cv <- function(no_prin_comps = no_prin_comps,
+                         mfinals = mfinals,
+                         depths = depths,
+                         thresholds = thresholds,
+                         no_folds = no_folds,
+                         seed = seed){
+  
+  boost_cv_scores <- data.frame(no_pc = c(),
+                              mfinal = c(),
+                              depth = c(),
+                              threshold = c(),
+                              f1 = c())
+  
+  set.seed(seed)
+  
+  fold_indices <- createFolds(train_data$label, k = no_folds, returnTrain = TRUE)
+  
+  X_df <- train_data[, !colnames(train_data) %in% c("label", "label_as_numeric")]
+  
+  i <- 0
+  
+  for (fold in fold_indices) {
+    # For each fold, perform PCA
+    i <- i + 1
+    print(paste0(Sys.time(), ": PCA in process"))
+    fold_pca_model <- prcomp(X_df[fold,], 
+                             center = TRUE,
+                             scale. = TRUE, 
+                             rank. = max(no_prin_comps))
+    
+    # Fold from PCA to be trained and tested
+    fold_train_df <- data.frame(fold_pca_model$x, 
+                               label = train_data$label[fold]) 
+    
+    fold_test_X <- predict(fold_pca_model, X_df[-fold,])
+    
+    fold_test_Y <- train_data$label[-fold]
+    
+    for (prin_comps in no_prin_comps){
+      #For each Fold, vary number of PCs used to train AdaBoost 
+      
+      # Use the first n (prin_comps) components
+      boost_train <- fold_train_df[, c(1:prin_comps, ncol(fold_train_df))]
+      
+      boost_test_X <- fold_test_X[, 1:prin_comps]
+      
+      for (mfinal in mfinals){
+        for (depth in depths){
+          print(paste0(Sys.time(), ": AdaBoost Training in process"))
+          # Set any randomness in boosting
+          set.seed(seed)
+          
+          # Train model on n PCs
+          boost_cv_model <- boosting(label ~ ., 
+                              data = boost_train,
+                              mfinal = mfinal,
+                              maxdepth = depth
+                              )
+          
+          # Predict the probabilities it belongs to a class using model on left out fold 
+          boost_cv_probs <- predict.boosting(boost_cv_model, 
+                                             data.frame(fold_test_X))$prob[,2]
+          
+            for (threshold in thresholds){
+              print(paste0(Sys.time(), ": Evaluating Fold ", i, " with ",
+                       prin_comps, " PCs, ",
+                       mfinal, " mfinal ",
+                       depth, " max_depth, ",
+                       threshold, " threshold."))
+              #For each fold and each model, vary the threshold that decides class
+              boost_cv_preds <- as.factor(ifelse(boost_cv_probs > threshold,
+                                                 "TREG",
+                                                 "CD4+T"))
+              
+              #Calculate balanced accuracy and f1
+              cm <- table(boost_cv_preds, fold_test_Y)
+              
+              f1 <- F1_Score(y_true = fold_test_Y,
+                             y_pred = boost_cv_preds,
+                             positive = "TREG")
+              
+              # Store the scores
+              return_df <- data.frame(no_pc = prin_comps,
+                              mfinal = mfinal,
+                              depth = depth,
+                              threshold = threshold,
+                              f1 = f1)
+              
+              boost_cv_scores <- rbind(boost_cv_scores, return_df)
+          
+          }
+        }
+      }
+    }
+  }
+  return(boost_cv_scores)
+}
+
 ```
 
 
-##### Ridge Regularisation and Cross Validation (Chi)
+## T1.1: Exploratory data analysis and summary statistics
 
-```{r}
+```{r EDA}
+dim(task_one_df)  # The data has 5471 observations and 4125 variables-- 4124 originally, 1 added (label)
+table(task_one_df$label) # 3356 observations are labelled as CD4+T and 2115 are labelled as TREG
+
+mean_table <- task_one_df %>%
+  dplyr::select(-label_as_numeric) %>%
+  group_by(label) %>%
+  summarise(across(everything(), mean, na.rm = TRUE)) %>%
+  pivot_longer(cols = -label, names_to = 'genes', values_to = 'mean_value') %>%
+  pivot_wider(names_from = label, values_from = mean_value) %>%
+  mutate(diff = abs(`CD4+T` - TREG))
+top_3_abs_diff <- mean_table %>% top_n(3, diff) %>% arrange(desc(diff))
+
+### Add x-axis label and title
+for (var in top_3_abs_diff$genes) {
+  formula <- as.formula(paste(var, "~ label"))
+  plot <- boxplot(formula, data = task_one_df, col=c("blue", "red"))
+  print(plot)
+}
+
+# Create the barplot with the highest 'diff' at the top
+mean_table_sorted <- mean_table[order(mean_table$diff), ]
+barplot(mean_table_sorted$diff, 
+        names.arg = rownames(mean_table_sorted), 
+        horiz = TRUE)
+  
+twenty_random_columns <- sample(names(task_one_df)[-1], 20)
+## Create boxplots for the random sample of columns
+for (column in twenty_random_columns) {
+    p <- ggplot(task_one_df, aes_string(x = "label", y = column)) +
+        geom_jitter(width = 0.2, height = 0) +
+        ggtitle(paste("Scatter Plot of", column, "by Label")) +
+        theme_minimal()
+    print(p)
+}
+```
+
+## T1.2: Training and evaluating various classifiers
+
+### Without PCA
+
+#### Linear Discriminant Analysis (LDA)
+
+```{r lda_train}
+lda_start_time  <- Sys.time()
+lda_fit <- lda(label ~ . -label_as_numeric, data=train_data)
+lda_end_time  <- Sys.time()
+lda_runtime <- lda_end_time - lda_start_time # Time difference of 4.937018 mins
+
+lda_pred <- predict(lda_fit, test_data)$class
+```
+
+```{r lda_save, eval = FALSE}
+write.csv(lda_pred, file = "predictions_1.2/lda_predictions.csv", row.names = TRUE)
+```
+
+```{r lda_load, eval = FALSE}
+lda_pred <- read.csv("predictions_1.2/lda_predictions.csv") %>% 
+  
+  dplyr::select(x)
+
+lda_pred <- lda_pred[,'x']
+```
+
+```{r lda_confusion}
+lda_confusion <- table(predicted = lda_pred, 
+                       observed = test_data$label)
+
+print(lda_confusion)
+```
+
+```{r lda_diagnostics}
+lda_accuracy <- mean(lda_pred == test_data$label)
+
+lda_balanced_accuracy <- fun_calc_balanced_accuracy(lda_confusion,
+                                                        pos_label = 'TREG',
+                                                        neg_label = 'CD4+T')
+
+lda_f1_score <- F1_Score(y_true = test_data$label, 
+                             y_pred = lda_pred,
+                             positive = "TREG")
+
+lda_pred_numeric <- ifelse(lda_pred == "TREG", 1, 0)
+lda_roc_curve <- roc(
+  response = test_data$label_as_numeric,
+  predictor = lda_pred_numeric, 
+  levels = c(0,1),
+  direction = "<"
+  )
+
+plot(lda_roc_curve, col = "red", main = "ROC Curve for LDA")
+
+lda_auc <- auc(lda_roc_curve)
+
+lda_misclas <- mean(lda_pred != test_data$label)
+```
+
+```{r lda_evaluation}
+# Create a table of the evaluation metrics
+lda_metrics_table <- data.frame(
+  Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
+  LDA = c(lda_accuracy, lda_balanced_accuracy, lda_f1_score, lda_auc, lda_misclas)
+)
+
+print(lda_metrics_table)
+```
+
+#### Logistic classifier
+
+```{r logreg_train}
+logreg_start_time <- Sys.time()
+
+logreg_fit <- glm(label_as_numeric ~ . -label,
+                  data = train_data,
+                  family = binomial)
+
+logreg_run_time <- Sys.time() - logreg_start_time # Time difference of 17.64516 mins
+
+logreg_probs <- predict(logreg_fit, newdata = test_data, type = "response")
+logreg_pred <- ifelse(logreg_probs > 0.5, 'TREG', 'CD4+T')
+```
+
+```{r logreg_save, eval = FALSE}
+write.csv(logreg_probs, file = "predictions_1.2/logreg_probabilities.csv", row.names = TRUE)
+write.csv(logreg_pred, file = "predictions_1.2/logreg_predictions.csv", row.names = TRUE)
+```
+
+```{r logreg_load, eval = FALSE}
+logreg_pred <- read.csv("predictions_1.2/logreg_predictions.csv") %>% 
+  
+  dplyr::select(x)
+
+logreg_pred <- logreg_pred[,'x']
+
+logreg_probs <- read.csv("predictions_1.2/logreg_probabilities.csv") %>% 
+  
+  dplyr::select(x)
+
+logreg_probs <- logreg_probs[,'x']
+```
+
+```{r logreg_confusion}
+logreg_confusion <- table(predicted = logreg_pred, 
+                       observed = test_data$label)
+print(logreg_confusion)
+```
+
+```{r logreg_diagnostics}
+logreg_accuracy <- mean(logreg_pred == test_data$label)
+
+logreg_balanced_accuracy <- fun_calc_balanced_accuracy(logreg_confusion,
+                                                        pos_label = 'TREG',
+                                                        neg_label = 'CD4+T')
+
+logreg_f1_score <- F1_Score(y_true = test_data$label, 
+                             y_pred = logreg_pred,
+                             positive = "TREG")
+
+logreg_roc_curve <- roc(
+  response = test_data$label,
+  predictor = logreg_probs, 
+  levels = c('CD4+T','TREG'),
+  direction = "<")
+
+plot(logreg_roc_curve, col = "red", main = "ROC Curve for Logistic Regression")
+
+logreg_auc <- auc(logreg_roc_curve)
+
+logreg_misclas <- mean(logreg_pred != test_data$label)
+```
+
+```{r logreg_evaluation}
+# Create a table of the evaluation metrics
+logreg_metrics_table <- data.frame(
+  Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
+  LogReg = c(logreg_accuracy, logreg_balanced_accuracy, logreg_f1_score, logreg_auc, logreg_misclas)
+)
+
+print(logreg_metrics_table)
+```
+
+#### Quadratic Discriminant Analysis (QDA)
+
+The current dimensionality of the data is too high for a QDA classifier. During training, the covariance matrix estimation for each class, k, fails. This occurs because, when the data is partitioned into k classes, the number of observations, n, is much smaller than the number of features, p (i.e n << p). As a result, the covariance matrix estimate for class k becomes singular or nearly singular. Therefore, without dimension reduction or regularisation, training this classifier is not feasible.
+
+#### Nearest Neighbor Classifier (k-NN)
+
+```{r kNN_train}
+set.seed(seed)
+
+knn_train_X <- train_data %>% 
+  dplyr::select(-label, -label_as_numeric)
+
+knn_train_Y <- train_data$label
+
+knn_test_X <- test_data %>% 
+  dplyr::select(-label, -label_as_numeric)
+
+knn_start_time <- Sys.time()
+knn_pred <- knn(train = knn_train_X, 
+                test = knn_test_X, 
+                cl = knn_train_Y,
+                k = 8)
+knn_end_time <- Sys.time()
+
+knn_train_runtime <- knn_end_time - knn_start_time
+print(knn_train_runtime) #50 mins for k=1 to k=10 
+
+rm(knn_train_X, knn_train_Y, knn_test_X)
+```
+
+```{r kNN_save, eval = FALSE}
+write.csv(knn_pred, file = "knn_predictions.csv", row.names = TRUE)
+```
+
+```{r kNN_load, eval = FALSE}
+knn_pred <- read.csv("knn_predictions.csv") %>% 
+  dplyr::select(-X)
+
+knn_pred <- knn_pred[, 'x']
+```
+
+```{r knn_pca_confusion}
+knn_confusion <- table(predicted = knn_pred,
+                           observed = test_data$label)
+
+print(knn_confusion)
+```
+
+```{r knn_diagnostics}
+knn_accuracy <- mean(knn_pred == test_data_pca$label)
+
+knn_balanced_accuracy <- fun_calc_balanced_accuracy(knn_confusion,
+                                                        pos_label = 'TREG',
+                                                        neg_label = 'CD4+T')
+
+knn_f1_score <- F1_Score(y_true = test_data_pca$label, 
+                             y_pred = knn_pred,
+                             positive = "TREG")
+
+knn_roc_curve <- roc(
+  response = test_data_pca$label,
+  predictor = as.numeric(knn_pred), 
+  levels = c('CD4+T','TREG'),
+  direction = "<"
+  )
+
+knn_auc <- auc(knn_roc_curve)
+
+knn_misclas <- mean(knn_pred != test_data_pca$label)
+
+plot(knn_roc_curve, col = "red", main = "ROC Curve for kNN")
+```
+
+```{r knn_evaluation}
+# Create a table of the evaluation metrics
+knn_metrics_table <- data.frame(
+  Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
+  kNN = c(knn_accuracy, knn_balanced_accuracy, knn_f1_score, knn_auc, knn_misclas)
+)
+
+print(knn_metrics_table)
+```
+
+#### Gradient Boosting Decision Trees (GBDT) 
+
+```{r gbmparams}
+#Number of trees
+num_trees = 1000
+# Define grid of lambda (shrinkage) values to evaluate
+lambda_grid <- c(0.001, 0.01,0.03,0.05)
+
+# Initialize a vector to store test errors for each lambda
+test_errors <- numeric(length(lambda_grid))
+```
+
+```{r gbm_model}
+# Set a single shrinkage value
+lambda <- 0.001
+
+test_data_cleaned_gbm <- test_data[, !colnames(test_data) %in% c("label", "label")]
+
+# Measure the time it takes to run 
+gbm_train_time <- Sys.time()
+# Train the gbm model
+smallest_lambda_gbm_model <- gbm(label_as_numeric ~ . - label, 
+                 data = train_data, 
+                 distribution = "bernoulli", 
+                 n.trees = num_trees, 
+                 interaction.depth = 4, 
+                 shrinkage = lambda, 
+                 cv.folds = 5, 
+                 verbose = FALSE)
+
+# Get the best number of trees based on cross-validation
+best_trees <- gbm.perf(smallest_lambda_gbm_model, method = "cv")
+
+# Measure time after model training
+gbm_train_time <- Sys.time() - gbm_train_time
+
+# Measure time for predictions
+gbm_pred_time <- Sys.time()
+# Make predictions on the test set using the best number of trees
+gbm_pred_probs <- predict(smallest_lambda_gbm_model, newdata = test_data_cleaned_gbm, n.trees = best_trees, type = "response")
+gbm_pred_classes <- ifelse(gbm_pred_probs > 0.5, "TREG", "CD4+T")
+
+# Measure time after predictions
+gbm_pred_time <- Sys.time() - gbm_pred_time
+```
+
+```{r gbm_save, eval = FALSE}
+write.csv(gbm_pred_classes, file = "predictions_1.2/gbm_predictions.csv", row.names = TRUE)
+```
+
+```{r gbm_load, eval = FALSE}
+gbm_pred_classes <- read.csv("predictions_1.2/gbm_predictions.csv") %>% 
+  
+  dplyr::select(x)
+
+gbm_pred_classes <- gbm_pred_classes[,'x']
+```
+
+```{r gbm_confusion}
+gbm_confusion <- table(predicted = gbm_pred_classes,
+                       observed = test_data$label)
+
+print(gbm_confusion)
+```
+
+```{r gbm_diagnostics}
+gbm_accuracy <- mean(gbm_pred_classes == test_data$label)
+
+gbm_balanced_accuracy <- fun_calc_balanced_accuracy(gbm_confusion,
+                                                        pos_label = 'TREG',
+                                                        neg_label = 'CD4+T')
+
+gbm_f1_score <- F1_Score(y_true = test_data$label, 
+                             y_pred = gbm_pred_classes,
+                             positive = "TREG")
+
+gbm_roc_curve <- roc(
+  response = test_data$label,
+  predictor = gbm_pred_probs, 
+  levels = c('CD4+T','TREG'),
+  direction = "<")
+
+plot(gbm_roc_curve, col = "red", main = "ROC Curve for GBDT")
+
+gbm_auc <- auc(gbm_roc_curve)
+
+gbm_misclas <- mean(gbm_pred_classes != test_data$label)
+```
+
+```{r gbm_evaluation}
+# Create a table of the evaluation metrics
+gbm_metrics_table <- data.frame(
+  Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
+  GBDT = c(gbm_accuracy, gbm_balanced_accuracy, gbm_f1_score, gbm_auc, gbm_misclas)
+)
+
+print(gbm_metrics_table)
+```
+
+
+#### Random Forest
+
+```{r rfmodel}
+# RF model
+start_time_rf <- Sys.time()
+
+rf.rna_features <-randomForest(label~. - label_as_numeric, data=train_data, mtry=64, importance=TRUE, n.tree = 5000) # RF Model
+
+end_time_rf <- Sys.time()
+rf_training_time <- end_time_rf - start_time_rf
+cat("Random Forest model training time:", rf_training_time, "\n")
+
+# Predictions
+start_time_rf_pred <- Sys.time()
+yhat.rf <-predict(rf.rna_features, newdata=test_data)
+
+end_time_rf_pred <- Sys.time()
+rf_prediction_time <- end_time_rf_pred - start_time_rf_pred
+cat("Random Forest prediction time:", rf_prediction_time, "\n")
+
+```
+
+```{r rf_save, eval = FALSE}
+write.csv(yhat.rf, file = "predictions_1.2/rf_predictions.csv", row.names = TRUE)
+```
+
+```{r rf_load, eval = FALSE}
+yhat.rf <- read.csv("predictions_1.2/rf_predictions.csv") %>% 
+  
+  dplyr::select(x)
+
+yhat.rf <- yhat.rf[,'x']
+```
+
+```{r rf_confusion}
+rf_confusion <- table(predicted = yhat.rf,
+                           observed = test_data$label)
+
+print(rf_confusion)
+```
+
+```{r rf_diagnostics}
+rf_accuracy <- mean(yhat.rf == test_data$label)
+
+rf_balanced_accuracy <- fun_calc_balanced_accuracy(rf_confusion,
+                                                        pos_label = 'TREG',
+                                                        neg_label = 'CD4+T')
+
+rf_f1_score <- F1_Score(y_true = test_data$label, 
+                             y_pred = yhat.rf,
+                             positive = "TREG")
+
+
+yhat.rf_numeric <- ifelse(yhat.rf == "CD4+T", 0, ifelse(yhat.rf == "TREG", 1, NA))
+rf_roc_curve <- roc(
+  response = test_data$label,
+  predictor = yhat.rf_numeric, 
+  levels = c('CD4+T','TREG'),
+  direction = "<"
+  )
+
+rf_auc <- auc(rf_roc_curve)
+
+rf_misclas <- mean(yhat.rf != test_data$label)
+
+plot(rf_roc_curve, col = "red", main = "ROC Curve for log")
+```
+
+```{r rf_evaluation}
+# Create a table of the evaluation metrics
+rf_metrics_table <- data.frame(
+  Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
+  RF = c(rf_accuracy, rf_balanced_accuracy, rf_f1_score, rf_auc, rf_misclas)
+)
+
+print(rf_metrics_table)
+```
+
+#### Support Vector Machine (SVM) 
+
+##### Linear SVM Model
+```{r svm_linear_model}
+## Clean the test data for the SVM task
+test_data_cleaned_for_svm <- test_data[, !colnames(test_data) %in% c("label_as_numeric", "label")]
+
+## K-fold CV for hyperparameter tuning of 'cost' for the training data with a linear kernel
+start_time_svm <- Sys.time()
+
+tune.out = tune(svm, 
+                label ~ . -label_as_numeric, 
+                data = train_data, 
+                kernel = "linear", 
+                ranges = list(cost = c(0.01, 0.1, 1, 10)))
+
+summary(tune.out)
+
+end_time_svm <- Sys.time()
+svm_training_time <- end_time_svm - start_time_svm # 1.18 hrs (~ 1hr & 10 min)
+```
+
+```{r svm_linear_tuned_model}
+# Save the model with the cost that results in the lowest cross validation error rate
+bestmod <-  tune.out$best.model
+summary(bestmod)
+```
+
+```{r svm_predictions}
+# Predictions
+start_time_svm_pred <-  Sys.time()
+yhat.svm = predict(bestmod, test_data)
+
+end_time_svm_pred <- Sys.time()
+svm_prediction_time <- end_time_svm_pred - start_time_svm_pred
+cat("SVM prediction time:", svm_prediction_time, "\n")
+```
+
+```{r svm_save, eval = FALSE}
+write.csv(yhat.svm, 
+          file = "predictions_1.2/svm_predictions.csv",
+          row.names = TRUE)
+```
+
+
+```{r svm_load, eval = FALSE}
+yhat.svm <- read.csv("predictions_1.2/svm_predictions.csv") %>% 
+  
+  dplyr::select(x)
+
+yhat.svm <- as.factor(yhat.svm[,'x'])
+```
+
+```{r svm_confusion}
+svm_confusion_matrix <- table(predict = yhat.svm, 
+                              truth = test_data$label)
+print(svm_confusion_matrix)
+```
+
+```{r svm_diagnostics}
+svm_balanced_accuracy <- fun_calc_balanced_accuracy(svm_confusion_matrix,
+                                                    pos_label = "TREG",
+                                                    neg_label = "CD4+T")
+
+svm_misclass <- mean(yhat.svm != test_data$label)
+
+svm_accuracy <- mean(yhat.svm == test_data$label)
+
+svm_roc <- roc(test_data$label, 
+               as.numeric(yhat.svm),
+               levels = c("CD4+T", "TREG"),
+               direction = "<")
+
+svm_auc <- auc(svm_roc)
+
+plot(svm_roc, main = "SVM ROC Curve") # Make the limits of the axes 0-1
+
+svm_f1_score <- F1_Score(y_pred = yhat.svm, 
+                         y_true = test_data$label,
+                         positive = 'TREG')
+
+```
+
+```{r svm_evaluation}
+# Create a table of the evaluation metrics
+svm_metrics_table <- data.frame(
+  Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
+  SVM_Linear = c(svm_accuracy, svm_balanced_accuracy, svm_f1_score, svm_auc, svm_misclass)
+)
+
+print(svm_metrics_table)
+```
+
+### With PCA
+
+```{r pc_decomp, eval = FALSE}
+# Perform PCA to get first 10 principal components
+pca_start <- Sys.time()
+
+pca_model <- train_data %>% 
+  
+  dplyr::select(-label, - label_as_numeric) %>% 
+  
+  prcomp(center = TRUE, scale. = TRUE)
+
+pca_end <- Sys.time()
+
+pca_runtime <- pca_end - pca_start # Time difference of 3.264391 mins
+```
+
+```{r pca_save, eval = FALSE}
+saveRDS(pca_model, file = "predictions_1.2/pca_model.rds")
+
+write.csv(task_one_df_pca$x, file = "predictions_1.2/task_one_df_pca.csv", row.names = TRUE)
+```
+
+```{r pca_load, eval = FALSE}
+pca_model <- readRDS("predictions_1.2/pca_model.rds")
+
+task_one_df_pca <- read.csv("predictions_1.2/task_one_df_pca.csv") %>% 
+  
+  dplyr::select(-X)
+```
+
+```{r pca_split}
+# Split into training and test data
+train_data_pca <- as.data.frame(pca_model$x[, 1:10])
+
+test_pca_runtime <- Sys.time()
+test_data_pca <- test_data %>%
+  
+  dplyr::select(-label, -label_as_numeric) %>%
+  
+  predict(pca_model, newdata = .) %>%
+  
+  as.data.frame()
+
+test_data_pca <- test_data_pca[,1:10]
+
+test_pca_runtime <- Sys.time() - test_pca_runtime # Time difference of 6.589544 secs
+
+train_data_pca$label <- train_data$label
+
+train_data_pca$label_as_numeric <- train_data$label_as_numeric
+
+test_data_pca$label <- test_data$label
+
+test_data_pca$label_as_numeric <- test_data$label_as_numeric
+```
+
+#### Linear Discriminant Analysis (LDA)
+
+```{r lda_pca_train}
+lda_pca_fit <- lda(label ~ .-label_as_numeric, data = train_data_pca)
+lda_pca_pred <- predict(lda_pca_model, test_data_pca)
+lda_test_data_labels <- as.factor(test_data_pca$label)
+```
+
+```{r lda_pca_confusion}
+lda_pca_pred <- predict(lda_pca_fit,
+                        test_data_pca)$class
+
+lda_pca_confusion <- table(predicted = lda_pca_pred,
+                           observed = test_data$label)
+
+print(lda_pca_confusion)
+```
+
+```{r lda_pca_diagnostics}
+lda_pca_probs <- predict(lda_pca_fit, newdata = test_data_pca, type = "prob")
+
+lda_pca_accuracy <- mean(lda_pca_pred == test_data_pca$label)
+
+lda_pca_balanced_accuracy <- fun_calc_balanced_accuracy(lda_pca_confusion,
+                                                        pos_label = 'TREG',
+                                                        neg_label = 'CD4+T')
+
+lda_pca_f1_score <- F1_Score(y_true = test_data_pca$label, 
+                             y_pred = lda_pca_pred,
+                             positive = "TREG")
+
+lda_pca_roc_curve <- roc(
+  response = test_data_pca$label,
+  predictor = lda_pca_probs$posterior[,'TREG'], 
+  levels = c('CD4+T','TREG'),
+  direction = "<"
+  )
+
+lda_pca_auc <- auc(lda_pca_roc_curve)
+
+lda_pca_misclas <- mean(lda_pca_pred != test_data_pca$label)
+
+plot(lda_pca_roc_curve, col = "red", main = "ROC Curve for lda")
+```
+
+```{r lda_PCA_evaluation}
+# Create a table of the evaluation metrics
+lda_pca_metrics_table <- data.frame(
+  Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
+  lda_pca = c(lda_pca_accuracy, lda_pca_balanced_accuracy, lda_pca_f1_score, lda_pca_auc, lda_pca_misclas)
+)
+
+print(lda_pca_metrics_table)
+```
+
+#### Logistic classifier
+
+```{r log_pca_train}
+log_pca_model <- glm(label ~ . -label_as_numeric, data=train_data_pca, family=binomial)
+log_pca_probs <- predict(log_pca_model, newdata = test_data_pca, type="response")
+log_pca_pred <- ifelse(log_pca_probs > 0.5, "TREG", "CD4+T")
+```
+
+```{r log_pca_confusion}
+log_pca_confusion <- table(predicted = log_pca_pred,
+                           observed = test_data$label)
+
+print(log_pca_confusion)
+```
+
+```{r log_pca_diagnostics}
+log_pca_accuracy <- mean(log_pca_pred == test_data_pca$label)
+
+log_pca_balanced_accuracy <- fun_calc_balanced_accuracy(log_pca_confusion,
+                                                        pos_label = 'TREG',
+                                                        neg_label = 'CD4+T')
+
+log_pca_f1_score <- F1_Score(y_true = test_data_pca$label, 
+                             y_pred = log_pca_pred,
+                             positive = "TREG")
+
+log_pca_roc_curve <- roc(
+  response = test_data_pca$label,
+  predictor = log_pca_probs, 
+  levels = c('CD4+T','TREG'),
+  direction = "<"
+  )
+
+log_pca_auc <- auc(log_pca_roc_curve)
+
+log_pca_misclas <- mean(log_pca_pred != test_data_pca$label)
+
+plot(log_pca_roc_curve, col = "red", main = "ROC Curve for log")
+```
+
+```{r log_PCA_evaluation}
+# Create a table of the evaluation metrics
+log_pca_metrics_table <- data.frame(
+  Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
+  log_pca = c(log_pca_accuracy, log_pca_balanced_accuracy, log_pca_f1_score, log_pca_auc, log_pca_misclas)
+)
+
+print(log_pca_metrics_table)
+```
+
+#### Quadratic Discriminant Analysis (QDA)
+
+```{r qda_pca_train}
+qda_start_time <- Sys.time()
+qda_pca_fit <- qda(label ~ . - label_as_numeric, 
+                   data = train_data_pca)
+qda_runtime <- Sys.time() - qda_start_time # Time difference of 0.01315498 secs
+```
+
+```{r qda_pca_confusion}
+qda_pca_pred <- predict(qda_pca_fit,
+                        test_data_pca)$class
+
+qda_pca_confusion <- table(predicted = qda_pca_pred,
+                           observed = test_data$label)
+
+print(qda_pca_confusion)
+```
+
+```{r qda_pca_diagnostics}
+qda_pca_probs <- predict(qda_pca_fit, newdata = test_data_pca, type = "prob")
+
+qda_pca_accuracy <- mean(qda_pca_pred == test_data_pca$label)
+
+qda_pca_balanced_accuracy <- fun_calc_balanced_accuracy(qda_pca_confusion,
+                                                        pos_label = 'TREG',
+                                                        neg_label = 'CD4+T')
+
+qda_pca_f1_score <- F1_Score(y_true = test_data_pca$label, 
+                             y_pred = qda_pca_pred,
+                             positive = "TREG")
+
+qda_pca_roc_curve <- roc(
+  response = test_data_pca$label,
+  predictor = qda_pca_probs$posterior[,'TREG'], 
+  levels = c('CD4+T','TREG'),
+  direction = "<"
+  )
+
+qda_pca_auc <- auc(qda_pca_roc_curve)
+
+qda_pca_misclas <- mean(qda_pca_pred != test_data_pca$label)
+
+plot(qda_pca_roc_curve, col = "red", main = "ROC Curve for QDA")
+```
+
+```{r qda_PCA_evaluation}
+# Create a table of the evaluation metrics
+qda_pca_metrics_table <- data.frame(
+  Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
+  qda_pca = c(qda_pca_accuracy, qda_pca_balanced_accuracy, qda_pca_f1_score, qda_pca_auc, qda_pca_misclas)
+)
+
+print(qda_pca_metrics_table)
+```
+
+#### Nearest Neighbor Classifier (k-NN)
+
+```{r kNN_train, eval = FALSE}
+knn_train_X <- train_data_pca %>%
+  dplyr::select(-label, -label_as_numeric)
+
+knn_train_Y <- train_data_pca$label
+
+knn_test_X <- test_data_pca %>%
+  dplyr::select(-label, -label_as_numeric)
+
+knn_start_time <- Sys.time()
+knn_pca_pred <- knn(train = knn_train_X, 
+                    test = knn_test_X, 
+                    cl = knn_train_Y, 
+                    k = 8)
+
+knn_end_time <- Sys.time()
+
+knn_train_runtime <- knn_end_time - knn_start_time # Time difference of 0.3525879 secs
+
+rm(knn_train_X, knn_train_Y, knn_test_X)
+```
+
+```{r knn_pca_confusion}
+knn_pca_confusion <- table(predicted = knn_pca_pred,
+                           observed = test_data$label)
+
+print(knn_pca_confusion)
+```
+
+```{r knn_pca_diagnostics}
+knn_pca_accuracy <- mean(knn_pca_pred == test_data_pca$label)
+
+knn_pca_balanced_accuracy <- fun_calc_balanced_accuracy(knn_pca_confusion,
+                                                        pos_label = 'TREG',
+                                                        neg_label = 'CD4+T')
+
+knn_pca_f1_score <- F1_Score(y_true = test_data_pca$label, 
+                             y_pred = knn_pca_pred,
+                             positive = "TREG")
+
+knn_pca_roc_curve <- roc(
+  response = test_data_pca$label,
+  predictor = as.numeric(knn_pca_pred), 
+  levels = c('CD4+T','TREG'),
+  direction = "<"
+  )
+
+knn_pca_auc <- auc(knn_pca_roc_curve)
+
+knn_pca_misclas <- mean(knn_pca_pred != test_data_pca$label)
+
+plot(knn_pca_roc_curve, col = "red", main = "ROC Curve for QDA")
+```
+
+```{r knn_pca_evaluation}
+# Create a table of the evaluation metrics
+knn_pca_metrics_table <- data.frame(
+  Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
+  kNN_pca = c(knn_pca_accuracy, knn_pca_balanced_accuracy, knn_pca_f1_score, knn_pca_auc, knn_pca_misclas)
+)
+
+print(knn_pca_metrics_table)
+```
+
+#### Gradient Boosting Decision Trees (GBDT)
+```{r gbm_pca_training}
+lambda <- 0.001
+# Measure the time it takes to run 
+gbm_start_time <- Sys.time()
+# Train the gbm model with PCA data
+pca_gbm_model <- gbm(label_as_numeric ~ . - label, 
+                     data = train_data_pca, 
+                     distribution = "bernoulli", 
+                     n.trees = num_trees, 
+                     interaction.depth = 4, 
+                     shrinkage = lambda, 
+                     cv.folds = 5, 
+                     verbose = FALSE)
+
+# Get the best number of trees based on cross-validation
+best_trees_pca <- gbm.perf(pca_gbm_model, method = "cv")
+
+# Measure time after model training
+gbm_end_time <- Sys.time()
+gbm_model_training_time <- gbm_end_time - gbm_start_time #Time difference of 8.224947 secs
+
+```
+
+```{r gbm_pca_predict}
+# Measure time for predictions
+gbm_pred_time <- Sys.time()
+
+# Make predictions on the test set using the best number of trees
+gbm_pca_probs <- predict(pca_gbm_model, newdata = test_data_pca, n.trees = best_trees_pca, type = "response")
+gbm_pca_pred <- ifelse(gbm_pca_probs > 0.5, "TREG", "CD4+T")
+
+# Measure time after predictions
+gbm_pred_time <- Sys.time() - gbm_pred_time # Time difference of 0.02414608 secs
+```
+
+```{r gbm_pca_confusion}
+gbm_pca_confusion <- table(predicted = gbm_pca_pred,
+                           observed = test_data$label)
+
+print(gbm_pca_confusion)
+```
+
+```{r gbm_pca_diagnostics}
+gbm_pca_accuracy <- mean(gbm_pca_pred == test_data_pca$label)
+
+gbm_pca_balanced_accuracy <- fun_calc_balanced_accuracy(gbm_pca_confusion,
+                                                        pos_label = 'TREG',
+                                                        neg_label = 'CD4+T')
+
+gbm_pca_f1_score <- F1_Score(y_true = test_data_pca$label, 
+                             y_pred = gbm_pca_pred,
+                             positive = "TREG")
+
+gbm_pca_roc_curve <- roc(
+  response = test_data_pca$label,
+  predictor = gbm_pca_probs, 
+  levels = c('CD4+T','TREG'),
+  direction = "<"
+  )
+
+gbm_pca_auc <- auc(gbm_pca_roc_curve)
+
+gbm_pca_misclas <- mean(gbm_pca_pred != test_data_pca$label)
+
+plot(gbm_pca_roc_curve, col = "red", main = "ROC Curve for gbm")
+```
+
+```{r gbm_PCA_evaluation}
+# Create a table of the evaluation metrics
+gbm_pca_metrics_table <- data.frame(
+  Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
+  gbm_pca = c(gbm_pca_accuracy, gbm_pca_balanced_accuracy, gbm_pca_f1_score, gbm_pca_auc, gbm_pca_misclas)
+)
+
+print(gbm_pca_metrics_table)
+```
+
+#### Random Forest
+```{r rf_pca_train}
+# RF model with PCA data
+rf_pca_train_time <- Sys.time()
+
+rf_pca_model <- randomForest(label ~ . - label_as_numeric, 
+                             data = train_data_pca,
+                             mtry = 3, 
+                             importance = TRUE, 
+                             n.tree = 5000)
+
+rf_pca_train_time <- Sys.time() - rf_pca_train_time #Time difference of 3.99099 secs
+```
+
+```{r rf_pca_prediction}
+# Predictions with PCA data
+rf_pca_pred_time <- Sys.time()
+
+rf_pca_pred <- predict(rf_pca_model, newdata = test_data_pca)
+
+rf_pca_pred_time <- Sys.time() - rf_pca_pred_time # Time difference of 0.072191 secs
+```
+
+```{r rf_pca_confusion}
+rf_pca_confusion <- table(predicted = rf_pca_pred,
+                           observed = test_data$label)
+
+print(rf_pca_confusion)
+```
+
+```{r rf_pca_diagnostics}
+rf_pca_accuracy <- mean(rf_pca_pred == test_data_pca$label)
+
+rf_pca_balanced_accuracy <- fun_calc_balanced_accuracy(rf_pca_confusion,
+                                                        pos_label = 'TREG',
+                                                        neg_label = 'CD4+T')
+
+rf_pca_f1_score <- F1_Score(y_true = test_data_pca$label, 
+                             y_pred = rf_pca_pred,
+                             positive = "TREG")
+
+rf_pca_pred_num <- ifelse(rf_pca_pred == "TREG", 1, 0)
+
+rf_pca_roc_curve <- roc(
+  response = test_data_pca$label_as_numeric,
+  predictor = rf_pca_pred_num, 
+  levels = c(0, 1),
+  direction = "<"
+  )
+
+rf_pca_auc <- auc(rf_pca_roc_curve)
+
+rf_pca_misclas <- mean(rf_pca_pred != test_data_pca$label)
+
+plot(rf_pca_roc_curve, col = "red", main = "ROC Curve for rf")
+```
+
+```{r rf_PCA_evaluation}
+# Create a table of the evaluation metrics
+rf_pca_metrics_table <- data.frame(
+  Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
+  rf_pca = c(rf_pca_accuracy, rf_pca_balanced_accuracy, rf_pca_f1_score, rf_pca_auc, rf_pca_misclas)
+)
+
+print(rf_pca_metrics_table)
+```
+
+#### Support Vector Machine (SVM)
+
+##### Linear SVM Model
+```{r svm_linear_model_pca}
+## K-fold CV for hyperparameter tuning of 'cost' for the training data with a linear kernel
+svm_train_time <- Sys.time()
+
+tune.out = tune(svm,
+                label ~ . -label_as_numeric,
+                data = train_data_pca, kernel = "linear", 
+                ranges = list(cost = c(0.01, 0.1, 1, 10)))
+
+summary(tune.out)
+
+svm_train_time <- Sys.time() - svm_train_time # Time difference of 4.748707 secs
+```
+
+
+```{r svm_linear_tuned_model_pca}
+# Save the model with the cost that results in the lowest cross validation error rate
+bestmod <-  tune.out$best.model
+summary(bestmod)
+```
+
+```{r svm_predictions_pca}
+svm_pred_time <-  Sys.time()
+
+svm_pca_pred = predict(bestmod, test_data_pca)
+
+svm_pred_time <-  Sys.time() - svm_pred_time
+# Time difference of 0.01050401 secs
+```
+
+```{r svm_pca_confusion}
+svm_pca_confusion_matrix <- table(predict = svm_pca_pred,
+                                  truth = test_data_pca$label)
+print(svm_pca_confusion_matrix)
+```
+
+```{r svm_pca_diagnostics}
+svm_pca_balanced_accuracy <- fun_calc_balanced_accuracy(svm_pca_confusion_matrix,
+                                                    pos_label = "TREG",
+                                                    neg_label = "CD4+T")
+
+svm_pca_misclass <- mean(svm_pca_pred != test_data$label)
+
+svm_pca_accuracy <- mean(svm_pca_pred == test_data$label)
+
+svm_pca_roc <- roc(test_data$label_as_numeric,
+               as.numeric(svm_pca_pred), 
+               levels = c(0,1),
+               direction = "<")
+
+svm_pca_auc <- auc(svm_pca_roc)
+
+plot(svm_pca_roc, main = "SVM ROC Curve") # Make the limits of the axes 0-1
+
+svm_pca_f1_score <- F1_Score(y_pred = svm_pca_pred, 
+                             y_true = test_data$label,
+                             positive = "TREG")
+
+```
+
+```{r svm_pca_evaluation}
+# Create a table of the evaluation metrics
+svm_pca_metrics_table <- data.frame(
+  Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
+  SVM_Linear_pca = c(svm_pca_accuracy, svm_pca_balanced_accuracy, svm_pca_f1_score, svm_pca_auc, svm_pca_misclass)
+)
+
+print(svm_pca_metrics_table)
+```
+
+##### Radial SVM Model
+```{r svm_radial_pca_model}
+## K-fold CV for hyperparameter tuning of 'cost' for the training data with a radial basis function (RBF) kernel
+svm_train_time_rad <- Sys.time()
+
+tune.out_rad = tune(svm,
+                    label ~ . -label_as_numeric,
+                    data = train_data_pca, 
+                    kernel = "radial", 
+                    ranges = list(cost = c(0.01, 0.1, 1, 10),
+                                  gamma = c(0.00003, 0.0003, 0.003)))
+summary(tune.out_rad)
+
+svm_train_time_rad <- Sys.time() - svm_train_time_rad # Time difference of 42.49734 secs
+
+bestmod_rad <-  tune.out_rad$best.model
+summary(bestmod_rad)
+```
+
+```{r svm_radial_pca_predictions}
+svm_pred_time <-  Sys.time()
+
+svm_rad_pca_pred = predict(bestmod_rad, test_data_pca)
+
+svm_pred_time <- Sys.time() - svm_pred_time # Time difference of 0.01661301 secs
+```
+
+```{r svm_radial_pca_confusion}
+svm_rad_pca_confusion_matrix <- table(predict = svm_rad_pca_pred,
+                                      truth = test_data_pca$label)
+print(svm_rad_pca_confusion_matrix)
+```
+
+```{r svm_radial_diagnostics}
+svm_rad_pca_balanced_accuracy <- fun_calc_balanced_accuracy(svm_rad_pca_confusion_matrix, 
+                                                    pos_label = "TREG",
+                                                    neg_label = "CD4+T")
+
+svm_rad_pca_misclass <- mean(svm_rad_pca_pred != test_data$label)
+
+svm_rad_pca_accuracy <- mean(svm_rad_pca_pred == test_data$label)
+
+svm_rad_pca_roc <- roc(test_data$label, 
+                       as.numeric(svm_rad_pca_pred),
+                       levels = c("CD4+T", 'TREG'),
+                       direction = "<")
+
+svm_rad_pca_auc <- auc(svm_rad_pca_roc)
+
+plot(svm_rad_pca_roc, main = "SVM ROC Curve") # Make the limits of the axes 0-1
+
+svm_rad_pca_f1_score <- F1_Score(y_pred = svm_rad_pca_pred, 
+                                 y_true = test_data$label,
+                                 positive = 'TREG')
+
+```
+
+```{r svm_rad_pca_evaluation}
+# Create a table of the evaluation metrics
+svm_rad_pca_metrics_table <- data.frame(
+  Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
+  SVM_Radial_pca = c(svm_rad_pca_accuracy, svm_rad_pca_balanced_accuracy, svm_rad_pca_f1_score, svm_rad_pca_auc, svm_rad_pca_misclass)
+)
+
+print(svm_rad_pca_metrics_table)
+```
+
+## T1.3: Improving F1 Score
+
+#### Identifying the number of Principle Components to use
+
+```{r scree_plot}
+variance_explained <- (pca_model$sdev)^2 / sum((pca_model$sdev)^2)
+
+scree_data <- data.frame(
+  Component = c(1:50),
+  Variance = variance_explained[1:50]
+)
+
+ggplot(scree_data, aes(x = Component, y = Variance)) + 
+   
+  geom_line() +
+  labs(title= 'Scree Plot', 
+       x = 'Principal Component',
+       y = 'Proportion of Variance Explained') +
+  scale_x_continuous(limits = c(0, 50))
+```
+
+#### LDA
+
+##### Cross-validation (Finding optimal number of Principal Components and tuning threshold)
+
+```{r lda_cv_train}
+lda_cv_time <- Sys.time()
+lda_cv_scores <- fun_lda_cv(no_prin_comps = c(10:30))
+lda_cv_time <- Sys.time() - lda_cv_time # Time difference of 14.50283 mins
+```
+
+```{r save_lda_cv_scores, eval = FALSE}
+write.csv(lda_cv_scores, file = "predictions_1.3/lda_cv_scores.csv")
+```
+
+```{r load_lda_cv_scores, eval = FALSE}
+lda_cv_scores <- dplyr::select(read.csv(file = "predictions_1.3/lda_cv_scores.csv"),
+                               -X)
+```
+
+
+```{r lda_avg_scores}
+lda_avg_scores <- lda_cv_scores %>%
+  
+  group_by(no_pc, threshold) %>%
+  
+  summarise(Balanced_Accuracy = mean(balanced_accuracy),
+            Balanced_Accuracy_sd = sd(balanced_accuracy),
+            F1 = mean(f1), 
+            F1_sd = sd(f1),
+            .groups = "keep")
+
+ggplot(filter(lda_avg_scores, no_pc >= 15), aes(x = threshold, y = F1, color = as.factor(no_pc))) +
+  geom_line() +
+  geom_point()
+```
+
+```{r lda_cv_scores_plot}
+ggplot(filter(lda_cv_scores, threshold == 0.2), aes(x = no_pc, y = f1)) +
+  geom_point() + 
+  geom_smooth()
+```
+
+##### Tuning
+
+```{r tuning_test_data_pca}
+tuning_test_data_pca <- predict(pca_model, test_data)
+```
+
+
+```{r lda_tuning}
+lda_best_no_pc <- 26 
+
+lda_tuned_training <- pca_model$x[, 1:lda_best_no_pc] %>%
+  
+  data.frame(., label = train_data$label)
+
+test_lda_tuned <- tuning_test_data_pca[, 1:lda_best_no_pc]
+
+lda_tuned_model <- lda(label ~ ., 
+                       lda_tuned_training)
+
+lda_tuned_prob <- predict(lda_tuned_model, 
+                          newdata = data.frame(test_lda_tuned))$posterior[, "TREG"]
+
+lda_tuned_pred <- ifelse(lda_tuned_prob > 0.2, "TREG", "CD4+T")
+```
+
+```{r lda_tuned_confusion}
+lda_tuned_confusion <- table(predicted = lda_tuned_pred,
+                           observed = test_data$label)
+
+print(lda_tuned_confusion)
+```
+
+```{r lda_tuned_diagnostics}
+lda_tuned_accuracy <- mean(lda_tuned_pred == test_data_pca$label)
+
+lda_tuned_balanced_accuracy <- fun_calc_balanced_accuracy(lda_tuned_confusion,
+                                                        pos_label = 'TREG',
+                                                        neg_label = 'CD4+T')
+
+lda_tuned_f1_score <- F1_Score(y_true = test_data_pca$label, 
+                             y_pred = lda_tuned_pred,
+                             positive = "TREG")
+
+lda_tuned_roc_curve <- roc(
+  response = test_data_pca$label,
+  predictor = lda_tuned_prob, 
+  levels = c('CD4+T','TREG'),
+  direction = "<"
+  )
+
+lda_tuned_auc <- auc(lda_tuned_roc_curve)
+
+lda_tuned_misclas <- mean(lda_tuned_pred != test_data_pca$label)
+
+plot(lda_tuned_roc_curve, col = "red", main = "ROC Curve for LDA")
+```
+
+```{r lda_tuned_evaluation}
+# Create a table of the evaluation metrics
+lda_tuned_metrics_table <- data.frame(
+  Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
+  LDA_tuned = c(lda_tuned_accuracy, lda_tuned_balanced_accuracy, lda_tuned_f1_score, lda_tuned_auc, lda_tuned_misclas)
+)
+
+print(lda_tuned_metrics_table)
+```
+
+#### Logistic Regression
+
+##### Ridge Regularisation and Cross Validation
+
+```{r logreg_rodge_cv_train}
 logreg_cv_time <- Sys.time()
-logreg_ridge_cv_scores <- fun_logreg_cv(no_prin_comps = c(10:30), 
+logreg_ridge_cv_scores <- fun_logreg_cv(no_prin_comps = c(15:50), 
                                         alpha = 0, 
-                                        lambda = lambda_tuning)
+                                        lambda = lambda_tuning
+                                        )
 logreg_cv_time <- Sys.time() - logreg_cv_time # Approx 15 mins
 ```
 
-```{r}
+```{r save_logreg_rodge_cv_scores, eval = FALSE}
 write.csv(logreg_ridge_cv_scores, file = "predictions_1.3/logreg_ridge_cv_scores.csv")
 ```
 
-```{r}
+```{r load_logreg_rodge_cv_scores, eval = FALSE}
 logreg_ridge_cv_scores <- dplyr::select(read.csv(file = "predictions_1.3/logreg_ridge_cv_scores.csv"),
                                -X)
 ```
 
-```{r}
+```{r logreg_ridge_avg_scores}
 logreg_ridge_avg_scores <- logreg_ridge_cv_scores %>%
   
   group_by(no_pc, threshold, lambda) %>%
@@ -1738,37 +1628,42 @@ logreg_ridge_avg_scores <- logreg_ridge_cv_scores %>%
   summarise(F1 = mean(f1), 
             F1_sd = sd(f1),
             .groups = "keep")
+
+head(logreg_ridge_avg_scores)
 ```
 
-```{r}
+```{r logreg_ridge_avg_scores_plot}
 ggplot(filter(logreg_ridge_avg_scores, lambda == 0.01), aes(x = threshold, y = F1, color = as.factor(no_pc))) +
   geom_line() +
   geom_point()
 ```
 
-```{r}
-logreg_ridge_improved_models <- logreg_ridge_avg_scores[order(logreg_ridge_avg_scores$F1,
-                                                 decreasing = TRUE),]
+```{r logreg_ridge_cv_scores_plot}
+ggplot(filter(logreg_ridge_cv_scores, threshold == 0.4, lambda == 0.01), aes(x = no_pc, y = f1)) +
+  geom_point() + 
+  geom_smooth()
+```
 
-logreg_ridge_best_no_pc <- as.integer(logreg_ridge_improved_models[1, 'no_pc'])
+###### Tuning
 
-logreg_ridge_tuned_training <- task_one_df_pca[train_indices, 1:logreg_ridge_best_no_pc] %>%
+```{r logreg_ridge_tuning}
+logreg_ridge_best_no_pc <- 48 #as.integer(logreg_ridge_improved_models[1, 'no_pc'])
+
+logreg_ridge_tuned_training <- pca_model$x[, 1:logreg_ridge_best_no_pc] %>%
   
   as.matrix()
 
-test_logreg_ridge_tuned <- task_one_df_pca[-train_indices, 1:logreg_ridge_best_no_pc] %>%
-  
-  as.matrix()
+test_logreg_ridge_tuned <- tuning_test_data_pca[, 1:logreg_ridge_best_no_pc]
 
 logreg_ridge_tuned_model <- glmnet(logreg_ridge_tuned_training,
-                             as.factor(train_data$label),
-                             family = "binomial",
-                             alpha = 0)
+                                   as.factor(train_data$label),
+                                   family = "binomial",
+                                   alpha = 0)
 
 logreg_ridge_tuned_prob <- predict(logreg_ridge_tuned_model, 
-                             newx = test_logreg_ridge_tuned,
-                             type = "response",
-                             s = 0.01)
+                          newx = test_logreg_ridge_tuned,
+                          type = "response",
+                          s = 0.01)
 
 logreg_ridge_tuned_pred <- ifelse(logreg_ridge_tuned_prob > 0.4, "TREG", "CD4+T")
 ```
@@ -1802,7 +1697,7 @@ logreg_ridge_tuned_auc <- auc(logreg_ridge_tuned_roc_curve)
 
 logreg_ridge_tuned_misclas <- mean(logreg_ridge_tuned_pred != test_data_pca$label)
 
-plot(logreg_ridge_tuned_roc_curve, col = "red", main = "ROC Curve for Logistic w Ridge")
+plot(logreg_ridge_tuned_roc_curve, col = "red", main = "ROC Curve for Logistic Ridge Regression")
 ```
 
 ```{r logreg_ridge_tuned_evaluation}
@@ -1815,26 +1710,27 @@ logreg_ridge_tuned_metrics_table <- data.frame(
 print(logreg_ridge_tuned_metrics_table)
 ```
 
-##### Lasso Regularisation and Cross Validation (Chi)
+##### Lasso Regularisation and Cross Validation
 
 ```{r logreg_lasso_cv_train}
 logreg_cv_time <- Sys.time()
-logreg_lasso_cv_scores <- fun_logreg_cv(no_prin_comps = c(10:30), 
+logreg_lasso_cv_scores <- fun_logreg_cv(no_prin_comps = c(10:50), 
                                         alpha = 1, 
-                                        lambda = lambda_tuning)
+                                        lambda = c(0, 0.00001, 0.0001, 0.001, 0.01) #lambda_tuning
+                                        )
 logreg_cv_time <- Sys.time() - logreg_cv_time # Time difference of 17.33742 mins
 ```
 
-```{r}
+```{r save_logreg_lasso_cv_train, eval = FALSE}
 write.csv(logreg_lasso_cv_scores, file = "predictions_1.3/logreg_lasso_cv_scores.csv")
 ```
 
-```{r}
+```{r load_logreg_lasso_cv_train, eval = FALSE}
 logreg_lasso_cv_scores <- dplyr::select(read.csv(file = "predictions_1.3/logreg_lasso_cv_scores.csv"),
                                -X)
 ```
 
-```{r}
+```{r logreg_lasso_avg_scores}
 logreg_lasso_avg_scores <- logreg_lasso_cv_scores %>%
   
   group_by(no_pc, threshold, lambda) %>%
@@ -1842,44 +1738,41 @@ logreg_lasso_avg_scores <- logreg_lasso_cv_scores %>%
   summarise(F1 = mean(f1), 
             F1_sd = sd(f1),
             .groups = "keep")
+
+head(logreg_lasso_avg_scores)
 ```
 
-```{r}
+```{r logreg_lasso_avg_scores_plot}
 ggplot(filter(logreg_lasso_avg_scores, lambda == 0.001), aes(x = threshold, y = F1, color = as.factor(no_pc))) +
   geom_line() +
   geom_point()
 ```
-```{r}
-ggplot(filter(logreg_lasso_avg_scores, threshold == 0.4), aes(x = lambda, y = F1, color = as.factor(no_pc))) +
-  geom_line() +
-  geom_point() +
-  scale_x_continuous(limits = c(0,0.1))
+
+```{r logreg_lasso_cv_scores_plot}
+ggplot(filter(logreg_lasso_cv_scores, threshold == 0.4, lambda == 0.001), aes(x = no_pc, y = f1)) +
+  geom_point() + 
+  geom_smooth()
 ```
 
+###### Tuning
+```{r logreg_lasso_tuning}
+logreg_lasso_best_no_pc <- 26 #as.integer(logreg_lasso_improved_models[1, 'no_pc'])
 
-```{r}
-logreg_lasso_improved_models <- logreg_lasso_avg_scores[order(logreg_lasso_avg_scores$F1,
-                                                 decreasing = TRUE),]
-
-logreg_lasso_best_no_pc <- 25 #as.integer(logreg_lasso_improved_models[1, 'no_pc'])
-
-logreg_lasso_tuned_training <- task_one_df_pca[train_indices, 1:logreg_lasso_best_no_pc] %>%
+logreg_lasso_tuned_training <- pca_model$x[, 1:logreg_lasso_best_no_pc] %>%
   
   as.matrix()
 
-test_logreg_lasso_tuned <- task_one_df_pca[-train_indices, 1:logreg_lasso_best_no_pc] %>%
-  
-  as.matrix()
+test_logreg_lasso_tuned <- tuning_test_data_pca[, 1:logreg_lasso_best_no_pc]
 
 logreg_lasso_tuned_model <- glmnet(logreg_lasso_tuned_training,
-                             as.factor(train_data$label),
-                             family = "binomial",
-                             alpha = 1)
+                                   as.factor(train_data$label),
+                                   family = "binomial",
+                                   alpha = 1)
 
 logreg_lasso_tuned_prob <- predict(logreg_lasso_tuned_model, 
-                             newx = test_logreg_lasso_tuned,
-                             type = "response",
-                             s = 0.001)
+                          newx = test_logreg_lasso_tuned,
+                          type = "response",
+                          s = 0.001)
 
 logreg_lasso_tuned_pred <- ifelse(logreg_lasso_tuned_prob > 0.4, "TREG", "CD4+T")
 ```
@@ -1913,7 +1806,7 @@ logreg_lasso_tuned_auc <- auc(logreg_lasso_tuned_roc_curve)
 
 logreg_lasso_tuned_misclas <- mean(logreg_lasso_tuned_pred != test_data_pca$label)
 
-plot(logreg_lasso_tuned_roc_curve, col = "red", main = "ROC Curve for QDA")
+plot(logreg_lasso_tuned_roc_curve, col = "red", main = "ROC Curve for Logistic Lasso Regression")
 ```
 
 ```{r logreg_lasso_tuned_evaluation}
@@ -1926,64 +1819,175 @@ logreg_lasso_tuned_metrics_table <- data.frame(
 print(logreg_lasso_tuned_metrics_table)
 ```
 
-#### Random Forest with AdaBoost (Imar)
-
-```{r}
-# Train the AdaBoost model with Random Forest as the base learner
-start_time_rf_ab <- Sys.time()
-
-set.seed(seed)
-# Train AdaBoost using Random Forest as the base model
-rf_ab_model <- boosting(label ~ . - label_as_numeric, data = train_data, boos = TRUE, mfinal = 50, baselearner = randomForest)
-
-end_time_rf_ab <- Sys.time()
-rf_ab_training_time <- end_time_rf_ab - start_time_rf_ab
-cat("AdaBoost with Random Forest training time:", rf_ab_training_time, "\n")
-
-# Predictions
-start_time_rf_ab_pred <- Sys.time()
-yhat.rf_ab <- predict(rf_ab_model, newdata = test_data)$class  # Predictions using the AdaBoost model
-end_time_rf_ab_pred <- Sys.time()
-rf_ab_prediction_time <- end_time_rf_ab_pred - start_time_rf_ab_pred
-cat("AdaBoost with Random Forest prediction time:", rf_ab_prediction_time, "\n")
-```
-
-```{r rf_ab_save, include = FALSE}
-write.csv(yhat.rf_ab, file = "predictions_1.3/rf_ab.csv", row.names = TRUE)
-```
-
-```{r logreg_load, include = FALSE}
-yhat.rf_ab <- read.csv("predictions_1.3/rf_ab.csv") %>% 
-  
-  dplyr::select(x)
-
-yhat.rf_ab <- yhat.rf_ab[,'x']
-```
-
-```{r}
-# Evaluate F1 Score and other metrics
-cm_rf_ab <- table(prediction = yhat.rf_ab, truth = test_data$label)
-cm_rf_ab
-```
-
-
-```{r}
-rf_cv_f1_score <- F1_Score(y_true = test_data$label, y_pred = yhat.rf_ab)
-cat("F1 Score of Random Forest with AdaBoost:", rf_cv_f1_score, "\n")
-```
-
 #### AdaBoost
+```{r boost_cv_train_fixed_pc}
+boost_cv_time <- Sys.time()
+boost_cv_scores_fixed_pc <- fun_boost_cv(no_prin_comps = c(25))
+boost_cv_time <- Sys.time() - boost_cv_time # Time difference of 31.34519 mins
 
-```{r}
-boost_train_time <- Sys.time()
-boost_model <- boosting(label ~ . - label_as_numeric, data = train_data_pca, mfinal = 50)
-boost_train_time <- Sys.time() - boost_train_time
+## First iteration of cross-validation showed that mfinal = 200, depth = 5 to be best. 
 ```
 
-## T1.4: Implement predictor (???)
+```{r save_boost_cv_fixed_pc_scores, eval = FALSE}
+write.csv(boost_cv_scores_fixed_pc, file = "predictions_1.3/boost_cv_scores_chosen_pc.csv")
+```
 
-Choose the best approach from those above tested and implement our predictor as a function of our code.
+```{r load_boost_cv_scores, eval = FALSE}
+boost_cv_scores_fixed_pc <- dplyr::select(read.csv(file = "predictions_1.3/boost_cv_scores_chosen_pc.csv"),
+                               -X)
+```
 
-```{r}
+```{r boost_cv_train}
+boost_cv_time <- Sys.time()
+boost_cv_scores <- fun_boost_cv(no_prin_comps = c(15:30),
+                                mfinals = c(200),
+                                depths = c(5),
+                                thresholds = c(0.5))
+boost_cv_time <- Sys.time() - boost_cv_time # Time difference of 47.41534 mins
+```
 
+```{r save_boost_cv_scores, eval = FALSE}
+write.csv(boost_cv_scores, file = "predictions_1.3/boost_cv_scores.csv")
+```
+
+```{r load_boost_cv_scores, eval = FALSE}
+boost_cv_scores <- dplyr::select(read.csv(file = "predictions_1.3/boost_cv_scores.csv"),
+                               -X)
+```
+
+
+```{r boost_avg_scores}
+boost_avg_scores <- boost_cv_scores_fixed_pc %>%
+  
+  group_by(no_pc, mfinal, depth,threshold) %>%
+  
+  summarise(F1 = mean(f1), 
+            F1_sd = sd(f1),
+            .groups = "keep")
+```
+
+```{r boost_avg_scores_plot_threshold}
+ggplot(boost_avg_scores, aes(x = threshold, y = F1)) + 
+  geom_point() + 
+  geom_smooth(method = 'loess', formula = y~x)
+```
+```{r boost_avg_scores_plot_threshold}
+ggplot(filter(boost_avg_scores, threshold == 0.5), aes(x = mfinal, y = F1)) + 
+  geom_point() + 
+  geom_line()
+```
+
+```{r boost_cv_scores_plot}
+ggplot(boost_cv_scores, aes(x = no_pc, y = f1)) + 
+  geom_point() + 
+  geom_smooth()
+```
+
+##### Tuning
+
+```{r boost_tuning}
+boost_best_no_pc <- 26 #as.integer(boost_improved_models[1, 'no_pc'])
+
+boost_tuned_training <- pca_model$x[, 1:boost_best_no_pc] %>%
+  
+  data.frame(., label = train_data$label)
+
+test_boost_tuned <- tuning_test_data_pca[, 1:boost_best_no_pc]
+
+boost_tuned_model <- boosting(label ~ ., 
+                           boost_tuned_training,
+                           mfinal = 200,
+                           maxdepth = 5)
+
+boost_tuned_prob <- predict(boost_tuned_model, 
+                            newdata = data.frame(test_boost_tuned))$prob[, 2]
+
+boost_tuned_pred <- ifelse(boost_tuned_prob > 0.5, "TREG", "CD4+T")
+```
+
+```{r boost_tuned_confusion}
+boost_tuned_confusion <- table(predicted = boost_tuned_pred,
+                           observed = test_data$label)
+
+print(boost_tuned_confusion)
+```
+
+```{r boost_tuned_diagnostics}
+boost_tuned_accuracy <- mean(boost_tuned_pred == test_data_pca$label)
+
+boost_tuned_balanced_accuracy <- fun_calc_balanced_accuracy(boost_tuned_confusion,
+                                                        pos_label = 'TREG',
+                                                        neg_label = 'CD4+T')
+
+boost_tuned_f1_score <- F1_Score(y_true = test_data_pca$label, 
+                             y_pred = boost_tuned_pred,
+                             positive = "TREG")
+
+boost_tuned_roc_curve <- roc(
+  response = test_data_pca$label,
+  predictor = boost_tuned_prob, 
+  levels = c('CD4+T','TREG'),
+  direction = "<"
+  )
+
+boost_tuned_auc <- auc(boost_tuned_roc_curve)
+
+boost_tuned_misclas <- mean(boost_tuned_pred != test_data_pca$label)
+
+plot(boost_tuned_roc_curve, col = "red", main = "ROC Curve for boost")
+```
+
+```{r boost_tuned_evaluation}
+# Create a table of the evaluation metrics
+boost_tuned_metrics_table <- data.frame(
+  Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
+  boost_tuned = c(boost_tuned_accuracy, boost_tuned_balanced_accuracy, boost_tuned_f1_score, boost_tuned_auc, boost_tuned_misclas)
+)
+
+print(boost_tuned_metrics_table)
+```
+
+## T1.4: Implement predictor
+
+```{r mypredict}
+mypredict <- function(){
+  # Load packages
+  library(MASS)
+  library(glmnet)
+  
+  # Load training data
+  train_df <- read.csv("data1.csv.gz")
+  cat("Data loaded")
+  
+  # Remove label column 
+  train_X <- train_df[, !colnames(train_df) %in% c("label")]
+  
+  # Perform PCA
+  pca <- prcomp(train_X, 
+                center = TRUE, 
+                scale. = TRUE, 
+                rank. = 48)
+  cat("PCA Trained")
+  # Load test data and transform using PCA model
+  test_df <- read.csv("test.csv.gz")
+  
+  test_X <- predict(pca, test_df[, !colnames(test_df) %in% c("label")])
+  
+  # Train model and predict probabilities
+  model <- glmnet(x = as.matrix(pca$x),
+                  y = as.factor(train_df$label),
+                  alpha = 0)
+  
+  probs <- predict(model, 
+                   newx = as.matrix(text_X),
+                   type = "response",
+                   s = 0.01)
+
+  # Assign class based on probability and selected threshold
+  threshold <- 0.4
+  predictions <- ifelse(probs > threshold, "TREG", "CD4+T")
+  
+  # Export to plain text file
+  writeLines(predictions, "predictions.txt")
+}
 ```
