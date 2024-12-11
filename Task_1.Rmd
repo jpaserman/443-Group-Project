@@ -45,8 +45,8 @@ lambda_grid <- c(0.001, 0.01,0.03,0.05)
 ## Initialize a vector to store test errors for each lambda
 test_errors <- numeric(length(lambda_grid))
 
-## Number of Principal Components to train with
-no_prin_comps <- c(2:1000)
+## Number of Principal Components to Cross-Validate on
+no_prin_comps <- c(2:25)
 
 ## Number of folds for Cross-Validation 
 no_folds <- 5
@@ -55,9 +55,11 @@ no_folds <- 5
 thresholds <- seq(0.1, 0.9, 0.1)
 
 ## Logistic Ridge/Lasso Tuning
-lambda_tuning = c(10^seq(-4, 1, 1))
+lambda_tuning = c(0, 0.00001, 0.0001, 0.001, 0.01)
 
-
+## AdaBoost Tuning 
+mfinals = c(50, 100, 150, 200)
+depths = c(3,5,7)
 ```
 
 ```{r load_packages, include=FALSE}
@@ -104,19 +106,257 @@ fun_calc_balanced_accuracy <- function(confusion_matrix, pos_label, neg_label){
   return(balanced_accuracy)
 }
 
-cv_f1_score <- function(data, lev = NULL, model = NULL) {
+## LDA Cross-Validation and Hyperparameter Tuning Function
+fun_lda_cv <- function(no_prin_comps = no_prin_comps,
+                        thresholds = thresholds,
+                        no_folds = no_folds,
+                        seed = seed){
   
-  precision <- posPredValue(data$pred, data$obs, positive = "TREG")
+  lda_cv_scores <- data.frame(no_pc = c(),
+                              threshold = c(),
+                              balanced_accuracy = c(),
+                              f1 = c())
   
-  recall <- sensitivity(data$pred, data$obs, positive = "TREG")
+  set.seed(seed)
   
-  F1 <- ifelse((precision + recall) == 0, 
-               0, 
-               2 * precision * recall / (precision + recall))
+  fold_indices <- createFolds(train_data$label, k = no_folds, returnTrain = TRUE)
   
-  accuracy <- mean(data$pred == data$obs)
-  # Return a named vector
-  c(Accuracy = accuracy, F1 = F1)
+  X_df <- train_data[, !colnames(train_data) %in% c("label", "label_as_numeric")]
+  
+  for (fold in fold_indices) {
+    # For each fold, perform PCA
+    fold_pca_model <- prcomp(X_df[fold,], 
+                             center = TRUE,
+                             scale. = TRUE, 
+                             rank. = max(no_prin_comps))
+    
+    # Fold from PCA to be trained and tested
+    fold_train_df <- data.frame(fold_pca_model$x, 
+                               label = train_data$label[fold]) 
+    
+    fold_test_X <- predict(fold_pca_model, X_df[-fold,])
+    
+    fold_test_Y <- train_data$label[-fold]
+    
+    for (prin_comps in no_prin_comps){
+      #For each Fold, vary number of PCs used to train LDA 
+      
+      # Use the first n (prin_comps) components
+      lda_train <- fold_train_df[, c(1:prin_comps, ncol(fold_train_df))]
+      
+      lda_test_X <- fold_test_X[, 1:prin_comps]
+      
+      # Train model on n PCs
+      lda_cv_model <- lda(label ~ ., 
+                          data = lda_train)
+      
+      # Predict the probabilities it belongs to a class using model on left out fold 
+      lda_cv_probs <- predict(lda_cv_model, 
+                              data.frame(fold_test_X), 
+                              type = "prob")
+      
+      for (threshold in thresholds){
+        #For each fold and each model, vary the threshold that decides class
+        lda_cv_preds <- as.factor(ifelse(lda_cv_probs$posterior[, "TREG"] > threshold,
+                                         "TREG",
+                                         "CD4+T"))
+        
+        #Calculate balanced accuracy and f1
+        cm <- table(lda_cv_preds, fold_test_Y)
+        
+        balanced_accuracy <- fun_calc_balanced_accuracy(cm, 
+                                                        pos_label = "TREG", 
+                                                        neg_label = "CD4+T")
+        
+        f1 <- F1_Score(y_true = fold_test_Y,
+                       y_pred = lda_cv_preds,
+                       positive = "TREG")
+        
+        # Store the scores
+        return_df <- data.frame(no_pc = prin_comps,
+                                threshold = threshold,
+                                balanced_accuracy = balanced_accuracy,
+                                f1 = f1)
+        
+        lda_cv_scores <- rbind(lda_cv_scores, return_df)
+      }
+    }
+  }
+  return(lda_cv_scores)
+}
+
+## Logistic Regression Cross-Validation and Hyperparameter Tuning Function
+fun_logreg_cv <- function(no_prin_comps = no_prin_comps,
+                       thresholds = thresholds,
+                       no_folds = no_folds,
+                       seed = seed,
+                       lambda,
+                       alpha){
+  
+  logreg_cv_scores <- data.frame(no_pc = c(),
+                              threshold = c(),
+                              lambda = c(),
+                              f1 = c())
+  
+  set.seed(seed)
+  
+  fold_indices <- createFolds(train_data$label, k = no_folds, returnTrain = TRUE)
+  
+  X_df <- train_data[, !colnames(train_data) %in% c("label", "label_as_numeric")]
+  
+  for (fold in fold_indices) {
+    # For each fold, perform PCA
+    fold_pca_model <- prcomp(X_df[fold,], 
+                             center = TRUE,
+                             scale. = TRUE, 
+                             rank. = max(no_prin_comps))
+    
+    # Fold from PCA to be trained and tested
+    fold_test_X <- predict(fold_pca_model, X_df[-fold,])
+    
+    fold_test_Y <- train_data$label[-fold]
+    
+    for (prin_comps in no_prin_comps){
+      #For each Fold, vary number of PCs used to train regression  
+      
+      # Train model on n PCs
+      logreg_cv_model <- glmnet(as.matrix(fold_pca_model$x[, 1:prin_comps]),
+                                as.factor(train_data[fold, 'label']),
+                                family = "binomial",
+                                alpha = alpha)
+      
+      
+      for (lambda in lambda_tuning){
+        # Predict the probabilities it belongs to a class using model on left out fold at different lambdas 
+        logreg_cv_probs <- predict(logreg_cv_model,
+                                   as.matrix(fold_test_X[, 1:prin_comps]),
+                                   type = "response",
+                                   s = lambda)
+      
+        for (threshold in thresholds){
+          #For each fold and each model, vary the threshold that decides class
+          logreg_cv_preds <- as.factor(ifelse(logreg_cv_probs > threshold,
+                                              "TREG",
+                                              "CD4+T"))
+          
+          #Calculate accuracy and f1
+          cm <- table(logreg_cv_preds, fold_test_Y)
+          
+          f1 <- F1_Score(y_true = fold_test_Y,
+                         y_pred = logreg_cv_preds,
+                         positive = "TREG")
+          
+          # Store the scores
+          return_df <- data.frame(no_pc = prin_comps,
+                                  threshold = threshold,
+                                  lambda = lambda,
+                                  f1 = f1)
+          
+          logreg_cv_scores <- rbind(logreg_cv_scores, return_df)
+        }
+      }
+    }
+  }
+  return(logreg_cv_scores)
+}
+
+## AdaBoost Cross-Validation and Hyperparameter Tuning Function
+fun_boost_cv <- function(no_prin_comps = no_prin_comps,
+                         mfinals = mfinals,
+                         depths = depths,
+                         thresholds = thresholds,
+                         no_folds = no_folds,
+                         seed = seed){
+  
+  boost_cv_scores <- data.frame(no_pc = c(),
+                              mfinal = c(),
+                              depth = c(),
+                              threshold = c(),
+                              f1 = c())
+  
+  set.seed(seed)
+  
+  fold_indices <- createFolds(train_data$label, k = no_folds, returnTrain = TRUE)
+  
+  X_df <- train_data[, !colnames(train_data) %in% c("label", "label_as_numeric")]
+  
+  i <- 0
+  
+  for (fold in fold_indices) {
+    # For each fold, perform PCA
+    i <- i + 1
+    print(paste0(Sys.time(), ": PCA in process"))
+    fold_pca_model <- prcomp(X_df[fold,], 
+                             center = TRUE,
+                             scale. = TRUE, 
+                             rank. = max(no_prin_comps))
+    
+    # Fold from PCA to be trained and tested
+    fold_train_df <- data.frame(fold_pca_model$x, 
+                               label = train_data$label[fold]) 
+    
+    fold_test_X <- predict(fold_pca_model, X_df[-fold,])
+    
+    fold_test_Y <- train_data$label[-fold]
+    
+    for (prin_comps in no_prin_comps){
+      #For each Fold, vary number of PCs used to train AdaBoost 
+      
+      # Use the first n (prin_comps) components
+      boost_train <- fold_train_df[, c(1:prin_comps, ncol(fold_train_df))]
+      
+      boost_test_X <- fold_test_X[, 1:prin_comps]
+      
+      for (mfinal in mfinals){
+        for (depth in depths){
+          print(paste0(Sys.time(), ": AdaBoost Training in process"))
+          # Set any randomness in boosting
+          set.seed(seed)
+          
+          # Train model on n PCs
+          boost_cv_model <- boosting(label ~ ., 
+                              data = boost_train,
+                              mfinal = mfinal,
+                              maxdepth = depth
+                              )
+          
+          # Predict the probabilities it belongs to a class using model on left out fold 
+          boost_cv_probs <- predict.boosting(boost_cv_model, 
+                                             data.frame(fold_test_X))$prob[,2]
+          
+            for (threshold in thresholds){
+              print(paste0(Sys.time(), ": Evaluating Fold ", i, " with ",
+                       prin_comps, " PCs, ",
+                       mfinal, " mfinal ",
+                       depth, " max_depth, ",
+                       threshold, " threshold."))
+              #For each fold and each model, vary the threshold that decides class
+              boost_cv_preds <- as.factor(ifelse(boost_cv_probs > threshold,
+                                                 "TREG",
+                                                 "CD4+T"))
+              
+              #Calculate balanced accuracy and f1
+              cm <- table(boost_cv_preds, fold_test_Y)
+              
+              f1 <- F1_Score(y_true = fold_test_Y,
+                             y_pred = boost_cv_preds,
+                             positive = "TREG")
+              
+              # Store the scores
+              return_df <- data.frame(no_pc = prin_comps,
+                              mfinal = mfinal,
+                              depth = depth,
+                              threshold = threshold,
+                              f1 = f1)
+              
+              boost_cv_scores <- rbind(boost_cv_scores, return_df)
+          
+          }
+        }
+      }
+    }
+  }
+  return(boost_cv_scores)
 }
 
 ```
@@ -165,7 +405,7 @@ for (column in twenty_random_columns) {
 
 ### Without PCA
 
-#### Linear Discriminant Analysis (LDA) (Imar)
+#### Linear Discriminant Analysis (LDA)
 
 ```{r lda_train}
 lda_start_time  <- Sys.time()
@@ -176,11 +416,11 @@ lda_runtime <- lda_end_time - lda_start_time # Time difference of 4.937018 mins
 lda_pred <- predict(lda_fit, test_data)$class
 ```
 
-```{r lda_save, include = FALSE}
+```{r lda_save, eval = FALSE}
 write.csv(lda_pred, file = "predictions_1.2/lda_predictions.csv", row.names = TRUE)
 ```
 
-```{r lda_load, include = FALSE}
+```{r lda_load, eval = FALSE}
 lda_pred <- read.csv("predictions_1.2/lda_predictions.csv") %>% 
   
   dplyr::select(x)
@@ -231,7 +471,7 @@ lda_metrics_table <- data.frame(
 print(lda_metrics_table)
 ```
 
-#### Logistic classifier (Imar)
+#### Logistic classifier
 
 ```{r logreg_train}
 logreg_start_time <- Sys.time()
@@ -246,12 +486,12 @@ logreg_probs <- predict(logreg_fit, newdata = test_data, type = "response")
 logreg_pred <- ifelse(logreg_probs > 0.5, 'TREG', 'CD4+T')
 ```
 
-```{r logreg_save, include = FALSE}
+```{r logreg_save, eval = FALSE}
 write.csv(logreg_probs, file = "predictions_1.2/logreg_probabilities.csv", row.names = TRUE)
 write.csv(logreg_pred, file = "predictions_1.2/logreg_predictions.csv", row.names = TRUE)
 ```
 
-```{r logreg_load, include = FALSE}
+```{r logreg_load, eval = FALSE}
 logreg_pred <- read.csv("predictions_1.2/logreg_predictions.csv") %>% 
   
   dplyr::select(x)
@@ -305,64 +545,13 @@ logreg_metrics_table <- data.frame(
 print(logreg_metrics_table)
 ```
 
-#### Quadratic Discriminant Analysis (QDA) (Chi)
+#### Quadratic Discriminant Analysis (QDA)
 
 The current dimensionality of the data is too high for a QDA classifier. During training, the covariance matrix estimation for each class, k, fails. This occurs because, when the data is partitioned into k classes, the number of observations, n, is much smaller than the number of features, p (i.e n << p). As a result, the covariance matrix estimate for class k becomes singular or nearly singular. Therefore, without dimension reduction or regularisation, training this classifier is not feasible.
 
-```{r qda_Train}
-# ## CAUTION: currently hard-coded numbers here. To be changed (Chi)
-# options(expressions = 10000)
-# qda_covariates = mean_table$genes[1:1100]
-# ## CAUTION: currently hard-coded numbers here. To be changed (Chi)
-# 
-# qda_formula = as.formula(
-#   paste(
-#     "label ~",
-#     paste(qda_covariates, collapse = " + ")
-#     ))
-# 
-# qda_fit <- qda(qda_formula, data = train_data)
-```
+#### Nearest Neighbor Classifier (k-NN)
 
-```{r qda_Confusion}
-# qda_pred <- predict(qda_fit, test_data)$class
-# 
-# table(predicted = qda_pred, observed = test_data$label)
-```
-
-```{r qda_Misclass}
-# qda_misclas = mean(qda_pred != test_data$label)
-# 
-# cat("Misclassification rate:", qda_misclas*100, "%")
-```
-
-```{r qda_ROC}
-# qda_pred_numeric <- ifelse(qda_pred == "TREG", 1, 0)
-#   
-# qda_roc_curve <- roc(
-#   response = test_data$label_as_numeric,
-#   predictor = qda_pred_numeric, 
-#   levels = c(0,1),
-#   direction = "<"
-#   )
-# 
-# plot(qda_roc_curve, col = "red", main = "ROC Curve for QDA")
-# 
-# qda_auc <- auc(qda_roc_curve)
-# qda_auc
-```
-
-```{r QDA_TBD}
-# qda_accuracy <- "n/a"
-# qda_balanced_accuracy <- "n/a"
-# qda_f1_score <- "n/a"
-# qda_runtime <- "n/a"
-```
-
-
-#### Nearest Neighbor Classifier (k-NN) (Chi)
-
-```{r kNN_train, eval = FALSE}
+```{r kNN_train}
 set.seed(seed)
 
 knn_train_X <- train_data %>% 
@@ -386,11 +575,11 @@ print(knn_train_runtime) #50 mins for k=1 to k=10
 rm(knn_train_X, knn_train_Y, knn_test_X)
 ```
 
-```{r kNN_save, include = FALSE}
+```{r kNN_save, eval = FALSE}
 write.csv(knn_pred, file = "knn_predictions.csv", row.names = TRUE)
 ```
 
-```{r kNN_load, include = FALSE}
+```{r kNN_load, eval = FALSE}
 knn_pred <- read.csv("knn_predictions.csv") %>% 
   dplyr::select(-X)
 
@@ -426,7 +615,7 @@ knn_auc <- auc(knn_roc_curve)
 
 knn_misclas <- mean(knn_pred != test_data_pca$label)
 
-plot(knn_roc_curve, col = "red", main = "ROC Curve for QDA")
+plot(knn_roc_curve, col = "red", main = "ROC Curve for kNN")
 ```
 
 ```{r knn_evaluation}
@@ -439,7 +628,7 @@ knn_metrics_table <- data.frame(
 print(knn_metrics_table)
 ```
 
-#### Gradient Boosting Decision Trees (GBDT) (Imar)
+#### Gradient Boosting Decision Trees (GBDT) 
 
 ```{r gbmparams}
 #Number of trees
@@ -451,59 +640,14 @@ lambda_grid <- c(0.001, 0.01,0.03,0.05)
 test_errors <- numeric(length(lambda_grid))
 ```
 
-```{r dataprepgbm}
-test_data_cleaned_gbm <- test_data[, !colnames(test_data) %in% c("label", "label")]
-```
-
-```{r gbmloop, eval=FALSE}
-gbm_optimal_lambda_start <- Sys.time()
-# Loop over each lambda value
-for (i in seq_along(lambda_grid)) {
-  lambda <- lambda_grid[i]
-  
-  # Train the gbm model with the current lambda (shrinkage) value
-  gbm_model <- gbm(label_as_numeric ~. - label, data = train_data, 
-                   distribution = "bernoulli", 
-                   n.trees = num_trees, 
-                   interaction.depth = 4, 
-                   shrinkage = lambda, 
-                   cv.folds = 5, 
-                   verbose = FALSE)
-  
-  # Make predictions on the test set using the optimal number of trees
-  predictions <- predict(gbm_model, newdata = test_data_cleaned_gbm, n.trees = num_trees)
-  
-  # Calculate the Mean Squared Error on the test set
-  test_errors[i] <- mean((predictions - test_data_cleaned_gbm$label_as_numeric)^2)
-}
-gbm_optimal_lambda_end <- Sys.time()
-gbm_optimal_lambda_total_time <- gbm_optimal_lambda_end - gbm_optimal_lambda_start
-print(gbm_optimal_lambda_total_time)
-```
-
-```{r gbmtse, eval=FALSE}
-# Combine lambda values and test errors into a data frame for plotting
-error_df <- data.frame(lambda = lambda_grid, test_error = test_errors)
-
-# Plot the test error over the range of lambda values
-ggplot(error_df, aes(x = lambda, y = test_error)) +
-  geom_line() +
-  geom_point() +
-  labs(title = "Test Error vs Lambda (Shrinkage)", 
-       x = "Lambda (Shrinkage)", 
-       y = "Test Mean Squared Error") +
-  theme_minimal()
-
-```
-
-The results above show use that the GLM model with the lowest Test Mean Squared Error, will be the one with the lowest lambda value we assigned of 0.001. This does not necessarily mean that the best Gradient Descent Boosting model that will work best will be the best model for our data, as it may not account for over fitting. However, we will continue using the GBDT model with a shrinkage value of 0.001 to analyze the model and to compare it to our other models.
-
 ```{r gbm_model}
 # Set a single shrinkage value
 lambda <- 0.001
 
+test_data_cleaned_gbm <- test_data[, !colnames(test_data) %in% c("label", "label")]
+
 # Measure the time it takes to run 
-gbm_start_time <- Sys.time()
+gbm_train_time <- Sys.time()
 # Train the gbm model
 smallest_lambda_gbm_model <- gbm(label_as_numeric ~ . - label, 
                  data = train_data, 
@@ -518,27 +662,23 @@ smallest_lambda_gbm_model <- gbm(label_as_numeric ~ . - label,
 best_trees <- gbm.perf(smallest_lambda_gbm_model, method = "cv")
 
 # Measure time after model training
-gbm_end_time <- Sys.time()
-gbm_model_training_time <- gbm_end_time - gbm_start_time
-cat("GBM Model training time:", gbm_model_training_time, "\n")
+gbm_train_time <- Sys.time() - gbm_train_time
 
 # Measure time for predictions
-gbm_start_time_pred <- Sys.time()
+gbm_pred_time <- Sys.time()
 # Make predictions on the test set using the best number of trees
 gbm_pred_probs <- predict(smallest_lambda_gbm_model, newdata = test_data_cleaned_gbm, n.trees = best_trees, type = "response")
 gbm_pred_classes <- ifelse(gbm_pred_probs > 0.5, "TREG", "CD4+T")
 
 # Measure time after predictions
-gbm_end_time_pred <- Sys.time()
-gbm_prediction_time <- gbm_end_time_pred - gbm_start_time_pred
-cat("Prediction time:", gbm_prediction_time, "\n")
+gbm_pred_time <- Sys.time() - gbm_pred_time
 ```
 
-```{r gbm_save, include = FALSE}
+```{r gbm_save, eval = FALSE}
 write.csv(gbm_pred_classes, file = "predictions_1.2/gbm_predictions.csv", row.names = TRUE)
 ```
 
-```{r gbm_load, include = FALSE}
+```{r gbm_load, eval = FALSE}
 gbm_pred_classes <- read.csv("predictions_1.2/gbm_predictions.csv") %>% 
   
   dplyr::select(x)
@@ -586,11 +726,9 @@ gbm_metrics_table <- data.frame(
 
 print(gbm_metrics_table)
 ```
-The accuracy for the gradient descent decision tree model (where the shrinkage term was equal to 0.001) was 0.904. The AUC was equal to 0.972 and the Test mean squared error was equal to 0.109. Misclassification rate was equal to 0.096. And F1 score was equal to 0.928
 
-#### Random Forest (Imar)
 
-Above we use a tree search to find.... When using the tree search, we get that there are 11 features that are the most important to classifying whether a cell is a TREG cell or a CD4+T cell. However, we can see based on the tree that there are certain features that appear more than once. Based on the tree plot, we can determine that the most important regressor that helps determine if a cell is a TREG cell or a CD4+T cell is the IL7R. From the National Library of medicine ("<https://www.ncbi.nlm.nih.gov/gene/3575>"), IL7R is a protein encoded by a gene that plays a critical role in the development of lymph nodes. Based on the analysis above, we decided to create a Random Forest regression that will have 12 terminal nodes.
+#### Random Forest
 
 ```{r rfmodel}
 # RF model
@@ -612,11 +750,11 @@ cat("Random Forest prediction time:", rf_prediction_time, "\n")
 
 ```
 
-```{r rf_save, include = FALSE}
+```{r rf_save, eval = FALSE}
 write.csv(yhat.rf, file = "predictions_1.2/rf_predictions.csv", row.names = TRUE)
 ```
 
-```{r rf_load, include = FALSE}
+```{r rf_load, eval = FALSE}
 yhat.rf <- read.csv("predictions_1.2/rf_predictions.csv") %>% 
   
   dplyr::select(x)
@@ -668,9 +806,7 @@ rf_metrics_table <- data.frame(
 print(rf_metrics_table)
 ```
 
-Using a random forest tree model, we see that the accuracy of the model was 0.936 Which is quite accurate! Misclassification Rate was equal to 0.064. The F1 score was equal to 0.9504
-
-#### Support Vector Machine (SVM) (Chi)
+#### Support Vector Machine (SVM) 
 
 ##### Linear SVM Model
 ```{r svm_linear_model}
@@ -708,14 +844,14 @@ svm_prediction_time <- end_time_svm_pred - start_time_svm_pred
 cat("SVM prediction time:", svm_prediction_time, "\n")
 ```
 
-```{r svm_save, include = FALSE}
+```{r svm_save, eval = FALSE}
 write.csv(yhat.svm, 
           file = "predictions_1.2/svm_predictions.csv",
           row.names = TRUE)
 ```
 
 
-```{r svm_load, include = FALSE}
+```{r svm_load, eval = FALSE}
 yhat.svm <- read.csv("predictions_1.2/svm_predictions.csv") %>% 
   
   dplyr::select(x)
@@ -786,7 +922,7 @@ saveRDS(pca_model, file = "predictions_1.2/pca_model.rds")
 write.csv(task_one_df_pca$x, file = "predictions_1.2/task_one_df_pca.csv", row.names = TRUE)
 ```
 
-```{r logreg_load, include = FALSE}
+```{r pca_load, eval = FALSE}
 pca_model <- readRDS("predictions_1.2/pca_model.rds")
 
 task_one_df_pca <- read.csv("predictions_1.2/task_one_df_pca.csv") %>% 
@@ -819,7 +955,6 @@ test_data_pca$label <- test_data$label
 
 test_data_pca$label_as_numeric <- test_data$label_as_numeric
 ```
-
 
 #### Linear Discriminant Analysis (LDA)
 
@@ -1333,11 +1468,10 @@ svm_rad_pca_metrics_table <- data.frame(
 print(svm_rad_pca_metrics_table)
 ```
 
-## T1.3: Improving F1 Score (???)
+## T1.3: Improving F1 Score
 
-Train and evaluating three classifiers of our choice with the goal of improving the F1 score (can use methods like bagging, boosting, and regularization (cross-fold validation, ridge/lasso)).
+#### Identifying the number of Principle Components to use
 
-#### Identifying the number of Principle Components to use 
 ```{r scree_plot}
 variance_explained <- (pca_model$sdev)^2 / sum((pca_model$sdev)^2)
 
@@ -1355,92 +1489,9 @@ ggplot(scree_data, aes(x = Component, y = Variance)) +
   scale_x_continuous(limits = c(0, 50))
 ```
 
-#### LDA (Chi)
-
-LDA outperforms QDA. Does this imply a linear bayes decision boundary?   
+#### LDA
 
 ##### Cross-validation (Finding optimal number of Principal Components and tuning threshold)
-
-```{r fun_lda_cv}
-fun_lda_cv <- function(no_prin_comps = c(2:25),
-                        thresholds = seq(0.1, 0.9, 0.1),
-                        no_folds = 5,
-                        seed = 443){
-  
-  lda_cv_scores <- data.frame(no_pc = c(),
-                              threshold = c(),
-                              balanced_accuracy = c(),
-                              f1 = c())
-  
-  set.seed(seed)
-  
-  fold_indices <- createFolds(train_data$label, k = no_folds, returnTrain = TRUE)
-  
-  X_df <- train_data[, !colnames(train_data) %in% c("label", "label_as_numeric")]
-  
-  for (fold in fold_indices) {
-    # For each fold, perform PCA
-    fold_pca_model <- prcomp(X_df[fold,], 
-                             center = TRUE,
-                             scale. = TRUE, 
-                             rank. = max(no_prin_comps))
-    
-    # Fold from PCA to be trained and tested
-    fold_train_df <- data.frame(fold_pca_model$x, 
-                               label = train_data$label[fold]) 
-    
-    fold_test_X <- predict(fold_pca_model, X_df[-fold,])
-    
-    fold_test_Y <- train_data$label[-fold]
-    
-    for (prin_comps in no_prin_comps){
-      #For each Fold, vary number of PCs used to train LDA 
-      
-      # Use the first n (prin_comps) components
-      lda_train <- fold_train_df[, c(1:prin_comps, ncol(fold_train_df))]
-      
-      lda_test_X <- fold_test_X[, 1:prin_comps]
-      
-      # Train model on n PCs
-      lda_cv_model <- lda(label ~ ., 
-                          data = lda_train)
-      
-      # Predict the probabilities it belongs to a class using model on left out fold 
-      lda_cv_probs <- predict(lda_cv_model, 
-                              data.frame(fold_test_X), 
-                              type = "prob")
-      
-      for (threshold in thresholds){
-        #For each fold and each model, vary the threshold that decides class
-        lda_cv_preds <- as.factor(ifelse(lda_cv_probs$posterior[, "TREG"] > threshold,
-                                         "TREG",
-                                         "CD4+T"))
-        
-        #Calculate balanced accuracy and f1
-        cm <- table(lda_cv_preds, fold_test_Y)
-        
-        balanced_accuracy <- fun_calc_balanced_accuracy(cm, 
-                                                        pos_label = "TREG", 
-                                                        neg_label = "CD4+T")
-        
-        f1 <- F1_Score(y_true = fold_test_Y,
-                       y_pred = lda_cv_preds,
-                       positive = "TREG")
-        
-        # Store the scores
-        return_df <- data.frame(no_pc = prin_comps,
-                                threshold = threshold,
-                                balanced_accuracy = balanced_accuracy,
-                                f1 = f1)
-        
-        lda_cv_scores <- rbind(lda_cv_scores, return_df)
-      }
-    }
-  }
-  return(lda_cv_scores)
-}
-```
-
 
 ```{r lda_cv_train}
 lda_cv_time <- Sys.time()
@@ -1448,11 +1499,11 @@ lda_cv_scores <- fun_lda_cv(no_prin_comps = c(10:30))
 lda_cv_time <- Sys.time() - lda_cv_time # Time difference of 14.50283 mins
 ```
 
-```{r save_lda_cv_scores}
+```{r save_lda_cv_scores, eval = FALSE}
 write.csv(lda_cv_scores, file = "predictions_1.3/lda_cv_scores.csv")
 ```
 
-```{r load_lda_cv_scores}
+```{r load_lda_cv_scores, eval = FALSE}
 lda_cv_scores <- dplyr::select(read.csv(file = "predictions_1.3/lda_cv_scores.csv"),
                                -X)
 ```
@@ -1474,7 +1525,7 @@ ggplot(filter(lda_avg_scores, no_pc >= 15), aes(x = threshold, y = F1, color = a
   geom_point()
 ```
 
-```{r}
+```{r lda_cv_scores_plot}
 ggplot(filter(lda_cv_scores, threshold == 0.2), aes(x = no_pc, y = f1)) +
   geom_point() + 
   geom_smooth()
@@ -1482,16 +1533,13 @@ ggplot(filter(lda_cv_scores, threshold == 0.2), aes(x = no_pc, y = f1)) +
 
 ##### Tuning
 
-```{r}
+```{r tuning_test_data_pca}
 tuning_test_data_pca <- predict(pca_model, test_data)
 ```
 
 
-```{r}
-# lda_improved_models <- lda_avg_scores[order(lda_avg_scores$F1,
-#                                                  decreasing = TRUE),]
-
-lda_best_no_pc <- 26 #as.integer(lda_improved_models[1, 'no_pc'])
+```{r lda_tuning}
+lda_best_no_pc <- 26 
 
 lda_tuned_training <- pca_model$x[, 1:lda_best_no_pc] %>%
   
@@ -1552,104 +1600,27 @@ print(lda_tuned_metrics_table)
 
 #### Logistic Regression
 
-```{r}
-fun_logreg_cv <- function(no_prin_comps = c(2:25),
-                       thresholds = seq(0.1, 0.9, 0.1),
-                       no_folds = 5,
-                       seed = 443,
-                       lambda,
-                       alpha){
-  
-  logreg_cv_scores <- data.frame(no_pc = c(),
-                              threshold = c(),
-                              lambda = c(),
-                              f1 = c())
-  
-  set.seed(seed)
-  
-  fold_indices <- createFolds(train_data$label, k = no_folds, returnTrain = TRUE)
-  
-  X_df <- train_data[, !colnames(train_data) %in% c("label", "label_as_numeric")]
-  
-  for (fold in fold_indices) {
-    # For each fold, perform PCA
-    fold_pca_model <- prcomp(X_df[fold,], 
-                             center = TRUE,
-                             scale. = TRUE, 
-                             rank. = max(no_prin_comps))
-    
-    # Fold from PCA to be trained and tested
-    fold_test_X <- predict(fold_pca_model, X_df[-fold,])
-    
-    fold_test_Y <- train_data$label[-fold]
-    
-    for (prin_comps in no_prin_comps){
-      #For each Fold, vary number of PCs used to train regression  
-      
-      # Train model on n PCs
-      logreg_cv_model <- glmnet(as.matrix(fold_pca_model$x[, 1:prin_comps]),
-                                as.factor(train_data[fold, 'label']),
-                                family = "binomial",
-                                alpha = alpha)
-      
-      
-      for (lambda in lambda_tuning){
-        # Predict the probabilities it belongs to a class using model on left out fold at different lambdas 
-        logreg_cv_probs <- predict(logreg_cv_model,
-                                   as.matrix(fold_test_X[, 1:prin_comps]),
-                                   type = "response",
-                                   s = lambda)
-      
-        for (threshold in thresholds){
-          #For each fold and each model, vary the threshold that decides class
-          logreg_cv_preds <- as.factor(ifelse(logreg_cv_probs > threshold,
-                                              "TREG",
-                                              "CD4+T"))
-          
-          #Calculate accuracy and f1
-          cm <- table(logreg_cv_preds, fold_test_Y)
-          
-          f1 <- F1_Score(y_true = fold_test_Y,
-                         y_pred = logreg_cv_preds,
-                         positive = "TREG")
-          
-          # Store the scores
-          return_df <- data.frame(no_pc = prin_comps,
-                                  threshold = threshold,
-                                  lambda = lambda,
-                                  f1 = f1)
-          
-          logreg_cv_scores <- rbind(logreg_cv_scores, return_df)
-        }
-      }
-    }
-  }
-  return(logreg_cv_scores)
-}
-```
+##### Ridge Regularisation and Cross Validation
 
-
-##### Ridge Regularisation and Cross Validation (Chi)
-
-```{r}
+```{r logreg_rodge_cv_train}
 logreg_cv_time <- Sys.time()
 logreg_ridge_cv_scores <- fun_logreg_cv(no_prin_comps = c(15:50), 
                                         alpha = 0, 
-                                        lambda = c(0, 0.00001, 0.0001, 0.001, 0.01) #lambda_tuning
+                                        lambda = lambda_tuning
                                         )
 logreg_cv_time <- Sys.time() - logreg_cv_time # Approx 15 mins
 ```
 
-```{r}
+```{r save_logreg_rodge_cv_scores, eval = FALSE}
 write.csv(logreg_ridge_cv_scores, file = "predictions_1.3/logreg_ridge_cv_scores.csv")
 ```
 
-```{r}
+```{r load_logreg_rodge_cv_scores, eval = FALSE}
 logreg_ridge_cv_scores <- dplyr::select(read.csv(file = "predictions_1.3/logreg_ridge_cv_scores.csv"),
                                -X)
 ```
 
-```{r}
+```{r logreg_ridge_avg_scores}
 logreg_ridge_avg_scores <- logreg_ridge_cv_scores %>%
   
   group_by(no_pc, threshold, lambda) %>%
@@ -1657,15 +1628,17 @@ logreg_ridge_avg_scores <- logreg_ridge_cv_scores %>%
   summarise(F1 = mean(f1), 
             F1_sd = sd(f1),
             .groups = "keep")
+
+head(logreg_ridge_avg_scores)
 ```
 
-```{r}
+```{r logreg_ridge_avg_scores_plot}
 ggplot(filter(logreg_ridge_avg_scores, lambda == 0.01), aes(x = threshold, y = F1, color = as.factor(no_pc))) +
   geom_line() +
   geom_point()
 ```
 
-```{r}
+```{r logreg_ridge_cv_scores_plot}
 ggplot(filter(logreg_ridge_cv_scores, threshold == 0.4, lambda == 0.01), aes(x = no_pc, y = f1)) +
   geom_point() + 
   geom_smooth()
@@ -1673,7 +1646,7 @@ ggplot(filter(logreg_ridge_cv_scores, threshold == 0.4, lambda == 0.01), aes(x =
 
 ###### Tuning
 
-```{r}
+```{r logreg_ridge_tuning}
 logreg_ridge_best_no_pc <- 48 #as.integer(logreg_ridge_improved_models[1, 'no_pc'])
 
 logreg_ridge_tuned_training <- pca_model$x[, 1:logreg_ridge_best_no_pc] %>%
@@ -1737,7 +1710,7 @@ logreg_ridge_tuned_metrics_table <- data.frame(
 print(logreg_ridge_tuned_metrics_table)
 ```
 
-##### Lasso Regularisation and Cross Validation (Chi)
+##### Lasso Regularisation and Cross Validation
 
 ```{r logreg_lasso_cv_train}
 logreg_cv_time <- Sys.time()
@@ -1748,16 +1721,16 @@ logreg_lasso_cv_scores <- fun_logreg_cv(no_prin_comps = c(10:50),
 logreg_cv_time <- Sys.time() - logreg_cv_time # Time difference of 17.33742 mins
 ```
 
-```{r}
+```{r save_logreg_lasso_cv_train, eval = FALSE}
 write.csv(logreg_lasso_cv_scores, file = "predictions_1.3/logreg_lasso_cv_scores.csv")
 ```
 
-```{r}
+```{r load_logreg_lasso_cv_train, eval = FALSE}
 logreg_lasso_cv_scores <- dplyr::select(read.csv(file = "predictions_1.3/logreg_lasso_cv_scores.csv"),
                                -X)
 ```
 
-```{r}
+```{r logreg_lasso_avg_scores}
 logreg_lasso_avg_scores <- logreg_lasso_cv_scores %>%
   
   group_by(no_pc, threshold, lambda) %>%
@@ -1765,22 +1738,24 @@ logreg_lasso_avg_scores <- logreg_lasso_cv_scores %>%
   summarise(F1 = mean(f1), 
             F1_sd = sd(f1),
             .groups = "keep")
+
+head(logreg_lasso_avg_scores)
 ```
 
-```{r}
+```{r logreg_lasso_avg_scores_plot}
 ggplot(filter(logreg_lasso_avg_scores, lambda == 0.001), aes(x = threshold, y = F1, color = as.factor(no_pc))) +
   geom_line() +
   geom_point()
 ```
 
-```{r}
+```{r logreg_lasso_cv_scores_plot}
 ggplot(filter(logreg_lasso_cv_scores, threshold == 0.4, lambda == 0.001), aes(x = no_pc, y = f1)) +
   geom_point() + 
   geom_smooth()
 ```
 
 ###### Tuning
-```{r}
+```{r logreg_lasso_tuning}
 logreg_lasso_best_no_pc <- 26 #as.integer(logreg_lasso_improved_models[1, 'no_pc'])
 
 logreg_lasso_tuned_training <- pca_model$x[, 1:logreg_lasso_best_no_pc] %>%
@@ -1845,120 +1820,24 @@ print(logreg_lasso_tuned_metrics_table)
 ```
 
 #### AdaBoost
-
-```{r}
-fun_boost_cv <- function(no_prin_comps = c(2:25),
-                         mfinals = c(50, 100, 150, 200),
-                         depths = c(3,5,7),
-                         thresholds = seq(0.1, 0.9, 0.1),
-                         no_folds = 5,
-                         seed = 443){
-  
-  boost_cv_scores <- data.frame(no_pc = c(),
-                              mfinal = c(),
-                              depth = c(),
-                              threshold = c(),
-                              f1 = c())
-  
-  set.seed(seed)
-  
-  fold_indices <- createFolds(train_data$label, k = no_folds, returnTrain = TRUE)
-  
-  X_df <- train_data[, !colnames(train_data) %in% c("label", "label_as_numeric")]
-  
-  i <- 0
-  
-  for (fold in fold_indices) {
-    # For each fold, perform PCA
-    i <- i + 1
-    print(paste0(Sys.time(), ": PCA in process"))
-    fold_pca_model <- prcomp(X_df[fold,], 
-                             center = TRUE,
-                             scale. = TRUE, 
-                             rank. = max(no_prin_comps))
-    
-    # Fold from PCA to be trained and tested
-    fold_train_df <- data.frame(fold_pca_model$x, 
-                               label = train_data$label[fold]) 
-    
-    fold_test_X <- predict(fold_pca_model, X_df[-fold,])
-    
-    fold_test_Y <- train_data$label[-fold]
-    
-    for (prin_comps in no_prin_comps){
-      #For each Fold, vary number of PCs used to train AdaBoost 
-      
-      # Use the first n (prin_comps) components
-      boost_train <- fold_train_df[, c(1:prin_comps, ncol(fold_train_df))]
-      
-      boost_test_X <- fold_test_X[, 1:prin_comps]
-      
-      for (mfinal in mfinals){
-        for (depth in depths){
-          print(paste0(Sys.time(), ": AdaBoost Training in process"))
-          # Set any randomness in boosting
-          set.seed(seed)
-          
-          # Train model on n PCs
-          boost_cv_model <- boosting(label ~ ., 
-                              data = boost_train,
-                              mfinal = mfinal,
-                              maxdepth = depth
-                              )
-          
-          # Predict the probabilities it belongs to a class using model on left out fold 
-          boost_cv_probs <- predict.boosting(boost_cv_model, 
-                                             data.frame(fold_test_X))$prob[,2]
-          
-            for (threshold in thresholds){
-              print(paste0(Sys.time(), ": Evaluating Fold ", i, " with ",
-                       prin_comps, " PCs, ",
-                       mfinal, " mfinal ",
-                       depth, " max_depth, ",
-                       threshold, " threshold."))
-              #For each fold and each model, vary the threshold that decides class
-              boost_cv_preds <- as.factor(ifelse(boost_cv_probs > threshold,
-                                                 "TREG",
-                                                 "CD4+T"))
-              
-              #Calculate balanced accuracy and f1
-              cm <- table(boost_cv_preds, fold_test_Y)
-              
-              f1 <- F1_Score(y_true = fold_test_Y,
-                             y_pred = boost_cv_preds,
-                             positive = "TREG")
-              
-              # Store the scores
-              return_df <- data.frame(no_pc = prin_comps,
-                              mfinal = mfinal,
-                              depth = depth,
-                              threshold = threshold,
-                              f1 = f1)
-              
-              boost_cv_scores <- rbind(boost_cv_scores, return_df)
-          
-          }
-        }
-      }
-    }
-  }
-  return(boost_cv_scores)
-}
-```
-
-```{r}
+```{r boost_cv_train_fixed_pc}
 boost_cv_time <- Sys.time()
-boost_cv_scores <- fun_boost_cv(no_prin_comps = c(25))
+boost_cv_scores_fixed_pc <- fun_boost_cv(no_prin_comps = c(25))
 boost_cv_time <- Sys.time() - boost_cv_time # Time difference of 31.34519 mins
 
 ## First iteration of cross-validation showed that mfinal = 200, depth = 5 to be best. 
 ```
 
-```{r}
-write.csv(boost_cv_scores, file = "predictions_1.3/boost_cv_scores_chosen_pc.csv")
+```{r save_boost_cv_fixed_pc_scores, eval = FALSE}
+write.csv(boost_cv_scores_fixed_pc, file = "predictions_1.3/boost_cv_scores_chosen_pc.csv")
 ```
 
-```{r}
+```{r load_boost_cv_scores, eval = FALSE}
+boost_cv_scores_fixed_pc <- dplyr::select(read.csv(file = "predictions_1.3/boost_cv_scores_chosen_pc.csv"),
+                               -X)
+```
+
+```{r boost_cv_train}
 boost_cv_time <- Sys.time()
 boost_cv_scores <- fun_boost_cv(no_prin_comps = c(15:30),
                                 mfinals = c(200),
@@ -1967,18 +1846,18 @@ boost_cv_scores <- fun_boost_cv(no_prin_comps = c(15:30),
 boost_cv_time <- Sys.time() - boost_cv_time # Time difference of 47.41534 mins
 ```
 
-```{r}
+```{r save_boost_cv_scores, eval = FALSE}
 write.csv(boost_cv_scores, file = "predictions_1.3/boost_cv_scores.csv")
 ```
 
-```{r}
+```{r load_boost_cv_scores, eval = FALSE}
 boost_cv_scores <- dplyr::select(read.csv(file = "predictions_1.3/boost_cv_scores.csv"),
                                -X)
 ```
 
 
-```{r}
-boost_avg_scores <- boost_cv_scores %>%
+```{r boost_avg_scores}
+boost_avg_scores <- boost_cv_scores_fixed_pc %>%
   
   group_by(no_pc, mfinal, depth,threshold) %>%
   
@@ -1987,7 +1866,18 @@ boost_avg_scores <- boost_cv_scores %>%
             .groups = "keep")
 ```
 
-```{r}
+```{r boost_avg_scores_plot_threshold}
+ggplot(boost_avg_scores, aes(x = threshold, y = F1)) + 
+  geom_point() + 
+  geom_smooth(method = 'loess', formula = y~x)
+```
+```{r boost_avg_scores_plot_threshold}
+ggplot(filter(boost_avg_scores, threshold == 0.5), aes(x = mfinal, y = F1)) + 
+  geom_point() + 
+  geom_line()
+```
+
+```{r boost_cv_scores_plot}
 ggplot(boost_cv_scores, aes(x = no_pc, y = f1)) + 
   geom_point() + 
   geom_smooth()
@@ -1995,7 +1885,7 @@ ggplot(boost_cv_scores, aes(x = no_pc, y = f1)) +
 
 ##### Tuning
 
-```{r}
+```{r boost_tuning}
 boost_best_no_pc <- 26 #as.integer(boost_improved_models[1, 'no_pc'])
 
 boost_tuned_training <- pca_model$x[, 1:boost_best_no_pc] %>%
@@ -2057,11 +1947,9 @@ boost_tuned_metrics_table <- data.frame(
 print(boost_tuned_metrics_table)
 ```
 
-## T1.4: Implement predictor (???)
+## T1.4: Implement predictor
 
-Choose the best approach from those above tested and implement our predictor as a function of our code.
-
-```{r}
+```{r mypredict}
 mypredict <- function(){
   # Load packages
   library(MASS)
