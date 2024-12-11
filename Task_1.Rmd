@@ -1973,12 +1973,12 @@ mypredict <- function(){
   test_X <- predict(pca, test_df[, !colnames(test_df) %in% c("label")])
   
   # Train model and predict probabilities
-  model <- glmnet(as.factor(train_df$label) ~ .,
-                  data = data.frame(pca$x),
+  model <- glmnet(x = as.matrix(pca$x),
+                  y = as.factor(train_df$label),
                   alpha = 0)
   
   probs <- predict(model, 
-                   newx = as.matrix(test_logreg_ridge_tuned),
+                   newx = as.matrix(text_X),
                    type = "response",
                    s = 0.01)
 
