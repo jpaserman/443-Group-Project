@@ -132,7 +132,7 @@ dim(task_two_df)
 
 # Labels represent whether given compound binds to target site on thrombin 
 # Possible values are -1 (compound did not bind) and 1 (compound did bind)
-table(task_two_df$label) # 772 compounds did not bind and 78 compounds did bind
+table(task_two_df$label) # 722 compounds did not bind and 78 compounds did bind
 
 ```
 
