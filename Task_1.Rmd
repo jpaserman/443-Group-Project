@@ -1889,9 +1889,8 @@ cat("F1 Score of Random Forest with AdaBoost:", rf_cv_f1_score, "\n")
 
 ```{r}
 fun_boost_cv <- function(no_prin_comps = c(2:25),
-                         mfinals = seq(50, 200, 50),
-                         depths = seq(1, 11, 2),
-                         complexities = 10^seq(-4, 0, 1),
+                         mfinals = c(50, 100, 150, 200),
+                         depths = c(3,5,7),
                          thresholds = seq(0.1, 0.9, 0.1),
                          no_folds = 5,
                          seed = 443){
@@ -1899,7 +1898,6 @@ fun_boost_cv <- function(no_prin_comps = c(2:25),
   boost_cv_scores <- data.frame(no_pc = c(),
                               mfinal = c(),
                               depth = c(),
-                              complexity = c(),
                               threshold = c(),
                               f1 = c())
   
@@ -1909,8 +1907,12 @@ fun_boost_cv <- function(no_prin_comps = c(2:25),
   
   X_df <- train_data[, !colnames(train_data) %in% c("label", "label_as_numeric")]
   
+  i <- 0
+  
   for (fold in fold_indices) {
     # For each fold, perform PCA
+    i <- i + 1
+    print(paste0(Sys.time(), ": PCA in process"))
     fold_pca_model <- prcomp(X_df[fold,], 
                              center = TRUE,
                              scale. = TRUE, 
@@ -1934,44 +1936,48 @@ fun_boost_cv <- function(no_prin_comps = c(2:25),
       
       for (mfinal in mfinals){
         for (depth in depths){
-          for (complexity in complexities){
-            # Set any randomness in boosting
-            set.seed(seed)
-            
-            # Train model on n PCs
-            boost_cv_model <- boosting(label ~ ., 
-                                data = boost_train,
-                                mfinal = mfinal,
-                                maxdepth = depth,
-                                cp = complexity)
-            
-            # Predict the probabilities it belongs to a class using model on left out fold 
-            boost_cv_probs <- predict.boosting(boost_cv_model, 
-                                               data.frame(fold_test_X))$prob[,2]
-            
-              for (threshold in thresholds){
-                #For each fold and each model, vary the threshold that decides class
-                boost_cv_preds <- as.factor(ifelse(boost_cv_probs > threshold,
-                                                   "TREG",
-                                                   "CD4+T"))
-                
-                #Calculate balanced accuracy and f1
-                cm <- table(boost_cv_preds, fold_test_Y)
-                
-                f1 <- F1_Score(y_true = fold_test_Y,
-                               y_pred = boost_cv_preds,
-                               positive = "TREG")
-                
-                # Store the scores
-                return_df <- data.frame(no_pc = prin_comps,
-                                mfinal = mfinal,
-                                depth = depth,
-                                complexity = complexity,
-                                threshold = threshold,
-                                f1 = f1)
-                
-                boost_cv_scores <- rbind(boost_cv_scores, return_df)
-            }
+          print(paste0(Sys.time(), ": AdaBoost Training in process"))
+          # Set any randomness in boosting
+          set.seed(seed)
+          
+          # Train model on n PCs
+          boost_cv_model <- boosting(label ~ ., 
+                              data = boost_train,
+                              mfinal = mfinal,
+                              maxdepth = depth
+                              )
+          
+          # Predict the probabilities it belongs to a class using model on left out fold 
+          boost_cv_probs <- predict.boosting(boost_cv_model, 
+                                             data.frame(fold_test_X))$prob[,2]
+          
+            for (threshold in thresholds){
+              print(paste0(Sys.time(), ": Evaluating Fold ", i, " with ",
+                       prin_comps, " PCs, ",
+                       mfinal, " mfinal ",
+                       depth, " max_depth, ",
+                       threshold, " threshold."))
+              #For each fold and each model, vary the threshold that decides class
+              boost_cv_preds <- as.factor(ifelse(boost_cv_probs > threshold,
+                                                 "TREG",
+                                                 "CD4+T"))
+              
+              #Calculate balanced accuracy and f1
+              cm <- table(boost_cv_preds, fold_test_Y)
+              
+              f1 <- F1_Score(y_true = fold_test_Y,
+                             y_pred = boost_cv_preds,
+                             positive = "TREG")
+              
+              # Store the scores
+              return_df <- data.frame(no_pc = prin_comps,
+                              mfinal = mfinal,
+                              depth = depth,
+                              threshold = threshold,
+                              f1 = f1)
+              
+              boost_cv_scores <- rbind(boost_cv_scores, return_df)
+          
           }
         }
       }
@@ -1981,11 +1987,42 @@ fun_boost_cv <- function(no_prin_comps = c(2:25),
 }
 ```
 
+```{r}
+boost_cv_time <- Sys.time()
+boost_cv_scores <- fun_boost_cv(no_prin_comps = c(25))
+boost_cv_time <- Sys.time() - boost_cv_time # Time difference of 31.34519 mins
+
+## First iteration of cross-validation showed that mfinal = 200, depth = 5 to be best. 
+```
 
 ```{r}
-boost_train_time <- Sys.time()
-boost_model <- boosting(label ~ . - label_as_numeric, data = train_data_pca, mfinal = 50)
-boost_train_time <- Sys.time() - boost_train_time #Time difference of 5.214975 secs
+boost_cv_time <- Sys.time()
+boost_cv_scores <- fun_boost_cv(no_prin_comps = c(10:50),
+                                mfinals = c(200),
+                                depths = c(5),
+                                thresholds = c(0.5))
+boost_cv_time <- Sys.time() - boost_cv_time # Time difference of 31.34519 mins
+
+```
+
+```{r}
+write.csv(boost_cv_scores, file = "predictions_1.3/boost_cv_scores_chosen_pc.csv")
+```
+
+```{r}
+boost_cv_scores <- dplyr::select(read.csv(file = "predictions_1.3/boost_cv_scores.csv"),
+                               -X)
+```
+
+
+```{r}
+boost_avg_scores <- boost_cv_scores %>%
+  
+  group_by(no_pc, mfinal, depth,threshold) %>%
+  
+  summarise(F1 = mean(f1), 
+            F1_sd = sd(f1),
+            .groups = "keep")
 ```
 
 ## T1.4: Implement predictor (???)
