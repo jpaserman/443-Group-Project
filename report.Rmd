@@ -75,7 +75,7 @@ In the following we are applying the dimensionality reduction tool PCA (Principa
 | GDBT                | 0.8703     | 0.8394        | 0.9483     | 0.8060     |
 | RF                  | 0.9379     | 0.9259        | 0.9259     | 0.9144     |
 | SVM (Linear Kernel) | 0.9516     | **0.9431**    | 0.9431     | **0.9342** |
-| SVM (Radial Kernel) | **0.9498** | 0.9397        | 0.9397     | 0.9312     |
+| SVM (Radial Kernel) | 0.9498     | 0.9397        | 0.9397     | 0.9312     |
 
 ## Task 1.3 Improved Classifiers
 
@@ -84,17 +84,12 @@ Now we want to focus on improving a selection of classifiers with regards to the
 |                                         | F1 Score before | F1 Score after |
 |-----------------------------------------|-----------------|----------------|
 | LDA (with CV and Hyperparameter tuning) | 0.9079          | 0.9433         |
-| Logistic (with CV and Regularization)   |                 |                |
-| RF (with AdaBoost)                      | 0.9141          | 0.9629         |
+| Logistic (with CV and Regularization)   | 0.9309          | 0.9510         |
+| AdaBoost                                | 0.9289          | 0.9323         |
 
 -   **LDA with CV**: We enhance LDA by applying PCA and cross-validation (CV) to address a drop in accuracy, balanced accuracy, and F1 score when using PCA. This is likely due to fewer components/features, which reduce the model’s ability to linearly separate data in lower dimensions. Cross-validation helps select the best subset for training, identifying the features that provide the most valuable information for the model. Additionally, the number of principal components and the threshold for classifying positive vs. negative predictions are tuned. Lower thresholds (around 0.2 to 0.3) improve the F1 score. The slight imbalance in the classes within the training data set is considered during hyperparameter tuning to optimize model performance.
 -   **Logistic CV and Lasso**: Cross-validation splits the data into multiple subsets (folds), training the model on some and testing on the others. This process helps assess the performance of logistic regression more robustly by reducing overfitting and providing a better estimate of generalization to unseen data. Regularization adds a penalty to the loss function to control model complexity, preventing overfitting by penalizing large coefficients. Lasso regularization can also perform feature selection by driving some coefficients to zero, while Ridge shrinks all coefficients towards zero without eliminating any. Together, cross-validation and regularization help evaluate and improve the model’s performance, with regularization enhancing generalization. Additionally, Lasso and Ridge are compared using different values of lambda (regularization strength), while hyperparameter tuning of the logistic threshold (around 0.4) optimizes the F1 score. The number of principal components is also tuned to achieve the best F1 score.
 -   **RF with AdaBoost**: We choose to improve the Random Forest with AdaBoost due to the fact that the Random Forest itself is already a bagged classifier, since the Decision Trees are consturcted on bootstrapped (with replacement) data sets and due to majority voting a decision is made which resembles the aggregation part of bagging. Boosting helps here to improve the weak classifiers which in this case are the Random Forests which misclassified the cells. By increasing their weights for the classification problem the classifier is focusing more on improving the flase classifiers, resulting in a better performance of the Random Forest.
 
-## Task 1.4 Final predict function
-
 Ultimately, after comparing the F1 Scores, we are choosing XXX to implement into our mypredict() function for Task 1.
 
-|             | Accuracy | Bal. Accuracy | AUC | F1 Score |
-|-------------|----------|---------------|-----|----------|
-| mypredict() |          |               |     |          |
