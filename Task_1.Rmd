@@ -1997,7 +1997,7 @@ boost_cv_time <- Sys.time() - boost_cv_time # Time difference of 31.34519 mins
 
 ```{r}
 boost_cv_time <- Sys.time()
-boost_cv_scores <- fun_boost_cv(no_prin_comps = c(10:50),
+boost_cv_scores <- fun_boost_cv(no_prin_comps = c(15:30),
                                 mfinals = c(200),
                                 depths = c(5),
                                 thresholds = c(0.5))
@@ -2030,5 +2030,42 @@ boost_avg_scores <- boost_cv_scores %>%
 Choose the best approach from those above tested and implement our predictor as a function of our code.
 
 ```{r}
-
+mypredict <- function(){
+  # Load packages
+  library(MASS)
+  library(glmnet)
+  
+  # Load training data
+  train_df <- read.csv("data1.csv.gz")
+  
+  # Remove label column 
+  train_X <- train_df[, !colnames(train_df) %in% c("label")]
+  
+  # Perform PCA
+  pca <- prcomp(train_X, 
+                center = TRUE, 
+                scale. = TRUE, 
+                rank. = 25)
+  
+  # Load test data and transform using PCA model
+  test_df <- read.csv("test.csv.gz")
+  
+  test_X <- predict(pca, test_df[, !colnames(test_df) %in% c("label")])
+  
+  # Train model and predict probabilities
+  model <- glmnet(as.factor(train_df$label) ~ .,
+                  data = data.frame(pca$x),
+                  alpha = 1)
+  
+  probabilities <- predict(model, 
+                          newdata = data.frame(test_X),
+                          type = 'response')
+  
+  # Assign class based on probability and selected threshold
+  threshold <-
+  predictions <- ifelse(probabilities > threshold, "TREG", "CD4+T")
+  
+  # Export to plain text file
+  writeLines(predictions, "predictions.txt")
+}
 ```
