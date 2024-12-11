@@ -166,7 +166,7 @@ long_df <- melt(new_df_2_top3_correlated_features)
 ggplot(long_df, aes(x = variable, fill = as.factor(value))) +
   geom_bar(position = "dodge") +
   geom_text(stat = "count", aes(label = ..count..), vjust = -0.5, position = position_dodge(width = 0.9)) +
-  labs(fill = "Value") +
+  labs(fill = "Value of feature") +
   theme_minimal() +
   ggtitle("Distribution of Top 3 Features Correlated with the Label")
 
