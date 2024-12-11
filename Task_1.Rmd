@@ -1871,6 +1871,7 @@ ggplot(boost_avg_scores, aes(x = threshold, y = F1)) +
   geom_point() + 
   geom_smooth(method = 'loess', formula = y~x)
 ```
+
 ```{r boost_avg_scores_plot_threshold}
 ggplot(filter(boost_avg_scores, threshold == 0.5), aes(x = mfinal, y = F1)) + 
   geom_point() + 
@@ -1963,21 +1964,24 @@ mypredict <- function(){
   train_X <- train_df[, !colnames(train_df) %in% c("label")]
   
   # Perform PCA
+  print("PCA processing")
   pca <- prcomp(train_X, 
                 center = TRUE, 
                 scale. = TRUE, 
                 rank. = 48)
-  cat("PCA Trained")
+  
   # Load test data and transform using PCA model
   test_df <- read.csv("test.csv.gz")
   
   test_X <- predict(pca, test_df[, !colnames(test_df) %in% c("label")])
   
   # Train model and predict probabilities
+  print("Training model")
   model <- glmnet(x = as.matrix(pca$x),
                   y = as.factor(train_df$label),
                   alpha = 0)
   
+  print("Predicting probabilities")
   probs <- predict(model, 
                    newx = as.matrix(text_X),
                    type = "response",
@@ -1987,7 +1991,9 @@ mypredict <- function(){
   threshold <- 0.4
   predictions <- ifelse(probs > threshold, "TREG", "CD4+T")
   
+  print("Exporting results")
   # Export to plain text file
   writeLines(predictions, "predictions.txt")
+  print("Results exported")
 }
 ```
