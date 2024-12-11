@@ -92,7 +92,7 @@ train_data <- task_one_df[train_indices,]
 test_data <- task_one_df[-train_indices,]
 ```
 
-## T1: Functions 
+## T1: Functions
 
 ```{r functions}
 fun_calc_balanced_accuracy <- function(confusion_matrix, pos_label, neg_label){
@@ -361,7 +361,6 @@ fun_boost_cv <- function(no_prin_comps = no_prin_comps,
 
 ```
 
-
 ## T1.1: Exploratory data analysis and summary statistics
 
 ```{r EDA}
@@ -547,7 +546,7 @@ print(logreg_metrics_table)
 
 #### Quadratic Discriminant Analysis (QDA)
 
-The current dimensionality of the data is too high for a QDA classifier. During training, the covariance matrix estimation for each class, k, fails. This occurs because, when the data is partitioned into k classes, the number of observations, n, is much smaller than the number of features, p (i.e n << p). As a result, the covariance matrix estimate for class k becomes singular or nearly singular. Therefore, without dimension reduction or regularisation, training this classifier is not feasible.
+The current dimensionality of the data is too high for a QDA classifier. During training, the covariance matrix estimation for each class, k, fails. This occurs because, when the data is partitioned into k classes, the number of observations, n, is much smaller than the number of features, p (i.e n \<\< p). As a result, the covariance matrix estimate for class k becomes singular or nearly singular. Therefore, without dimension reduction or regularisation, training this classifier is not feasible.
 
 #### Nearest Neighbor Classifier (k-NN)
 
@@ -628,7 +627,7 @@ knn_metrics_table <- data.frame(
 print(knn_metrics_table)
 ```
 
-#### Gradient Boosting Decision Trees (GBDT) 
+#### Gradient Boosting Decision Trees (GBDT)
 
 ```{r gbmparams}
 #Number of trees
@@ -727,7 +726,6 @@ gbm_metrics_table <- data.frame(
 print(gbm_metrics_table)
 ```
 
-
 #### Random Forest
 
 ```{r rfmodel}
@@ -806,9 +804,10 @@ rf_metrics_table <- data.frame(
 print(rf_metrics_table)
 ```
 
-#### Support Vector Machine (SVM) 
+#### Support Vector Machine (SVM)
 
 ##### Linear SVM Model
+
 ```{r svm_linear_model}
 ## Clean the test data for the SVM task
 test_data_cleaned_for_svm <- test_data[, !colnames(test_data) %in% c("label_as_numeric", "label")]
@@ -849,7 +848,6 @@ write.csv(yhat.svm,
           file = "predictions_1.2/svm_predictions.csv",
           row.names = TRUE)
 ```
-
 
 ```{r svm_load, eval = FALSE}
 yhat.svm <- read.csv("predictions_1.2/svm_predictions.csv") %>% 
@@ -1184,6 +1182,7 @@ print(knn_pca_metrics_table)
 ```
 
 #### Gradient Boosting Decision Trees (GBDT)
+
 ```{r gbm_pca_training}
 lambda <- 0.001
 # Measure the time it takes to run 
@@ -1262,6 +1261,7 @@ print(gbm_pca_metrics_table)
 ```
 
 #### Random Forest
+
 ```{r rf_pca_train}
 # RF model with PCA data
 rf_pca_train_time <- Sys.time()
@@ -1331,6 +1331,7 @@ print(rf_pca_metrics_table)
 #### Support Vector Machine (SVM)
 
 ##### Linear SVM Model
+
 ```{r svm_linear_model_pca}
 ## K-fold CV for hyperparameter tuning of 'cost' for the training data with a linear kernel
 svm_train_time <- Sys.time()
@@ -1344,7 +1345,6 @@ summary(tune.out)
 
 svm_train_time <- Sys.time() - svm_train_time # Time difference of 4.748707 secs
 ```
-
 
 ```{r svm_linear_tuned_model_pca}
 # Save the model with the cost that results in the lowest cross validation error rate
@@ -1402,6 +1402,7 @@ print(svm_pca_metrics_table)
 ```
 
 ##### Radial SVM Model
+
 ```{r svm_radial_pca_model}
 ## K-fold CV for hyperparameter tuning of 'cost' for the training data with a radial basis function (RBF) kernel
 svm_train_time_rad <- Sys.time()
@@ -1508,7 +1509,6 @@ lda_cv_scores <- dplyr::select(read.csv(file = "predictions_1.3/lda_cv_scores.cs
                                -X)
 ```
 
-
 ```{r lda_avg_scores}
 lda_avg_scores <- lda_cv_scores %>%
   
@@ -1536,7 +1536,6 @@ ggplot(filter(lda_cv_scores, threshold == 0.2), aes(x = no_pc, y = f1)) +
 ```{r tuning_test_data_pca}
 tuning_test_data_pca <- predict(pca_model, test_data)
 ```
-
 
 ```{r lda_tuning}
 lda_best_no_pc <- 26 
@@ -1755,6 +1754,7 @@ ggplot(filter(logreg_lasso_cv_scores, threshold == 0.4, lambda == 0.001), aes(x 
 ```
 
 ###### Tuning
+
 ```{r logreg_lasso_tuning}
 logreg_lasso_best_no_pc <- 26 #as.integer(logreg_lasso_improved_models[1, 'no_pc'])
 
@@ -1820,6 +1820,7 @@ print(logreg_lasso_tuned_metrics_table)
 ```
 
 #### AdaBoost
+
 ```{r boost_cv_train_fixed_pc}
 boost_cv_time <- Sys.time()
 boost_cv_scores_fixed_pc <- fun_boost_cv(no_prin_comps = c(25))
@@ -1854,7 +1855,6 @@ write.csv(boost_cv_scores, file = "predictions_1.3/boost_cv_scores.csv")
 boost_cv_scores <- dplyr::select(read.csv(file = "predictions_1.3/boost_cv_scores.csv"),
                                -X)
 ```
-
 
 ```{r boost_avg_scores}
 boost_avg_scores <- boost_cv_scores_fixed_pc %>%
@@ -1898,7 +1898,7 @@ test_boost_tuned <- tuning_test_data_pca[, 1:boost_best_no_pc]
 boost_tuned_model <- boosting(label ~ ., 
                            boost_tuned_training,
                            mfinal = 200,
-                           maxdepth = 5)
+                           maxdepth = 3)
 
 boost_tuned_prob <- predict(boost_tuned_model, 
                             newdata = data.frame(test_boost_tuned))$prob[, 2]
@@ -1957,8 +1957,8 @@ mypredict <- function(){
   library(glmnet)
   
   # Load training data
-  train_df <- read.csv("data1.csv.gz")
-  cat("Data loaded")
+  train_df <- read.csv("data1.csv")
+  print("Data loaded")
   
   # Remove label column 
   train_X <- train_df[, !colnames(train_df) %in% c("label")]
@@ -1971,7 +1971,7 @@ mypredict <- function(){
                 rank. = 48)
   
   # Load test data and transform using PCA model
-  test_df <- read.csv("test.csv.gz")
+  test_df <- read.csv("test.csv")
   
   test_X <- predict(pca, test_df[, !colnames(test_df) %in% c("label")])
   
@@ -1983,7 +1983,7 @@ mypredict <- function(){
   
   print("Predicting probabilities")
   probs <- predict(model, 
-                   newx = as.matrix(text_X),
+                   newx = as.matrix(test_X),
                    type = "response",
                    s = 0.01)
 

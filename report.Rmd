@@ -105,7 +105,7 @@ Now we want to focus on improving a selection of classifiers with regards to the
 +-----------------------------------------+-----------------+----------------+
 | Logistic (with CV and Regularization)   | 0.9309          | 0.9510         |
 +-----------------------------------------+-----------------+----------------+
-| AdaBoost                                | 0.9289          | 0.9323         |
+| AdaBoost                                | 0.9289          | 0.9362         |
 +-----------------------------------------+-----------------+----------------+
 
 PCA is performed on the data as a means of dimension reduction and feature scaling. For each of the classifiers, 5-fold cross validations are run on the training data to estimate the F1-Score under different hyperparameters. The main hyperparameters tuned for all classifiers is the number of principal components used in training and the classification threshold. The threshold, in particular, is a key hyperparameter due to its direct impact on the precision and recall of a model. There are other hyperparameters considered and tuned for specific to some of the chosen classifiers.
