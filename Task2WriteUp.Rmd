@@ -31,7 +31,7 @@ knitr::include_graphics("images/Task2_EDA_var.png")
 However, even with decreasing our features to 30,000 there are some models that might struggle with the computational cost of training on the entire dataset. Therefore, we construct an additional subset of the dataset that solely contains the top 1,000 features that are highly correlated with the $label$. The only feature reduction models that utilize this extremely subset dataset are FSS and random forest, with the later solely using as a benchmark comparison as opposed to within the final model. You can assume otherwise if not specified, that the following models use the dataset that contains roughly 30,000 features. Lastly, an important aspect to note is that in terms of classes for the $label$ our data is very skewed with less than 10% (78/800) of the compounds being associated with the positive class. This structure of the data and its implications will be expanded upon later at the conclusion of the report.
 
 ```{r, echo=FALSE, out.width="50%"}
-knitr::include_graphics("images/EDA_2_task2.png")
+knitr::include_graphics("images/bar_chart_eda_2.png")
 ```
 
 ## Models
