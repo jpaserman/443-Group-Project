@@ -119,8 +119,7 @@ L., Weiss, Y. and Bottou, L., eds.), vol. 17, MIT Press.
   
   “Understand Your Dataset with Xgboost.” Understand Your Dataset with XGBoost - Xgboost 2.1.3 Documentation, xgboost.readthedocs.io/en/latest/R-package/discoverYourData.html. Accessed 11 Dec. 2024. 
   
-  ### How do I reference / cite???
-  https://www.css.cornell.edu/faculty/dgr2/_static/files/R_html/CompareRandomForestPackages.html#4_Conclusion 
+ “Variable Importance for Support Vector Machine and Naive Bayes Classifiers in R.” GeeksforGeeks, GeeksforGeeks, 12 July 2024, www.geeksforgeeks.org/variable-importance-for-support-vector-machine-and-naive-bayes-classifiers-in-r/. 
   
-  https://www.geeksforgeeks.org/variable-importance-for-support-vector-machine-and-naive-bayes-classifiers-in-r/
+
   
