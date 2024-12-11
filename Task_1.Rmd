@@ -899,7 +899,7 @@ print(svm_metrics_table)
 
 ### With PCA
 
-```{r pc_decomp, eval = FALSE}
+```{r pc_decomp}
 # Perform PCA to get first 10 principal components
 pca_start <- Sys.time()
 
@@ -999,7 +999,7 @@ lda_pca_misclas <- mean(lda_pca_pred != test_data_pca$label)
 plot(lda_pca_roc_curve, col = "red", main = "ROC Curve for lda")
 ```
 
-```{r lda_PCA_evaluation}
+```{r lda_pca_evaluation}
 # Create a table of the evaluation metrics
 lda_pca_metrics_table <- data.frame(
   Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
@@ -1049,7 +1049,7 @@ log_pca_misclas <- mean(log_pca_pred != test_data_pca$label)
 plot(log_pca_roc_curve, col = "red", main = "ROC Curve for log")
 ```
 
-```{r log_PCA_evaluation}
+```{r log_pca_evaluation}
 # Create a table of the evaluation metrics
 log_pca_metrics_table <- data.frame(
   Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
@@ -1105,7 +1105,7 @@ qda_pca_misclas <- mean(qda_pca_pred != test_data_pca$label)
 plot(qda_pca_roc_curve, col = "red", main = "ROC Curve for QDA")
 ```
 
-```{r qda_PCA_evaluation}
+```{r qda_pca_evaluation}
 # Create a table of the evaluation metrics
 qda_pca_metrics_table <- data.frame(
   Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
@@ -1250,7 +1250,7 @@ gbm_pca_misclas <- mean(gbm_pca_pred != test_data_pca$label)
 plot(gbm_pca_roc_curve, col = "red", main = "ROC Curve for gbm")
 ```
 
-```{r gbm_PCA_evaluation}
+```{r gbm_pca_evaluation}
 # Create a table of the evaluation metrics
 gbm_pca_metrics_table <- data.frame(
   Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
@@ -1318,7 +1318,7 @@ rf_pca_misclas <- mean(rf_pca_pred != test_data_pca$label)
 plot(rf_pca_roc_curve, col = "red", main = "ROC Curve for rf")
 ```
 
-```{r rf_PCA_evaluation}
+```{r rf_pca_evaluation}
 # Create a table of the evaluation metrics
 rf_pca_metrics_table <- data.frame(
   Metric = c("Accuracy", "Balanced Accuracy", "F1 Score", "AUC (ROC)", "Misclassification Rate"),
