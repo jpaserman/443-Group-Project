@@ -19,12 +19,7 @@ The focus of the following analysis is to attempt to achieve high classification
 We were given one dataset that contains binary features that describe the three-dimensional properties of a molecule in a compound or a random probe across different compounds. The data contains 800 observations, which represent 800 compounds, and 100,000 columns (50,000 real variables and 50,000 random probes). The first column named $label$ represents whether a compound bound to a target site on thrombin^[Thrombin is an enzyme that plays a key role in blood clotting and other biological processes.].
 
 ## Exploratory Data Analysis 
-Most of our exploratory data analysis was undertaken with the goal of preliminary feature reduction prior to model implementation. After confirming that there were no missing values within our data, we aim to remove features with extremely low to zero variance. The following histograms depict the number of compounds found to have bound to a particular target site and the associated variance ...
-
-
--mention traintest split as well
--imbalanced data
--var threshold
+Most of our exploratory data analysis was undertaken with the goal of preliminary feature reduction prior to model implementation. After confirming that there were no missing values within our data, we aim to remove features with extremely low to zero variance. The below histograms depict the number of compounds found to have bound to the target site and the variance associated with a given feature respectively. Notice how extremely right skewed both plots are, indicating a high density of features with low variance due to being largely associated with the negative class of compounds not binding. Features that contain little to no variance are not likely to be informative in explaining and as such, are not worthwhile to retain. By setting a variance threshold of 0.01, associated with a feature having less than or equal to 8 compounds binding out of 800, we are able to reduce the number of features in the dataset from 100,000 to only a little over 30,000. This will greatly speed up the subsequent feature reduction models and hopefully make our results more interpretable. However, even with decreasing our features to 30,000 there are some models that might struggle with the computational cost of training on the entire dataset. Therefore, we construct an additional subset of the dataset that solely contains the top 1,000 features that are highly correlated with the $label$. The only feature reduction models that utilize this extremely subset dataset are FSS and random forest, with the later solely using as a benchmark comparison as opposed to within the final model. You can assume otherwise if not specified, that the following models use the dataset that contains roughly 30,000 features. Lastly, an important aspect to note is that in terms of classes for the $label$ our data is very skewed with less than 10% (78/800) of the compounds being associated with the positive class. This structure of the data and its implications will be expanded upon later at the conclusion of the report.
 
 ```{r, echo=FALSE, out.width="50%"}
 par(mfrow = c(2,1))
@@ -32,7 +27,6 @@ knitr::include_graphics("images/Task2_EDA_freq.png")
 knitr::include_graphics("images/Task2_EDA_var.png")
 
 ```
-
 
 ## Models
 #### Lasso
@@ -47,7 +41,22 @@ The first model we attempted to run was logistic classifier with a Lasso-Penalty
 
 #### Forward Stepwise Selection (FSS)
 
+Even though utilizing the approach of selecting features via maximizing the Adjusted R-squared as opposed to minimizing BIC....
+we decided upon proceeding with BIC as the evaluation criteria due to having nearly half of the number of selected features in the final model.
+
+| Evaluation Criteria | Number of Selected Features | Balanced Accuracy |
+|---------------------|-----------------------------|-------------------|
+| Adjusted R^2        | 383                         | 0.8257            |
+| BIC                 | 208                         | 0.7804814         |
+
 #### Random Forest
+
+
+
+| Package      | Initial Data # of Features | Number of Trees | Number of Selected Features | Balanced Accuracy |
+|--------------|----------------------------|-----------------|-----------------------------|-------------------|
+| randomForest | 1049                       | 5               | 785                         | 0.7974882         |
+| ranger       | 30122                      | 5               | 100                         | 0.8223443         |
 
 #### Elastic Net
 After the results obtained from the logistic classification method with a lasso penalty term, we thought that it could be interesting to compare with the results of an elastic net. An elastic net is another regularization technique which combines both the Lasso (L1) and the Ridge (L2)^[The Ridge Regularization technique is one that shrinks the coefficients on the predictors, but never to 0, so it keeps all coefficients in a model.] penalties.Since the elastic net penalty is not as harsh as the Lasso penalty, we assumed it will return more features, but we were interested in seeing if the elastic net could improve the balanced accuracy. The elastic net penalty depends on two main parameters, $\lambda$, (the strength of the penalty term) and $\alpha$ (the mix between Lasso and Ridge). We use a process very similar to the one used for the Lasso penalty term on the logistic regression, only we also try different values of $\alpha$. The table below shows results for the best scores, worst scores, and worst balanced accuracy on the validation set:
@@ -65,8 +74,6 @@ We attempted to use the XGBoost (Extreme Gradient Boosting) algorithm. XGBoost, 
 ```{r, echo=FALSE, out.width="80%", fig.align="left"}
 knitr::include_graphics("images/xgb_selected_features_importance.png")
 ```
-
-
 
 #### Support Vector Machines (SVM)
 
@@ -88,7 +95,7 @@ knitr::include_graphics("images/xgb_selected_features_importance.png")
 ## Conclusion
 The results above, lead us that there is an inherent trade-off between the number of features, the evaluation metrics such as the balanced accuracy on the test data. The reason we care about taking into consideration the smaller amount of number of features has to do with both efficiency and interpretability. For example, if one were to conduct future research, they could focus on a smaller subset of features. 
 
-Depending on one's preferences and goals, either the Elastic Net or the SVM model seem to be good models for the classification for whether a compound will bind to a target site. 
+It is best to compare the evaluation metrics across different models when they contain relatively similar quantities of features. For instance, when comparing Random Forest, the Elastic Net, and XGBoost, which all have similar quantity of features in their final model, we see that the Elastic Net contains the highest value of balanced accuracy, accuracy, and F1 score out of the three. Similarly, when comparing Logistic Lasso and SVM, the SVM is strickly better across the metrics of balanced accuracy, accuracy, and F1. Depending on one's preferences and goals, either the Elastic Net or the SVM model seem to be good models for the classification for whether a compound will bind to a target site. 
 
 #### Strengths and Weaknesses
 Our first attempt at running many of our models, we encountered computational/memory limit-issues. To combat this, we had to aggressively reduce the dimensionality of our data before feature selection from our models could take place. We subset the data based off of features' variance, removing features with less than 0.01 variance. Ideally we would have been able to run the entire original data (100,000 features) through the models and allow them to *naturally* select the relevant features. 
