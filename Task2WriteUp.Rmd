@@ -30,8 +30,8 @@ knitr::include_graphics("images/Task2_EDA_var.png")
 
 However, even with decreasing our features to 30,000 there are some models that might struggle with the computational cost of training on the dataset. Therefore, we construct an additional subset of the data that solely contains the top 1,000 features that are highly correlated with the $label$. The only feature reduction models that utilize this extremely subset dataset are forward stepwise selection (FSS) and random forest, with the later solely using the subset as a benchmark rather than within the final model. One can assume that if not otherwise specified, any following models use the dataset that contains roughly 30,000 features. Lastly, an important aspect to note is that in terms of classes for the $label$ our data is very skewed with less than 10% (78/800) of the compounds being associated with the positive class (1) which would indicate that the compound bound with the target site. This structure of the data and its implications will be expanded upon later at the conclusion of the report.
 
-```{r, echo=FALSE, out.width="50%"}
-knitr::include_graphics("images/bar_chart_eda_2.png")
+```{r, echo=FALSE, out.width="50%", fig.align='center'}
+knitr::include_graphics("images/barrchart_eda_2.png")
 ```
 
 ## Models
@@ -119,8 +119,7 @@ L., Weiss, Y. and Bottou, L., eds.), vol. 17, MIT Press.
   
   “Understand Your Dataset with Xgboost.” Understand Your Dataset with XGBoost - Xgboost 2.1.3 Documentation, xgboost.readthedocs.io/en/latest/R-package/discoverYourData.html. Accessed 11 Dec. 2024. 
   
-  ### How do I reference / cite???
-  https://www.css.cornell.edu/faculty/dgr2/_static/files/R_html/CompareRandomForestPackages.html#4_Conclusion 
+ “Variable Importance for Support Vector Machine and Naive Bayes Classifiers in R.” GeeksforGeeks, GeeksforGeeks, 12 July 2024, www.geeksforgeeks.org/variable-importance-for-support-vector-machine-and-naive-bayes-classifiers-in-r/. 
   
-  https://www.geeksforgeeks.org/variable-importance-for-support-vector-machine-and-naive-bayes-classifiers-in-r/
+
   
